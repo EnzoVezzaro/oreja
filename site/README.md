@@ -35,11 +35,15 @@ Vercel's Git integration owns the deploy; GitHub Actions owns the check.
 | Production branch | `main` |
 | Root directory | `site` |
 | Framework | Other (static output; no `package.json`, so no build or install runs) |
-| Skip deployments | Enabled when nothing under `site/` changed |
+| Ignored Build Step | `git diff HEAD^ HEAD --quiet -- .` — build only when `site/` changed |
 
 On a push to `main` that touches `site/`, Vercel publishes production. Pull requests and other
-branches get preview deployments. Pushes that only change the macOS app, packages, or docs are
-skipped, so they cannot break the site deployment.
+branches get preview deployments. Pushes that only change the macOS app, packages, docs, or
+workflows are skipped before a build starts; Vercel may list the skipped attempt as canceled.
+
+The custom step is required because Vercel's automatic skip only supports npm, yarn, pnpm, or Bun
+workspaces, and this repository is Swift. With `site` as the root directory, `git diff HEAD^ HEAD
+--quiet -- .` exits 0 when nothing under `site/` changed, which tells Vercel to skip the build.
 
 `.github/workflows/site.yml` runs `scripts/check-site.py` for every change under `site/` and on
 pull requests. The check fails on unbalanced HTML, duplicate ids, broken internal links, undefined
