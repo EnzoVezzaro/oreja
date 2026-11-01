@@ -41,10 +41,22 @@ Symptom: monitoring works, but music never pauses; diagnostics records a permiss
    prompt on the next check.
 3. Keep Music running. Oreja deliberately never launches it.
 
+## Music comes back in the middle of a conversation
+
+Symptom: the assistant stops to work on its answer and music starts again before it speaks.
+
+Oreja reacts to audio, not to the assistant's internal state, so the only thing that holds playback
+through a silent stretch is time. **Settings › Keep music paused through a whole conversation**
+controls it: raise the seconds until your longest "thinking" pause is covered (30–45 s is comfortable
+for long answers), or lower it if you want music back sooner after a quick question. Turning it off
+restores the per-reply resume delay.
+
 ## Music is playing but Oreja does not pause it
 
 - Check that the **AI source** selection matches the app that is talking. ChatGPT app vs. browser is
-  a common mismatch.
+  a common mismatch; a browser that renders audio in a helper process needs its audio-process prefix
+  (ego lite renders in `com.citrolabs.ego.helper`, Chrome in `com.google.Chrome.helper`). Verify with
+  `build/bin/oreja-probe --bundle <prefix> --list` while the app is speaking.
 - Check that Music is actually the app playing (not Spotify, not a browser tab).
 - Watch Diagnostics for activity events. If no activity appears, the tap is not receiving audio:
   verify with the probe (below), then re-grant audio capture.
@@ -116,5 +128,26 @@ Then relaunch and complete onboarding.
 ## Diagnostics content
 
 The log holds Oreja's own state transitions (monitor start/stop, permission errors, ownership
-changes, command outcomes) in a 300-event memory buffer. It never contains audio, prompts,
-responses, or transcripts. Use "Clear" to reset it; the log disappears when the app quits.
+changes, command outcomes) in a 300-event memory buffer and mirrors them to
+`~/Library/Logs/Oreja/oreja.log` (rotated at ~1 MB). It never contains audio, prompts, responses, or
+transcripts. Use "Clear" to reset the in-app list.
+
+```bash
+tail -40 ~/Library/Logs/Oreja/oreja.log     # what Oreja actually did, with timestamps
+```
+
+## macOS is waiting for an answer from you
+
+A rebuild changes the app's ad-hoc signature, so the System Audio Recording grant no longer matches
+and macOS asks again the next time the app starts monitoring. The permission call blocks until it is
+answered, which looks like "Oreja does nothing" — no activity, no pause, and the last log line is
+`Starting audio monitor for …`. Look for the dialog (it may be behind other windows) and choose
+Allow. Sign a build with a stable identity to avoid the prompt on every build.
+
+## The menu says "Looking for the AI source"
+
+That is the waiting state: the selected app is running but has no audio process yet. ChatGPT only
+registers one once a voice session actually produces sound, and the app closes it again when the
+session ends. Oreja retries every three seconds and starts the moment the process appears, so no
+action is needed — if it never leaves this state, the source selection is usually wrong (App vs.
+browser).

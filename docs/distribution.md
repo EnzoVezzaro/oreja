@@ -1,6 +1,6 @@
 # Distribution
 
-## Current artifact
+## Current artifacts
 
 ```bash
 ./scripts/build.sh
@@ -24,6 +24,10 @@ own nested dylibs and the app aborts in dyld at launch. The hardened runtime is 
 automatically when a real identity is supplied through `OREJA_SIGN_IDENTITY`. `codesign
 --verify --strict` passes locally. The build is **not notarized**: no Developer ID credentials were
 available, and this document does not claim otherwise.
+
+`build/Oreja.dmg` is a local UDZO disk image containing that ad-hoc-signed app. It is suitable for
+local testing and packaging review, but it is not yet a public release artifact: it still needs
+Developer ID signing, notarization, release notes and a clean-Mac install test.
 
 The dylibs are linked with `@rpath` install names and copied into `Contents/Frameworks`, so the
 bundle is self-contained. Verified by hiding `build/lib` and relaunching: the app still starts and

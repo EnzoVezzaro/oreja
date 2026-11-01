@@ -41,6 +41,18 @@ public struct AISourceSelection: Codable, Sendable, Equatable, Hashable {
         bundleIdentifier: "com.apple.Safari",
         displayName: "Safari"
     )
+
+    public static let egoLite = AISourceSelection(
+        kind: .browser,
+        bundleIdentifier: "com.citrolabs.ego.lite",
+        displayName: "ego lite"
+    )
+
+    /// Browsers that are known to be running, beyond the built-in choices, so the settings picker
+    /// can offer whatever the user actually has open.
+    public static func browser(bundleIdentifier: String, displayName: String) -> AISourceSelection {
+        AISourceSelection(kind: .browser, bundleIdentifier: bundleIdentifier, displayName: displayName)
+    }
 }
 
 /// Static knowledge about which applications can be monitored.
@@ -67,6 +79,22 @@ public enum AISourceCatalog {
         "company.thebrowser.Browser",
         "com.brave.Browser",
         "org.mozilla.firefox",
+        "com.citrolabs.ego.lite",
+    ]
+
+    /// Chromium keeps audio out of the main process: it renders in a helper with its own bundle
+    /// identifier (`com.google.Chrome.helper`, `com.citrolabs.ego.helper`, …), which often does not
+    /// share the app's full identifier. Each browser therefore declares the prefix its audio
+    /// processes actually use.
+    public static let browserAudioProcessPrefixes: [String: [String]] = [
+        "com.google.Chrome": ["com.google.Chrome"],
+        "com.apple.Safari": ["com.apple.Safari", "com.apple.WebKit"],
+        "com.microsoft.edgemac": ["com.microsoft.edgemac"],
+        "company.thebrowser.Browser": ["company.thebrowser.Browser"],
+        "com.brave.Browser": ["com.brave.Browser"],
+        "org.mozilla.firefox": ["org.mozilla.firefox"],
+        // ego lite renders audio in `com.citrolabs.ego.helper`, not in `com.citrolabs.ego.lite`.
+        "com.citrolabs.ego.lite": ["com.citrolabs.ego"],
     ]
 
     public static func isChatGPT(bundleIdentifier: String?) -> Bool {
@@ -86,7 +114,7 @@ public enum AISourceCatalog {
         case .chatGPTDesktop:
             return [chatGPTPrefix] + chatGPTBundleIdentifiers
         case .browser:
-            return [selection.bundleIdentifier]
+            return browserAudioProcessPrefixes[selection.bundleIdentifier] ?? [selection.bundleIdentifier]
         }
     }
 }

@@ -6,14 +6,15 @@ import OrejaCore
 ///
 /// - Pause uses `pause`, never `stop`, so the track, queue and playback position are preserved.
 /// - Resume uses `play` only after the coordinator verified the paused track is still loaded.
-/// - The adapter never launches Music and never changes volume in the MVP.
+/// - The adapter never launches Music during coordination and only changes volume when the
+///   coordinator explicitly requests ducking.
 @MainActor
 public final class AppleMusicController: MediaPlaybackController {
     public let provider: MediaProviderID = .appleMusic
     public let capabilities = MediaCapabilities(
         canPause: true,
         canResume: true,
-        canSetVolume: false,
+        canSetVolume: true,
         canReportTrackIdentity: true,
         requiresAutomationPermission: true
     )
@@ -55,6 +56,19 @@ public final class AppleMusicController: MediaPlaybackController {
 
     public func resume() async throws {
         _ = try await resumeReporting()
+    }
+
+    public func setVolume(_ volume: Double) async throws {
+        guard isMusicRunning else { throw MediaControlError.notRunning("Music") }
+        let percent = Int((min(max(volume, 0), 1) * 100).rounded())
+        switch runner.run(AppleMusicScript.setVolume(percent)) {
+        case .success(let output):
+            guard output.trimmingCharacters(in: .whitespacesAndNewlines) == "ok" else {
+                throw MediaControlError.commandFailed("Music did not accept the volume change.")
+            }
+        case .failure(let error):
+            throw error
+        }
     }
 
     /// Pauses and returns the state Music reported inside the same Apple Event, so the caller

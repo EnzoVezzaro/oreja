@@ -8,7 +8,7 @@ public final class MockMusicController: MediaPlaybackController {
     public let capabilities = MediaCapabilities(
         canPause: true,
         canResume: true,
-        canSetVolume: false,
+        canSetVolume: true,
         canReportTrackIdentity: true,
         requiresAutomationPermission: false
     )
@@ -17,6 +17,7 @@ public final class MockMusicController: MediaPlaybackController {
     public private(set) var pauseCount = 0
     public private(set) var resumeCount = 0
     public private(set) var commands: [String] = []
+    public private(set) var volumeChanges: [Double] = []
     public var pauseError: MediaControlError?
     public var resumeError: MediaControlError?
 
@@ -50,6 +51,13 @@ public final class MockMusicController: MediaPlaybackController {
         resumeCount += 1
         snapshot.state = .playing
         snapshot.capturedAt = ProcessInfo.processInfo.systemUptime
+    }
+
+    public func setVolume(_ volume: Double) async throws {
+        let value = min(max(volume, 0), 1)
+        volumeChanges.append(value)
+        commands.append("volume:\(value)")
+        snapshot.volume = value
     }
 
     /// Simulates a user action in the music app (manual pause/resume/track change).

@@ -47,7 +47,7 @@ paths in sync when moving files.
 ## Test
 
 ```bash
-./scripts/test.sh             # all 42 tests
+./scripts/test.sh             # all 44 tests
 ./scripts/test.sh resume      # name filter
 ./build/bin/oreja-probe --list
 ./build/bin/oreja-probe --pid <pid> --seconds 6

@@ -69,6 +69,52 @@ func runMediaAndSettingsSuite(_ t: Harness) async {
         t.expect(resume.contains("if playerStatus is \"playing\" then"), "resume waits for the playing state")
     }
 
+    t.run("user speech keeps the activity window open while the AI is quiet") {
+        var aggregator = ActivityAggregator()
+        t.expect(!aggregator.isActive)
+
+        t.expect(aggregator.set(true, for: .ai), "AI speech starts the window")
+        t.expect(aggregator.isActive)
+        t.expect(!aggregator.set(true, for: .user), "the user speaking does not restart it")
+
+        // ChatGPT goes quiet while the user answers: the window must stay open, which is the whole
+        // point of merging both sources.
+        t.expect(!aggregator.set(false, for: .ai), "AI silence alone must not end the window")
+        t.expect(aggregator.isActive, "music stays paused while the user is talking")
+
+        t.expect(aggregator.set(false, for: .user), "the user going quiet ends the window")
+        t.expect(!aggregator.isActive)
+
+        // The reverse order must behave the same way.
+        t.expect(aggregator.set(true, for: .user))
+        t.expect(!aggregator.set(true, for: .ai))
+        t.expect(!aggregator.set(false, for: .user))
+        t.expect(aggregator.isActive)
+        t.expect(aggregator.set(false, for: .ai))
+
+        aggregator.set(true, for: .ai)
+        aggregator.reset()
+        t.expect(!aggregator.isActive, "reset clears both sources")
+    }
+
+    t.run("pause-while-I-speak is off by default and survives a settings round trip") {
+        t.expectEqual(AppSettings().pauseWhileISpeak, false)
+
+        let suiteName = "com.oreja.tests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let store = UserDefaultsSettingsStore(defaults: defaults)
+        var settings = AppSettings()
+        settings.pauseWhileISpeak = true
+        store.save(settings)
+        t.expect(store.load().pauseWhileISpeak)
+
+        // Older builds' JSON has no such key; it must decode as off rather than fail.
+        let legacy = #"{"automationEnabled":true,"resumeDelay":0.8}"#
+        let decoded = try? JSONDecoder().decode(AppSettings.self, from: Data(legacy.utf8))
+        t.expectEqual(decoded?.pauseWhileISpeak, false)
+    }
+
     await t.runAsync("providers without a reporting script fall back to pause plus a state read") {
         let fake = ScriptedMediaController(state: .playing)
         let paused = try await fake.pauseReporting()
@@ -92,7 +138,7 @@ func runMediaAndSettingsSuite(_ t: Harness) async {
         settings.resumeDelay = 99
         t.expectClose(settings.resumeDelay, 3.0)
         settings.resumeDelay = 0.1
-        t.expectClose(settings.resumeDelay, 0.3)
+        t.expectClose(settings.resumeDelay, 0.1)
         settings.resumeDelay = 1.4
         settings.aiSource = .safari
         settings.launchAtLogin = true
@@ -103,7 +149,32 @@ func runMediaAndSettingsSuite(_ t: Harness) async {
         let decoded = try! JSONDecoder().decode(AppSettings.self, from: data)
         t.expectEqual(decoded, settings)
         t.expectClose(decoded.policy.quietInterval, 1.4)
+        t.expectClose(decoded.policy.conversationHold, 0, "conversation hold is disabled by default for immediate volume restore")
+        t.expectClose(decoded.policy.resumeWait, 1.4)
+        t.expectEqual(decoded.interruptionMode, .duck)
+        t.expectEqual(decoded.duckVolumePercent, 5)
+        t.expectEqual(decoded.restoreVolumePercent, 100)
+        settings.duckVolumePercent = 100
+        t.expectEqual(settings.duckVolumePercent, 100, "keep music volume accepts the full range")
+        settings.restoreVolumePercent = 67
+        t.expectClose(settings.policy.restoreVolume, 0.67)
         t.expectEqual(decoded.aiSource.bundleIdentifier, "com.apple.Safari")
+    }
+
+    t.run("conversation hold is clamped and can be switched off") {
+        var settings = AppSettings()
+        t.expectEqual(settings.holdThroughConversation, true)
+        settings.conversationHold = -1
+        t.expectClose(settings.conversationHold, AppSettings.conversationHoldRange.lowerBound)
+        settings.conversationHold = 999
+        t.expectClose(settings.conversationHold, AppSettings.conversationHoldRange.upperBound)
+
+        settings.conversationHold = 20
+        t.expectClose(settings.policy.resumeWait, 20)
+
+        settings.holdThroughConversation = false
+        t.expectClose(settings.policy.conversationHold, 0)
+        t.expectClose(settings.policy.resumeWait, settings.resumeDelay, "per-reply mode uses the quiet interval")
     }
 
     t.run("settings decode tolerates missing and unknown fields") {
@@ -202,6 +273,23 @@ func runMediaAndSettingsSuite(_ t: Harness) async {
         t.expect(AIAudioSourceDescriptor(selection: .safari).isExperimental)
     }
 
+    t.run("browsers are tapped where their audio actually renders") {
+        // Chromium renders audio in a helper process whose bundle identifier is a prefix of the
+        // browser's own id — but not always of the full one, which is the ego lite case.
+        t.expect(AISourceCatalog.isBrowser(bundleIdentifier: "com.citrolabs.ego.lite"))
+        t.expectEqual(
+            AIAudioSourceDescriptor(selection: .egoLite).bundleIdentifierPrefixes,
+            ["com.citrolabs.ego"]
+        )
+        t.expectEqual(
+            AIAudioSourceDescriptor(selection: .chrome).bundleIdentifierPrefixes,
+            ["com.google.Chrome"]
+        )
+        // An unknown browser still taps its own bundle identifier.
+        let custom = AISourceSelection.browser(bundleIdentifier: "com.example.browser", displayName: "Example")
+        t.expectEqual(AIAudioSourceDescriptor(selection: custom).bundleIdentifierPrefixes, ["com.example.browser"])
+    }
+
     t.run("PlaybackPolicy clamps the quiet interval") {
         let clampedLow = PlaybackPolicy(
             quietInterval: 0.1,
@@ -211,8 +299,21 @@ func runMediaAndSettingsSuite(_ t: Harness) async {
             restoreOwnedPauseOnFailure: true,
             staleOwnershipLifetime: 100
         )
-        t.expectClose(clampedLow.quietInterval, 0.3)
+        t.expectClose(clampedLow.quietInterval, 0.1)
         t.expectClose(PlaybackPolicy.default.quietInterval, 0.8)
+        t.expectClose(PlaybackPolicy.default.conversationHold, 0, "the plain policy returns after each reply")
+
+        let held = PlaybackPolicy(
+            quietInterval: 0.8,
+            minimumActivityDuration: 0.06,
+            minimumSilenceDuration: 0.25,
+            failureLimit: 3,
+            restoreOwnedPauseOnFailure: true,
+            staleOwnershipLifetime: 100,
+            conversationHold: 500
+        )
+        t.expectClose(held.conversationHold, PlaybackPolicy.conversationHoldRange.upperBound)
+        t.expectClose(held.resumeWait, PlaybackPolicy.conversationHoldRange.upperBound)
     }
 
     await t.runAsync("mock provider records commands for adapter-level tests") {

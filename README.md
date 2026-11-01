@@ -2,8 +2,9 @@
 
 **Your AI talks. Your music listens.**
 
-Oreja is a tiny macOS menu bar companion with one job: when ChatGPT starts speaking, Apple Music
-pauses; when ChatGPT goes quiet, Apple Music resumes exactly where it left off.
+Oreja is a tiny macOS menu bar companion with one job: when the selected AI app starts speaking,
+Oreja either pauses Apple Music or lowers its volume, depending on your chosen mode. When the app
+goes quiet, Music resumes or its original volume returns exactly where it left off.
 
 - It runs alongside ChatGPT. It does not replace it, proxy it, or change your account.
 - It needs no OpenAI API key, no account, and no network connection.
@@ -64,7 +65,7 @@ Onboarding runs once per install; to see it again, quit Oreja and delete its def
 To run the automated suite:
 
 ```bash
-./scripts/test.sh             # 42 tests, 0 failures
+./scripts/test.sh             # 44 tests, 0 failures
 ./scripts/test.sh resume      # filter by test name
 ```
 
@@ -86,17 +87,25 @@ Oreja asks for two macOS permissions, each with a specific purpose string:
 | Permission | Why | Where |
 | --- | --- | --- |
 | System audio recording | Read the selected app's output level through a Core Audio process tap | System Settings › Privacy & Security › Screen & System Audio Recording |
-| Automation (Music) | Pause and resume the Music app | The macOS prompt on first control, then System Settings › Privacy & Security › Automation |
+| Automation (Music) | Pause, resume, or adjust the Music app's volume, depending on the selected mode | The macOS prompt on first control, then System Settings › Privacy & Security › Automation |
 
-No microphone, screen content, accessibility, full disk, contacts, or network access is used.
+No microphone is needed by default. The optional “Pause while I speak” setting uses microphone level
+only; Oreja does not request screen content, accessibility, full disk, contacts, or network access.
 Details and reset commands: [docs/permissions.md](docs/permissions.md).
 
 ## Using Oreja
 
 - **Automation switch** in the menu bar panel enables or disables coordination. Turning it off while
-  Oreja holds a pause resumes your music first.
-- **Resume delay** (Settings, 0.3–3.0 s, default 0.8 s) is how long ChatGPT must stay quiet before
-  music resumes. This is layered on top of the detector's 0.25 s silence window.
+  Oreja owns a pause or volume change restores Music first.
+- **Conversation hold** (Settings, 0–60 s, default 0 s) can keep music interrupted through the
+  silent stretches while the assistant works on an answer. Set it above zero when you want that
+  conversation-wide behavior; otherwise Music returns after the resume delay.
+- **Resume delay** (Settings, 0.3–3.0 s, default 0.8 s) is how long the AI must stay quiet before
+  music resumes when the conversation hold is off. Both are layered on top of the detector's 0.25 s
+  silence window.
+- **Pause while I speak** (off by default, needs the microphone) keeps the music paused while you
+  answer. When enabled, the microphone can also start a pause when the person speaks first;
+  headphones are recommended so music does not feed back into the microphone.
 - **Manual control always wins.** If you pause Music yourself, Oreja will not resume it. If you
   resume Music while ChatGPT is speaking, Oreja releases its claim and will pause again the next
   time ChatGPT speaks.
@@ -113,7 +122,7 @@ attention.
 
 Executed on this machine (macOS 26.6.2, Apple M2, Swift 6.3.3):
 
-- ✅ **42/42 automated tests pass** (211 assertions): pause, resume, stale-state recovery, sentence gaps, manual pause and resume, process exit, Music exit, permission revoked, device change, rapid responses, sleep/wake, ownership reconciliation, quit restoration, delayed commands, command-failure limits, detector thresholds/hysteresis, AppleScript parsing, one-round-trip command scripts, settings, journal recovery.
+- ✅ **53/53 automated tests pass** (278 assertions): pause, resume, stale-state recovery, sentence gaps, conversation hold, volume ducking, user-first speech pause, manual pause and resume, process exit, Music exit, permission revoked, device change, rapid responses, sleep/wake, ownership reconciliation, quit restoration, delayed commands, command-failure limits, detector thresholds/hysteresis, AppleScript parsing, one-round-trip command scripts, settings, journal recovery.
 - ✅ **App bundle builds, signs, and launches**: the menu bar app stays resident, maps only its own
   `Contents/Frameworks` dylibs, and idles at 0.0–0.1% CPU with a ~37–54 MB physical footprint.
   A packaging bug that made the app abort in dyld at launch was found and fixed; see
@@ -150,10 +159,11 @@ packages/OrejaMedia/            Apple Music Apple Events adapter, mock provider
 Tests/OrejaTestRunner/          Executable test suite (no XCTest runtime required)
 tools/AudioProbe/               Developer capture probe (--list / --bundle / --pid)
 tools/IntegrationHarness/       Real tap → coordinator → Apple Music measurement harness
-tools/IconBuilder/              Generates AppIcon.icns
+tools/IconBuilder/              Generates AppIcon.icns from the brand mark
 packaging/                      Info.plist, entitlements
 scripts/                        build.sh, test.sh
-docs/                           Architecture, feasibility, permissions, compatibility, roadmap…
+docs/                           Architecture, feasibility, permissions, compatibility, brand…
+site/                           Static landing page and documentation page (no build step)
 ```
 
 ## Privacy
@@ -178,12 +188,34 @@ There is no analytics SDK and no server. Full text: [docs/privacy.md](docs/priva
 See [docs/roadmap.md](docs/roadmap.md). Next milestone: a supervised live test against a real
 ChatGPT Voice session and Apple Music, including measured pause/resume latency and a device matrix.
 
+## Brand and site
+
+One brand system across the app and the site: warm paper, warm ink, one indigo for focus and one
+wheat accent for a held pause. Palette, type scale, voice rules and mark usage are in
+[docs/brand.md](docs/brand.md); the tokens live in `apps/macos/Theme.swift` and `site/styles.css`
+and must change together.
+
+The landing and documentation pages are static and need no build step:
+
+```bash
+open site/index.html                     # or:
+python3 -m http.server 8000 -d site      # http://localhost:8000
+```
+
+See [site/README.md](site/README.md) for what is in the folder and the rules it follows.
+
 ## License
 
-MIT — see [LICENSE](LICENSE).
+GPL-3.0-only — see [LICENSE](LICENSE). Repo Shield's [NOTICE](NOTICE) and [AI training policy](AI_TRAINING_POLICY.md)
+document the repository's position on AI-training use without changing GPL's open-source rights.
+
+See [TRADEMARKS.md](TRADEMARKS.md) for the project's name, logo and endorsement
+position.
 
 ## More documentation
 
+- [Brand guidelines](docs/brand.md)
 - [Apple Music connection guide](docs/apple-music.md)
 - [ChatGPT sources on macOS](docs/chatgpt-sources.md)
 - [Test results log](docs/test-results.md) and [consolidated evidence](docs/test-evidence.md)
+- [Landing and docs pages](site/README.md)

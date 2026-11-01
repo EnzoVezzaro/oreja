@@ -68,8 +68,9 @@
         <section id="start">
           <h2>Quick start</h2>
           <p>
-            Oreja is a menu bar app for macOS with one job: pause Apple Music while the AI app you
-            choose is speaking, and resume it when the reply ends.
+            Oreja is a menu bar app for macOS with one job: coordinate Apple Music while the AI app you
+            choose is speaking. You can pause and resume Music, or keep it playing at a lower volume and
+            restore that volume when the reply ends.
           </p>
           <h3>What you need</h3>
           <ul>
@@ -103,14 +104,15 @@ open build/Oreja.app</code></pre>
               </thead>
               <tbody>
                 <tr><td>System audio recording</td><td>Read the selected app's output level through a Core Audio process tap.</td><td>System Settings › Privacy &amp; Security › Screen &amp; System Audio Recording</td></tr>
-                <tr><td>Automation (Music)</td><td>Pause and resume the Music app.</td><td>The macOS prompt on first control, then Privacy &amp; Security › Automation</td></tr>
+                <tr><td>Automation (Music)</td><td>Pause, resume, or adjust the Music app's volume, depending on the selected mode.</td><td>The macOS prompt on first control, then Privacy &amp; Security › Automation</td></tr>
               </tbody>
             </table>
           </div>
           <p>
-            No microphone, screen content, accessibility, full disk, contacts, location or network
-            access is used. If you rebuild the app, macOS may treat it as a new app because its
-            ad-hoc signature changed: grant audio capture again.
+            No microphone is needed by default, and Oreja never requests screen content, accessibility,
+            full disk, contacts, location or network access. The optional “Pause while I speak” setting
+            uses microphone level only. If you rebuild the app, macOS may treat it as a new app because
+            its ad-hoc signature changed: grant audio capture again.
           </p>
           <pre><code>tccutil reset AudioCapture app.oreja.van-gogh
 tccutil reset AppleEvents app.oreja.van-gogh</code></pre>
@@ -119,8 +121,10 @@ tccutil reset AppleEvents app.oreja.van-gogh</code></pre>
         <section id="using">
           <h2>Using Oreja</h2>
           <ul>
-            <li><strong>The switch</strong> in the panel enables or disables coordination. Turning it off while Oreja holds a pause resumes your music first.</li>
+            <li><strong>The switch</strong> in the panel enables or disables coordination. Turning it off while Oreja owns a pause or volume change restores Music first.</li>
+            <li><strong>Interruption mode</strong> lets you choose between pausing and resuming Music, or keeping it playing at a lower volume and restoring the original volume afterward.</li>
             <li><strong>Resume delay</strong> (0.3–3.0 s, default 0.8 s) is how long ChatGPT must stay quiet before music resumes. It is layered on top of the detector's 0.25 s silence window.</li>
+            <li><strong>Pause while I speak</strong> optionally includes your microphone activity, so Music also responds while you answer.</li>
             <li><strong>Manual control always wins.</strong> If you pause Music yourself, Oreja will not resume it. If you resume Music while ChatGPT speaks, Oreja releases its claim.</li>
             <li><strong>Quitting</strong> while Oreja owns a pause restores playback before exit. The pause journal can restore it on the next launch, but only when the same track is still paused and the pause is recent.</li>
           </ul>
@@ -139,8 +143,8 @@ tccutil reset AppleEvents app.oreja.van-gogh</code></pre>
                 <tr><td>Looking for the AI source</td><td>Automation is on but no monitor is running.</td><td>Open ChatGPT; check the selected source matches the app that is running.</td></tr>
                 <tr><td>Monitoring ChatGPT</td><td>The monitor is alive and the AI is quiet.</td><td>Ask ChatGPT a question and watch for "ChatGPT is speaking".</td></tr>
                 <tr><td>Music playing</td><td>The AI is quiet and music is playing.</td><td>Normal while ChatGPT is silent.</td></tr>
-                <tr><td>ChatGPT is speaking</td><td>Activity detected; music should be paused.</td><td>If music continues, check Automation permission for Music.</td></tr>
-                <tr><td>Music paused by Oreja</td><td>Oreja owns the pause.</td><td>It resumes after the quiet interval.</td></tr>
+                <tr><td>ChatGPT is speaking</td><td>Activity detected; Music is paused or its volume is reduced, depending on the selected mode.</td><td>If Music does not respond, check Automation permission for Music.</td></tr>
+                <tr><td>Music paused or volume reduced by Oreja</td><td>Oreja owns the current interruption.</td><td>Music resumes or its original volume returns after the quiet interval.</td></tr>
                 <tr><td>Waiting for silence</td><td>The AI stopped; the resume delay is counting.</td><td>Adjust the delay in Settings.</td></tr>
                 <tr><td>Resuming music</td><td>A resume command is in flight.</td><td>A failure is shown with a reason.</td></tr>
                 <tr><td>Suspended</td><td>The Mac slept.</td><td>Wake it; state reconciles automatically.</td></tr>
@@ -165,7 +169,7 @@ tccutil reset AppleEvents app.oreja.van-gogh</code></pre>
             <li>Restart Oreja after changing the setting.</li>
             <li>If you rebuilt the app, its ad-hoc signature changed: grant again.</li>
           </ol>
-          <p>Do not grant Microphone or Accessibility. They are not used.</p>
+          <p>Do not grant Accessibility. Microphone access is optional and only needed for “Pause while I speak.”</p>
 
           <h3>Music never pauses</h3>
           <ul>
@@ -314,12 +318,12 @@ Apple Music playback ← Apple Events ← pause / resume commands ┘</code></pr
           <a href="index.html#verified">Verification</a>
           <a href="#start">Quick start</a>
           <a href="#privacy">Privacy</a>
-          <a href="https://opensource.org/license/mit">License (MIT)</a>
+          <a href="https://opensource.org/license/gpl-3.0">License (GPL-3.0-only)</a>
         </nav>
       </div>
       <p class="footer-fine">
-        Independent project. Not affiliated with OpenAI or Apple. Built with Swift and no third-party
-        dependencies.
+        Independent project. Not affiliated with OpenAI or Apple. Built with AI-assisted development
+        and human review.
       </p>
     </div>
   </footer>

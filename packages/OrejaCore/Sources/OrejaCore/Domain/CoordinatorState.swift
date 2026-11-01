@@ -16,9 +16,23 @@ public enum CoordinatorState: String, Sendable, Equatable, CaseIterable {
     case error
 }
 
+public enum MusicInterruptionMode: String, Codable, Sendable, Equatable, CaseIterable {
+    case pause
+    case duck
+}
+
 public struct PlaybackPolicy: Sendable, Equatable {
+    public var interruptionMode: MusicInterruptionMode
+    public var duckVolume: Double
+    /// Volume to restore when the conversation becomes quiet.
+    public var restoreVolume: Double
     /// How long the AI must be quiet before music resumes.
     public var quietInterval: TimeInterval
+    /// How long music stays paused once a conversation is under way. In a spoken conversation the
+    /// assistant is silent while it works on the answer and while the user talks, so returning music
+    /// after `quietInterval` would drop it into the middle of the exchange. Zero means "return after
+    /// each reply"; the coordinator waits for the longer of this and `quietInterval`.
+    public var conversationHold: TimeInterval
     /// How long the AI must be audible before Oreja treats output as activity.
     public var minimumActivityDuration: TimeInterval
     /// Silence required before the activity stream reports `.activityEnded`.
@@ -31,6 +45,9 @@ public struct PlaybackPolicy: Sendable, Equatable {
     public var staleOwnershipLifetime: TimeInterval
 
     public static let `default` = PlaybackPolicy(
+        interruptionMode: .pause,
+        duckVolume: 0.05,
+        restoreVolume: 1.0,
         quietInterval: 0.8,
         minimumActivityDuration: 0.06,
         minimumSilenceDuration: 0.25,
@@ -39,17 +56,31 @@ public struct PlaybackPolicy: Sendable, Equatable {
         staleOwnershipLifetime: 12 * 60 * 60
     )
 
-    public static let quietIntervalRange: ClosedRange<TimeInterval> = 0.3...3.0
+    public static let quietIntervalRange: ClosedRange<TimeInterval> = 0...3.0
+    public static let conversationHoldRange: ClosedRange<TimeInterval> = 0...60
+
+    /// Silence Oreja waits for before touching playback again.
+    public var resumeWait: TimeInterval {
+        max(quietInterval, conversationHold)
+    }
 
     public init(
+        interruptionMode: MusicInterruptionMode = .pause,
+        duckVolume: Double = 0.05,
+        restoreVolume: Double = 1.0,
         quietInterval: TimeInterval,
         minimumActivityDuration: TimeInterval,
         minimumSilenceDuration: TimeInterval,
         failureLimit: Int,
         restoreOwnedPauseOnFailure: Bool,
-        staleOwnershipLifetime: TimeInterval
+        staleOwnershipLifetime: TimeInterval,
+        conversationHold: TimeInterval = 0
     ) {
+        self.interruptionMode = interruptionMode
+        self.duckVolume = min(max(duckVolume, 0), 1)
+        self.restoreVolume = min(max(restoreVolume, 0), 1)
         self.quietInterval = min(max(quietInterval, Self.quietIntervalRange.lowerBound), Self.quietIntervalRange.upperBound)
+        self.conversationHold = min(max(conversationHold, Self.conversationHoldRange.lowerBound), Self.conversationHoldRange.upperBound)
         self.minimumActivityDuration = minimumActivityDuration
         self.minimumSilenceDuration = minimumSilenceDuration
         self.failureLimit = failureLimit
@@ -66,6 +97,24 @@ public struct PauseOwnership: Sendable, Equatable {
     public init(track: MediaTrack?, provider: MediaProviderID, acquiredAt: TimeInterval) {
         self.track = track
         self.provider = provider
+        self.acquiredAt = acquiredAt
+    }
+}
+
+public struct VolumeOwnership: Sendable, Equatable {
+    public var track: MediaTrack?
+    public var provider: MediaProviderID
+    public var originalVolume: Double
+    public var duckVolume: Double
+    public var restoreVolume: Double
+    public var acquiredAt: TimeInterval
+
+    public init(track: MediaTrack?, provider: MediaProviderID, originalVolume: Double, duckVolume: Double, restoreVolume: Double? = nil, acquiredAt: TimeInterval) {
+        self.track = track
+        self.provider = provider
+        self.originalVolume = originalVolume
+        self.duckVolume = duckVolume
+        self.restoreVolume = restoreVolume ?? originalVolume
         self.acquiredAt = acquiredAt
     }
 }

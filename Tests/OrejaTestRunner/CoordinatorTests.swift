@@ -65,6 +65,118 @@ func runCoordinatorSuite(_ t: Harness) async {
         t.expect(f.coordinator.ownership == nil, "ownership released after the resume")
     }
 
+    await t.runAsync("2c. conversation hold keeps music paused while the assistant works") {
+        var policy = PlaybackPolicy.default
+        policy.conversationHold = 12
+        let f = CoordinatorFixture(policy: policy)
+        await f.startMonitoring()
+        f.coordinator.audioActivityStarted(levelDB: -20)
+        f.completeLast(nextState: .paused)
+
+        // The reply ends; the assistant is now silently working on the next one.
+        f.coordinator.audioActivityEnded()
+        f.scheduler.advance(by: 5)
+        t.expectEqual(f.commands.count, 1, "no resume in the middle of the conversation")
+        t.expectEqual(f.coordinator.state, .waitingForSilence)
+
+        // The user answers, which restarts the hold rather than shortening it.
+        f.coordinator.audioActivityStarted(levelDB: -22)
+        f.coordinator.audioActivityEnded()
+        f.scheduler.advance(by: 11.5)
+        t.expectEqual(f.commands.count, 1, "the hold restarts after every turn")
+        f.scheduler.advance(by: 0.6)
+        t.expectEqual(f.lastCommand?.kind, .resume, "music returns once the conversation is over")
+
+        f.completeLast(nextState: .playing)
+        t.expectEqual(f.coordinator.state, .musicPlaying)
+    }
+
+    await t.runAsync("2d. per-reply mode resumes as soon as one reply ends") {
+        let f = CoordinatorFixture()
+        await f.startMonitoring()
+        f.coordinator.audioActivityStarted(levelDB: -20)
+        f.completeLast(nextState: .paused)
+
+        f.coordinator.audioActivityEnded()
+        f.scheduler.advance(by: 0.8)
+        t.expectEqual(f.lastCommand?.kind, .resume)
+    }
+
+    await t.runAsync("2e. duck mode keeps music playing and restores its volume") {
+        var policy = PlaybackPolicy.default
+        policy.interruptionMode = .duck
+        policy.duckVolume = 0.05
+        policy.restoreVolume = 0.67
+        let f = CoordinatorFixture(policy: policy)
+        f.media.snapshot.volume = 0.67
+        await f.startMonitoring()
+
+        f.coordinator.audioActivityStarted(levelDB: -20)
+        t.expectEqual(f.lastCommand?.kind, .setVolume)
+        t.expectClose(f.lastCommand?.targetVolume ?? -1, 0.05)
+        f.completeLast()
+        t.expectEqual(f.media.snapshot.state, .playing)
+        t.expectClose(f.coordinator.volumeOwnership?.originalVolume ?? -1, 0.67)
+
+        f.coordinator.audioActivityEnded()
+        f.scheduler.advance(by: 0.8)
+        t.expectEqual(f.lastCommand?.kind, .setVolume)
+        t.expect(f.lastCommand?.restoresVolume == true)
+        t.expectClose(f.lastCommand?.targetVolume ?? -1, 0.67)
+        f.completeLast()
+        t.expect(f.coordinator.volumeOwnership == nil, "volume ownership released after restore")
+        t.expectEqual(f.media.snapshot.state, .playing)
+    }
+
+    await t.runAsync("2f. duck mode preserves original volume across conversation turns") {
+        var policy = PlaybackPolicy.default
+        policy.interruptionMode = .duck
+        policy.duckVolume = 0.05
+        policy.restoreVolume = 0.67
+        policy.conversationHold = 12
+        let f = CoordinatorFixture(policy: policy)
+        f.media.snapshot.volume = 0.67
+        await f.startMonitoring()
+
+        f.coordinator.audioActivityStarted(levelDB: -20)
+        t.expectEqual(f.lastCommand?.kind, .setVolume)
+        f.completeLast()
+        t.expectClose(f.coordinator.volumeOwnership?.originalVolume ?? -1, 0.67)
+
+        f.coordinator.audioActivityEnded()
+        f.scheduler.advance(by: 5)
+        f.coordinator.audioActivityStarted(levelDB: -22)
+        t.expectEqual(f.commands(of: .setVolume).count, 1, "a later turn does not re-duck or overwrite ownership")
+        t.expectClose(f.coordinator.volumeOwnership?.originalVolume ?? -1, 0.67)
+
+        f.coordinator.audioActivityEnded()
+        f.scheduler.advance(by: 12.1)
+        t.expect(f.lastCommand?.restoresVolume == true, "the whole conversation restores volume")
+        t.expectClose(f.lastCommand?.targetVolume ?? -1, 0.67)
+    }
+
+    await t.runAsync("2g. live policy changes re-arm an active quiet timer") {
+        var policy = PlaybackPolicy.default
+        policy.interruptionMode = .duck
+        policy.duckVolume = 0.05
+        policy.restoreVolume = 0.67
+        let f = CoordinatorFixture(policy: policy)
+        f.media.snapshot.volume = 0.67
+        await f.startMonitoring()
+
+        f.coordinator.audioActivityStarted(levelDB: -20)
+        f.completeLast()
+        f.coordinator.audioActivityEnded()
+
+        var updated = policy
+        updated.quietInterval = 0
+        f.coordinator.updatePolicy(updated)
+        f.scheduler.advance(by: 0)
+
+        t.expect(f.lastCommand?.restoresVolume == true, "changing quiet interval updates an active timer")
+        t.expectClose(f.lastCommand?.targetVolume ?? -1, 0.67)
+    }
+
     await t.runAsync("3. brief silence inside a response keeps music paused") {
         let f = CoordinatorFixture()
         await f.startMonitoring()
@@ -352,12 +464,77 @@ func runCoordinatorSuite(_ t: Harness) async {
         t.expect(f.coordinator.ownership == nil)
     }
 
+    await t.runAsync("18b. an app with no audio process yet is a waiting state, not an error") {
+        let f = CoordinatorFixture()
+        await f.startMonitoring()
+
+        f.coordinator.monitoringFailed(AudioMonitoringFailure(
+            .sourceUnavailable,
+            "ChatGPT is not writing audio right now."
+        ))
+        t.expectEqual(f.coordinator.state, .searchingForSource)
+        t.expectFalseMonitoredSource(f.coordinator.sourceIsValid)
+        t.expect(
+            !f.diagnostics.events.contains { $0.level == .error },
+            "waiting for the app to speak must not look like a failure"
+        )
+
+        f.coordinator.monitoringBecameAvailable(description: "ChatGPT (2 audio processes)")
+        t.expectEqual(f.coordinator.state, .musicPlaying)
+    }
+
     await t.runAsync("19. commands are ignored without a valid source") {
         let f = CoordinatorFixture()
         f.coordinator.setAutomationEnabled(true)
         f.coordinator.audioActivityStarted(levelDB: -20)
         t.expectEqual(f.coordinator.state, .searchingForSource)
         t.expectEqual(f.commands.count, 0)
+    }
+
+    await t.runAsync("19b. user speech can start a pause when the person speaks first") {
+        let f = CoordinatorFixture()
+        await f.startMonitoring()
+
+        var activity = ActivityAggregator()
+        if activity.set(true, for: .user) {
+            f.coordinator.audioActivityStarted(levelDB: -30)
+        }
+
+        t.expectEqual(f.lastCommand?.kind, .pause, "the user's first turn pauses playing music")
+        f.completeLast(nextState: .paused)
+        t.expectEqual(f.coordinator.state, .musicPausedByOreja)
+
+        if activity.set(false, for: .user) {
+            f.coordinator.audioActivityEnded()
+        }
+        f.scheduler.advance(by: 0.81)
+        t.expectEqual(f.lastCommand?.kind, .resume, "music resumes after the user goes quiet")
+    }
+
+    await t.runAsync("20. music stays paused through a spoken exchange") {
+        let f = CoordinatorFixture()
+        await f.startMonitoring()
+
+        // ChatGPT answers, goes quiet for a moment, then the user starts answering.
+        f.coordinator.audioActivityStarted(levelDB: -20)
+        f.completeLast(nextState: .paused)
+        f.coordinator.audioActivityEnded()
+
+        var activity = ActivityAggregator()
+        if activity.set(true, for: .user) {
+            f.coordinator.audioActivityStarted(levelDB: -30)
+        }
+        t.expectEqual(f.coordinator.state, .musicPausedByOreja, "the user taking over keeps it paused")
+        t.expectEqual(f.commands.count, 1, "no second pause command for the user's turn")
+
+        if activity.set(false, for: .user) {
+            f.coordinator.audioActivityEnded()
+        }
+        t.expectEqual(f.coordinator.state, .waitingForSilence)
+        t.expectEqual(f.commands.count, 1, "nothing is resumed while the quiet interval runs")
+
+        f.scheduler.advance(by: 0.81)
+        t.expectEqual(f.lastCommand?.kind, .resume, "music returns once both sides are quiet")
     }
 }
 

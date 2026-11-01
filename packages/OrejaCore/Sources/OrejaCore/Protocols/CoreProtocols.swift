@@ -14,6 +14,9 @@ public protocol MediaPlaybackController: AnyObject {
     /// Resumes the paused track from its previous position.
     func resume() async throws
 
+    /// Sets the provider volume as a normalized value from 0 through 1.
+    func setVolume(_ volume: Double) async throws
+
     /// Pauses and reports the state observed after the command. Providers that can return the new
     /// state in the same round trip override this to save a command/observation cycle, which is the
     /// difference between a ~300 ms and a ~100 ms pause on Apple Events.
@@ -48,6 +51,9 @@ public protocol AIAudioMonitorFactory: AnyObject, Sendable {
 
 public enum AudioActivityEvent: Sendable, Equatable {
     case monitorStarted(processDescription: String)
+    /// The monitored app spawned or dropped audio processes and the tap was rebuilt. This is not a
+    /// state change for the coordinator: music must not resume because a process appeared.
+    case targetsChanged(processDescription: String)
     case monitorStopped(String)
     case monitorFailed(AudioMonitoringFailure)
     case activityStarted(levelDB: Double)

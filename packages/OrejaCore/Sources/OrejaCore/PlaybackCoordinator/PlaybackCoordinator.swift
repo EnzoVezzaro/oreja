@@ -11,18 +11,25 @@ public final class PlaybackCoordinator {
     public enum CommandKind: String, Sendable, Equatable {
         case pause
         case resume
+        case setVolume
     }
 
     public struct Command: Identifiable, Sendable, Equatable {
         public var id: UUID
         public var kind: CommandKind
         public var expectedTrack: MediaTrack?
+        public var targetVolume: Double?
+        public var originalVolume: Double?
+        public var restoresVolume: Bool
         public var issuedAt: TimeInterval
 
-        public init(id: UUID = UUID(), kind: CommandKind, expectedTrack: MediaTrack?, issuedAt: TimeInterval) {
+        public init(id: UUID = UUID(), kind: CommandKind, expectedTrack: MediaTrack?, targetVolume: Double? = nil, originalVolume: Double? = nil, restoresVolume: Bool = false, issuedAt: TimeInterval) {
             self.id = id
             self.kind = kind
             self.expectedTrack = expectedTrack
+            self.targetVolume = targetVolume
+            self.originalVolume = originalVolume
+            self.restoresVolume = restoresVolume
             self.issuedAt = issuedAt
         }
     }
@@ -35,6 +42,7 @@ public final class PlaybackCoordinator {
     private let journal: (any PauseJournal)?
     private let now: @MainActor () -> TimeInterval
     private let dateProvider: () -> Date
+    private let canSetVolume: Bool
 
     // MARK: Observable state
 
@@ -42,6 +50,7 @@ public final class PlaybackCoordinator {
     public private(set) var automationEnabled = false
     public private(set) var aiIsActive = false
     public private(set) var ownership: PauseOwnership?
+    public private(set) var volumeOwnership: VolumeOwnership?
     public private(set) var lastSnapshot: MediaPlaybackSnapshot?
     public private(set) var pendingCommand: Command?
     public private(set) var sourceIsValid = false
@@ -70,6 +79,7 @@ public final class PlaybackCoordinator {
         scheduler: (any SilenceScheduling)? = nil,
         diagnostics: (any DiagnosticsSink)? = nil,
         journal: (any PauseJournal)? = nil,
+        canSetVolume: Bool = false,
         now: @escaping @MainActor () -> TimeInterval = { ProcessInfo.processInfo.systemUptime },
         dateProvider: @escaping () -> Date = Date.init
     ) {
@@ -79,6 +89,7 @@ public final class PlaybackCoordinator {
         self.journal = journal
         self.now = now
         self.dateProvider = dateProvider
+        self.canSetVolume = canSetVolume
     }
 
     // MARK: Public API — user intent
@@ -102,12 +113,36 @@ public final class PlaybackCoordinator {
         // Disabling automation releases responsibility for any pause Oreja owns, restoring
         // the user's playback so Oreja never leaves music stuck.
         restoreOwnedPause(reason: "automation disabled")
+        restoreOwnedVolume(reason: "automation disabled")
         transition(.disabled)
         log(.info, .lifecycle, "Automation disabled.")
     }
 
     public func updatePolicy(_ policy: PlaybackPolicy) {
+        let previousPolicy = self.policy
+        let wasWaitingForSilence = silenceToken != nil
         self.policy = policy
+
+        if var volume = volumeOwnership {
+            volume.restoreVolume = policy.restoreVolume
+            volume.duckVolume = policy.duckVolume
+            volumeOwnership = volume
+
+            if aiIsActive,
+               canSetVolume,
+               pendingCommand == nil,
+               let snapshot = lastSnapshot,
+               snapshot.isPlaying,
+               let currentVolume = snapshot.volume,
+               abs(currentVolume - policy.duckVolume) > 0.02 {
+                requestVolume(policy.duckVolume, expectedTrack: snapshot.track, originalVolume: volume.originalVolume, restoresVolume: false)
+            }
+        }
+
+        if wasWaitingForSilence, previousPolicy.resumeWait != policy.resumeWait {
+            cancelSilence()
+            scheduleQuietInterval()
+        }
     }
 
     /// Re-arm automation after an error without changing settings.
@@ -150,9 +185,14 @@ public final class PlaybackCoordinator {
         activityOnsetTime = nil
         lastError = failure.message
 
-        if failure.kind == .permissionDenied {
+        switch failure.kind {
+        case .permissionDenied:
             log(.error, .permissions, "Audio capture permission unavailable: \(failure.message)")
-        } else {
+        case .sourceUnavailable:
+            // The selected app is running but has no audio process yet. ChatGPT only registers one
+            // once a voice session actually speaks, so this is a normal waiting state, not a fault.
+            log(.info, .monitoring, "Waiting for audio: \(failure.message)")
+        default:
             log(.error, .monitoring, "Monitoring failed: \(failure.message)")
         }
 
@@ -160,8 +200,19 @@ public final class PlaybackCoordinator {
             isRestoringOnFailure = true
             restoreOwnedPause(reason: "monitoring failed")
         }
+        if policy.restoreOwnedPauseOnFailure, volumeOwnership != nil {
+            isRestoringOnFailure = true
+            restoreOwnedVolume(reason: "monitoring failed")
+        }
 
-        transition(failure.kind == .permissionDenied ? .permissionRequired : .error)
+        switch failure.kind {
+        case .permissionDenied:
+            transition(.permissionRequired)
+        case .sourceUnavailable:
+            transition(automationEnabled ? .searchingForSource : .disabled)
+        default:
+            transition(.error)
+        }
     }
 
     public func sourceInvalidated(reason: String) {
@@ -172,6 +223,7 @@ public final class PlaybackCoordinator {
         isRestoringOnFailure = false
         log(.warning, .monitoring, "Monitored source became invalid: \(reason)")
         restoreOwnedPause(reason: "monitored source vanished")
+        restoreOwnedVolume(reason: "monitored source vanished")
         transition(automationEnabled ? .searchingForSource : .disabled)
     }
 
@@ -195,7 +247,18 @@ public final class PlaybackCoordinator {
         }
 
         if let snapshot = lastSnapshot, snapshot.isPlaying, !userOverrodeDuringActivity {
-            request(.pause, expectedTrack: snapshot.track)
+            if policy.interruptionMode == .duck, (volumeOwnership != nil || pendingCommand?.kind == .setVolume) {
+                // Keep the first pre-duck volume for the whole conversation. A later audio
+                // segment must cancel/re-arm silence, never treat the already-ducked volume as
+                // the new original volume.
+                transition(.musicPausedByOreja)
+                return
+            }
+            if policy.interruptionMode == .duck, canSetVolume, snapshot.volume != nil {
+                requestVolume(policy.duckVolume, expectedTrack: snapshot.track, originalVolume: snapshot.volume, restoresVolume: false)
+            } else {
+                request(.pause, expectedTrack: snapshot.track)
+            }
         }
         transition(.aiActive)
     }
@@ -210,7 +273,7 @@ public final class PlaybackCoordinator {
             return
         }
 
-        guard ownership != nil || pendingCommand?.kind == .pause else {
+        guard ownership != nil || volumeOwnership != nil || pendingCommand?.kind == .pause || pendingCommand?.kind == .setVolume else {
             transition(desiredIdleState())
             return
         }
@@ -256,6 +319,27 @@ public final class PlaybackCoordinator {
                 transition(providerProblemState(snapshot) ?? desiredIdleState())
                 return
             }
+        }
+
+        if let volume = volumeOwnership {
+            guard snapshot.state == .playing, snapshot.refersTo(volume.track) else {
+                releaseVolumeOwnership(reason: "playback changed while volume was reduced")
+                cancelSilence()
+                transition(desiredIdleState())
+                return
+            }
+            if let reported = snapshot.volume, abs(reported - volume.duckVolume) > 0.02 {
+                releaseVolumeOwnership(reason: "volume changed externally")
+                statistics.manualOverrides += 1
+                if aiIsActive { userOverrodeDuringActivity = true }
+                cancelSilence()
+                transition(aiIsActive ? .aiActive : desiredIdleState())
+                return
+            }
+            if state == .monitoring || state == .musicPlaying || state == .error {
+                transition(.musicPausedByOreja)
+            }
+            return
         }
 
         if aiIsActive, snapshot.isPlaying, !userOverrodeDuringActivity, previous?.isPlaying != true {
@@ -331,6 +415,24 @@ public final class PlaybackCoordinator {
                 } else {
                     transition(desiredIdleState())
                 }
+
+            case .setVolume:
+                if command.restoresVolume {
+                    volumeOwnership = nil
+                    log(.success, .playback, "Restored Music volume.")
+                } else if let target = command.targetVolume,
+                          let original = command.originalVolume ?? lastSnapshot?.volume {
+                    volumeOwnership = VolumeOwnership(
+                        track: lastSnapshot?.track ?? command.expectedTrack,
+                        provider: lastSnapshot?.provider ?? .appleMusic,
+                        originalVolume: original,
+                        duckVolume: target,
+                        restoreVolume: policy.restoreVolume,
+                        acquiredAt: now()
+                    )
+                    log(.success, .playback, "Reduced Music volume to \(Int(target * 100))%.")
+                }
+                transition(aiIsActive ? .musicPausedByOreja : desiredIdleState())
             }
 
         case .noOp(let snapshot):
@@ -355,6 +457,9 @@ public final class PlaybackCoordinator {
             if command.kind == .resume {
                 ownership = nil
                 journal?.clear()
+            }
+            if command.kind == .setVolume, command.restoresVolume {
+                volumeOwnership = nil
             }
 
             if consecutiveFailures >= policy.failureLimit {
@@ -398,6 +503,12 @@ public final class PlaybackCoordinator {
     /// Called when Oreja is about to quit. Returns a command the app must execute (and await)
     /// so a graceful quit never leaves the user's music paused by Oreja.
     public func commandForTermination() -> Command? {
+        if ownership == nil, let volume = volumeOwnership {
+            cancelSilence()
+            let command = Command(kind: .setVolume, expectedTrack: volume.track, targetVolume: volume.restoreVolume, originalVolume: volume.originalVolume, restoresVolume: true, issuedAt: now())
+            pendingCommand = command
+            return command
+        }
         guard ownership != nil else { return nil }
         let kind: CommandKind = .resume
         let command = Command(kind: kind, expectedTrack: ownership?.track, issuedAt: now())
@@ -412,6 +523,7 @@ public final class PlaybackCoordinator {
     /// Marks the ownership journal as cleared (used after a termination resume succeeds).
     public func acknowledgeTermination() {
         ownership = nil
+        volumeOwnership = nil
         pendingCommand = nil
         journal?.clear()
         notify()
@@ -475,6 +587,12 @@ public final class PlaybackCoordinator {
             quietElapsedTime = now()
             request(.resume, expectedTrack: own.track)
             transition(.restoringPlayback)
+        case .setVolume:
+            guard automationEnabled, !aiIsActive, sourceIsValid,
+                  let volume = volumeOwnership, pendingCommand == nil else { return }
+            quietElapsedTime = now()
+            requestVolume(volume.restoreVolume, expectedTrack: volume.track, originalVolume: volume.originalVolume, restoresVolume: true)
+            transition(.restoringPlayback)
         }
     }
 
@@ -483,8 +601,8 @@ public final class PlaybackCoordinator {
         let token = UUID()
         silenceToken = token
         transition(.waitingForSilence)
-        log(.info, .detection, "AI is quiet; waiting \(Int(policy.quietInterval * 1000)) ms before resuming music.")
-        let delay = policy.quietInterval
+        log(.info, .detection, "AI is quiet; waiting \(Int(policy.resumeWait * 1000)) ms before resuming music.")
+        let delay = policy.resumeWait
         silenceTask = scheduler.schedule(after: delay) { [weak self] in
             self?.quietIntervalElapsed(token)
         }
@@ -500,6 +618,23 @@ public final class PlaybackCoordinator {
         if pendingCommand?.kind == .pause {
             // The pause was slow; resume once it lands (ownership does not exist yet).
             queuedIntent = .resume
+            return
+        }
+        if pendingCommand?.kind == .setVolume {
+            queuedIntent = .setVolume
+            return
+        }
+        if let volume = volumeOwnership {
+            guard pendingCommand == nil else { queuedIntent = .setVolume; return }
+            guard let snapshot = lastSnapshot, snapshot.state == .playing,
+                  snapshot.refersTo(volume.track) else {
+                releaseVolumeOwnership(reason: "playback changed during the quiet interval")
+                transition(desiredIdleState())
+                return
+            }
+            quietElapsedTime = now()
+            requestVolume(volume.restoreVolume, expectedTrack: volume.track, originalVolume: volume.originalVolume, restoresVolume: true)
+            transition(.restoringPlayback)
             return
         }
         guard let own = ownership else { return }
@@ -574,11 +709,46 @@ public final class PlaybackCoordinator {
         transition(.restoringPlayback)
     }
 
+    private func restoreOwnedVolume(reason: String) {
+        guard let volume = volumeOwnership else { return }
+        guard let snapshot = lastSnapshot, snapshot.state == .playing,
+              snapshot.refersTo(volume.track) else {
+            releaseVolumeOwnership(reason: "playback no longer matches the reduced volume")
+            return
+        }
+        quietElapsedTime = now()
+        log(.info, .recovery, "Restoring Music volume because \(reason).")
+        requestVolume(volume.restoreVolume, expectedTrack: volume.track, restoresVolume: true)
+        transition(.restoringPlayback)
+    }
+
     private func releaseOwnership(reason: String) {
         guard ownership != nil else { return }
         ownership = nil
         journal?.clear()
         log(.info, .playback, "Released pause ownership (\(reason)).")
+    }
+
+    private func releaseVolumeOwnership(reason: String) {
+        guard volumeOwnership != nil else { return }
+        volumeOwnership = nil
+        log(.info, .playback, "Released volume ownership (\(reason)).")
+    }
+
+    private func requestVolume(_ volume: Double, expectedTrack: MediaTrack?, originalVolume: Double? = nil, restoresVolume: Bool) {
+        guard pendingCommand == nil else { queuedIntent = .setVolume; return }
+        let command = Command(
+            kind: .setVolume,
+            expectedTrack: expectedTrack,
+            targetVolume: volume,
+            originalVolume: originalVolume,
+            restoresVolume: restoresVolume,
+            issuedAt: now()
+        )
+        pendingCommand = command
+        log(.info, .playback, "Issuing volume change to \(Int(volume * 100))%.")
+        onCommand?(command)
+        notify()
     }
 
     // MARK: - Derived state

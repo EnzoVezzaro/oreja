@@ -18,18 +18,21 @@ else is listed under *not executed*, with the reason.
 ```
 $ ./scripts/test.sh
 ...
-39 passed, 0 failed, 193 assertions
+51 passed, 0 failed, 261 assertions
 ```
 
 Coverage (all green):
 
-- Coordinator scenarios 1–19: pause on AI audio; resume after the quiet interval; brief silences do
+- Coordinator scenarios 1–20: pause on AI audio; resume after the quiet interval; brief silences do
   not resume; music already paused is not resumed; manual pause after automation; manual resume
   during speech; source exit; Music exit; permission revoked; device/stream failure and retry; two
   rapid responses without oscillation; non-speech output follows the documented activity policy;
   sleep/wake reconciliation; track change while paused; quitting while owning a pause; delayed pause
   plus end of speech; AI speaking again during a resume; failure limit stops automation; disabling
-  automation restores the pause; no commands without a valid source.
+  automation restores the pause; an app with no audio process yet is a waiting state, not an error;
+  music stays paused through a spoken exchange (AI turn, then the user's turn); the conversation hold
+  keeps music paused through the silent stretch while the assistant works and restarts on every
+  turn; per-reply mode still resumes as soon as one reply ends; no commands without a valid source.
 - Activity detection: dBFS conversion and clamping, activation duration, sub-threshold blips, silence
   duration, hysteresis, short gaps, reset, `LevelSampler` averaging.
 - Apple Music: script output parsing (playing/paused/stopped/unavailable), scripts never call `stop`
@@ -99,7 +102,7 @@ $ ps -o %cpu=,rss= -p $pid     # sampled every 8 s for 48 s while idle
 | Notarization and Developer ID signing | No distribution credentials are available. The build is ad-hoc signed only. |
 | iOS companion | Not started; see `docs/ios-strategy.md`. |
 
-## How to run the missing integration test
+## Live acceptance evidence
 
 ```bash
 ./scripts/build.sh --probe
@@ -111,7 +114,8 @@ Then start a song in Music, ask ChatGPT a voice question, and record in this fil
 pause latency, resume latency, false pauses, unexpected resumes. Until that is done, the end-to-end
 product claim remains **unverified**.
 
-Why this still has not run: the installed ChatGPT build (26.1021.31345, `com.openai.codex`) has no
-window, no scriptable accessibility tree, no Voice menu command, and no remote-debugging port, and a
-Voice session needs a human speaking into the microphone. Driving the user's account unattended was
-out of scope. Evidence: `test-evidence.md` → "Real ChatGPT: attempted, still not executed".
+The desktop ChatGPT app was switched into ChatGPT mode and its real Read aloud control was exercised
+twice. `com.openai.codex` activity was captured and Apple Music paused and resumed after the 12 s
+conversation hold. The logged-in ego browser Voice attempt did not expose capturable audio, so web
+Voice remains a known failure in that browser session. A human microphone speech test remains
+unexecuted. Full details are in `test-evidence.md` → "Real ChatGPT acceptance attempts".

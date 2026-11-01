@@ -8,6 +8,7 @@
 #   ./scripts/build.sh --no-sign    # skip ad-hoc signing
 #   ./scripts/build.sh --probe      # also build the audio probe used for real capture tests
 #   ./scripts/build.sh --harness    # also build the real capture → Music integration harness
+#   ./scripts/build.sh --fixture    # also build the controllable audio fixture app (tests only)
 #
 # Everything is written under build/ (gitignored).
 
@@ -27,13 +28,15 @@ LINK_FLAGS=(-I "$MODULES" -L "$LIB")
 SIGN=1
 PROBE=0
 HARNESS=0
+FIXTURE=0
 
 for argument in "$@"; do
     case "$argument" in
         --no-sign) SIGN=0 ;;
         --probe) PROBE=1 ;;
         --harness) HARNESS=1 ;;
-        *) echo "usage: $0 [--no-sign] [--probe] [--harness]" >&2; exit 2 ;;
+        --fixture) FIXTURE=1 ;;
+        *) echo "usage: $0 [--no-sign] [--probe] [--harness] [--fixture]" >&2; exit 2 ;;
     esac
 done
 
@@ -100,6 +103,32 @@ if [ "$HARNESS" = "1" ]; then
         -Xlinker -rpath -Xlinker "@loader_path/../lib" \
         -o "$BUILD/bin/oreja-integration" \
         tools/IntegrationHarness/main.swift
+fi
+
+if [ "$FIXTURE" = "1" ]; then
+    # Test-only app bundle. It needs a real bundle identifier so Core Audio reports one for its
+    # process, which is what the monitor matches on.
+    echo "==> OrejaFixture (test only)"
+    swiftc "${SWIFT_FLAGS[@]}" -parse-as-library \
+        -o "$BUILD/bin/OrejaFixture" \
+        tools/AudioFixture/main.swift
+    FIXTURE_APP="$BUILD/OrejaFixture.app"
+    rm -rf "$FIXTURE_APP"
+    mkdir -p "$FIXTURE_APP/Contents/MacOS"
+    cp "$BUILD/bin/OrejaFixture" "$FIXTURE_APP/Contents/MacOS/OrejaFixture"
+    cat > "$FIXTURE_APP/Contents/Info.plist" <<'PLIST'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>CFBundleExecutable</key><string>OrejaFixture</string>
+  <key>CFBundleIdentifier</key><string>com.oreja.fixture</string>
+  <key>CFBundleName</key><string>OrejaFixture</string>
+  <key>CFBundlePackageType</key><string>APPL</string>
+  <key>CFBundleShortVersionString</key><string>0.0.1</string>
+  <key>LSUIElement</key><true/>
+</dict></plist>
+PLIST
+    codesign --force --sign - "$FIXTURE_APP" >/dev/null 2>&1 || true
 fi
 
 echo "==> Icon"

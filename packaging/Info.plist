@@ -32,6 +32,8 @@
 	<string>Oreja de Van Gogh — an independent audio companion. Not affiliated with OpenAI or Apple.</string>
 	<key>NSAudioCaptureUsageDescription</key>
 	<string>Oreja listens to the audio output of the app you select so it can pause your music while ChatGPT speaks. Audio is analyzed locally as level only; nothing is recorded, stored, or uploaded.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Only if you turn on “Pause while I speak”: Oreja measures the level of your microphone to keep the music paused while you talk. The audio never leaves your Mac and nothing is recorded.</string>
 	<key>NSAppleEventsUsageDescription</key>
 	<string>Oreja controls the Music app to pause and resume your music when ChatGPT starts and stops speaking. Oreja never reads your library or conversations.</string>
 	<key>NSHighResolutionCapable</key>

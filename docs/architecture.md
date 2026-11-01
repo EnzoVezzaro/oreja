@@ -122,12 +122,26 @@ The enum is intentionally coarse: one state is displayed everywhere. Finer flags
 | Activity onset debounce | 60 ms | policy |
 | AI silence window (detector end) | 250 ms | policy |
 | Resume delay (coordinator quiet interval) | 800 ms | 300–3000 ms |
-| Level analysis period | 50 ms | implementation |
+| Conversation hold (silence that ends a conversation) | 12 s | 2–60 s, or off |
+| Level analysis period | 30 ms | implementation |
 | Data watchdog while active | 1.5 s | implementation |
 | Media observation period | 1 s | implementation |
 
 The 250 ms detector window protects against syllable gaps; the resume delay is the user-facing
 "wait before the music comes back" control.
+
+A spoken conversation is mostly silence: the assistant stops talking, works on the answer, then you
+answer, and only then does it speak again. Resuming after 800 ms would therefore drop music into the
+middle of the exchange. `PlaybackPolicy.conversationHold` replaces that wait with a longer one
+(`resumeWait = max(quietInterval, conversationHold)`), so every turn restarts the same timer and the
+music returns only when the whole conversation has been quiet. It is one number, not a second state
+machine: the pause is still owned by the coordinator and the manual-override, source-loss and
+provider rules are unchanged.
+
+`pauseWhileISpeak` feeds the microphone into the same activity stream, but only while music is not
+playing. If the microphone could start a pause, speaker output would close a loop: music on →
+microphone hears the music → pause → silence → resume → music on. The assistant's output starts the
+pause; the microphone merely keeps it alive.
 
 ## Real-time audio safety
 
@@ -141,12 +155,37 @@ The tap is private and unmuted (`CATapMuteBehavior` raw value 0), so the target 
 normal output. Only the selected application's processes are tapped; Music is never part of the
 tap. Taps, the aggregate device, and the IOProc are destroyed on stop, failure, and deinit.
 
+## Process set while a conversation runs
+
+A voice conversation does not keep a fixed set of audio processes. ChatGPT's desktop app and every
+Chromium browser create and destroy renderer/utility audio processes per session, and they flip
+`kAudioProcessPropertyIsRunningOutput` on and off with each spoken turn. The monitor therefore:
+
+- taps **every** process that matches the selected source, including ones that are quiet right now.
+  Preferring only the processes that report output would rebuild the tap at the instant a sentence
+  starts and lose its first syllables;
+- listens for `kAudioHardwarePropertyProcessObjectList` changes and rebuilds the tap when the app
+  spawns or drops a process, with a one-second poll as a fallback;
+- asks the aggregate device for a small IO buffer (1024 frames, about 23 ms), because the default
+  buffer alone can delay detection by several hundred milliseconds;
+- keeps the monitor alive when the app currently has no audio process at all, instead of failing
+  and retrying: Chrome only spawns its audio service on the first sound, so a failing monitor would
+  miss the first sentence while it waited for the next retry. The monitor stays up with no tap
+  (`"… (waiting for its audio process)"`), and the process-list listener gives it the tap the
+  moment the process appears. When the last process disappears the tap is torn down and the monitor
+  returns to that waiting state.
+
+Monitoring is therefore driven entirely by the Core Audio process list. There is no timer that
+rebuilds a tap for an app that is closed, and no separate "is the app running" poll to disagree with
+what Core Audio reports.
+
 ## Failure handling
 
 | Failure | Behavior |
 | --- | --- |
 | Audio capture permission missing | `permissionRequired`, no playback automation, direct links to System Settings |
-| ChatGPT quits / source invalid | activity ends, ownership released, retry delayed and bounded |
+| Source app quits | its audio processes vanish; the tap is torn down and the monitor waits for the app to come back |
+| Source app has no audio process yet | monitor stays up without a tap; the process-list listener attaches it when one appears |
 | Music quits | provider unavailable; ownership released; no retry storm |
 | Music automation denied | typed error, actionable message, no silent success |
 | Output device change | tap stops delivering; watchdog ends activity; monitor is re-established |

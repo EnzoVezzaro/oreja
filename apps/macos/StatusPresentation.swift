@@ -57,11 +57,19 @@ extension CoordinatorState {
 
     var tint: Color {
         switch self {
-        case .aiActive, .musicPausedByOreja: .accentColor
-        case .waitingForSilence, .restoringPlayback: .accentColor
-        case .permissionRequired, .error: .orange
-        case .disabled, .suspended: .secondary
-        default: .primary
+        case .aiActive, .musicPausedByOreja: OrejaTheme.Palette.accent
+        case .waitingForSilence, .restoringPlayback: OrejaTheme.Palette.wheat
+        case .permissionRequired, .error: OrejaTheme.Palette.warning
+        case .disabled, .suspended, .searchingForSource: OrejaTheme.Palette.inkSoft
+        case .monitoring, .musicPlaying: OrejaTheme.Palette.positive
+        }
+    }
+
+    /// Whether the dot should carry a quiet ring: speaking, holding a pause, or handing back.
+    var isActive: Bool {
+        switch self {
+        case .aiActive, .musicPausedByOreja, .waitingForSilence, .restoringPlayback: true
+        default: false
         }
     }
 

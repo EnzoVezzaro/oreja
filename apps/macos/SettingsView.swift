@@ -1,106 +1,352 @@
 import SwiftUI
 import OrejaCore
 
+/// Settings, grouped the same way as the setup flow. Native controls, brand spacing, no form
+/// chrome: the window should read as five short answers, not a control panel.
 struct SettingsView: View {
     @ObservedObject var model: AppModel
 
     var body: some View {
-        Form {
-            Section("Behavior") {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 22) {
+                header
+                behavior
+                source
+                music
+                startup
+                privacy
+                permissions
+                versionFooter
+            }
+            .frame(maxWidth: 480, alignment: .leading)
+            .frame(maxWidth: .infinity, alignment: .center)
+            .padding(.horizontal, 28)
+            .padding(.top, 24)
+            .padding(.bottom, 28)
+        }
+        .background(OrejaTheme.Palette.paper)
+        .tint(OrejaTheme.Palette.accent)
+        .frame(minWidth: 560, minHeight: 560)
+    }
+
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Settings")
+                .font(OrejaTheme.Typography.pageTitle)
+                .tracking(-0.5)
+                .foregroundStyle(OrejaTheme.Palette.ink)
+            Text("Oreja only touches playback while the selected AI source is speaking.")
+                .font(OrejaTheme.Typography.caption)
+                .foregroundStyle(OrejaTheme.Palette.inkSoft)
+        }
+    }
+
+    private var versionFooter: some View {
+        Text("Version \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "Development")")
+            .font(OrejaTheme.Typography.micro)
+            .foregroundStyle(OrejaTheme.Palette.inkSoft)
+            .frame(maxWidth: .infinity, alignment: .center)
+            .padding(.top, 2)
+    }
+
+    // MARK: Sections
+
+    private var behavior: some View {
+        ThemeSection(title: "Behavior") {
+            VStack(alignment: .leading, spacing: 10) {
                 Toggle("Automation enabled", isOn: Binding(
                     get: { model.settings.automationEnabled },
                     set: { model.setAutomationEnabled($0) }
                 ))
-                Text("When off, Oreja never touches playback.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                .toggleStyle(.switch)
+                .tint(OrejaTheme.Palette.accent)
+                .font(.system(size: 12.5))
 
-                VStack(alignment: .leading, spacing: 4) {
+                Text("When off, Oreja never touches playback.")
+                    .font(OrejaTheme.Typography.micro)
+                    .foregroundStyle(OrejaTheme.Palette.inkSoft)
+
+                HStack {
+                    Text("While ChatGPT speaks")
+                        .font(.system(size: 12.5))
+                        .foregroundStyle(OrejaTheme.Palette.ink)
+                    Spacer(minLength: 8)
+                    Picker("Playback behavior", selection: Binding(
+                        get: { model.settings.interruptionMode },
+                        set: { model.settings.interruptionMode = $0 }
+                    )) {
+                        Text("Pause music").tag(MusicInterruptionMode.pause)
+                        Text("Lower volume").tag(MusicInterruptionMode.duck)
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                }
+
+                if model.settings.interruptionMode == .duck {
                     HStack {
-                        Text("Quiet interval before music resumes")
-                        Spacer()
-                        Text("\(Int(model.settings.resumeDelay * 1000)) ms")
+                        Text("Keep Music at")
+                            .font(.system(size: 12.5))
+                            .foregroundStyle(OrejaTheme.Palette.ink)
+                        Spacer(minLength: 8)
+                        Text("\(model.settings.duckVolumePercent)%")
+                            .font(.system(size: 11, design: .monospaced))
                             .monospacedDigit()
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(OrejaTheme.Palette.inkSoft)
                     }
                     Slider(
                         value: Binding(
-                            get: { model.settings.resumeDelay },
-                            set: { model.settings.resumeDelay = $0 }
+                            get: { Double(model.settings.duckVolumePercent) },
+                            set: { model.settings.duckVolumePercent = Int($0.rounded()) }
                         ),
-                        in: AppSettings.resumeDelayRange,
-                        step: 0.05
+                        in: 1...100,
+                        step: 1
                     )
-                    Text("Longer values tolerate natural pauses between sentences; shorter values resume music faster.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    .tint(OrejaTheme.Palette.accent)
+                    Text("Music lowers to this level while you speak and returns to the volume below when the conversation is quiet.")
+                        .font(OrejaTheme.Typography.micro)
+                        .foregroundStyle(OrejaTheme.Palette.inkSoft)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    HStack {
+                        Text("Return Music to")
+                            .font(.system(size: 12.5))
+                            .foregroundStyle(OrejaTheme.Palette.ink)
+                        Spacer(minLength: 8)
+                        Text("\(model.settings.restoreVolumePercent)%")
+                            .font(.system(size: 11, design: .monospaced))
+                            .monospacedDigit()
+                            .foregroundStyle(OrejaTheme.Palette.inkSoft)
+                    }
+                    Slider(
+                        value: Binding(
+                            get: { Double(model.settings.restoreVolumePercent) },
+                            set: { model.settings.restoreVolumePercent = Int($0.rounded()) }
+                        ),
+                        in: 1...100,
+                        step: 1
+                    )
+                    .tint(OrejaTheme.Palette.accent)
+                    Text("After the conversation is quiet, music automatically returns to this volume.")
+                        .font(OrejaTheme.Typography.micro)
+                        .foregroundStyle(OrejaTheme.Palette.inkSoft)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Hairline()
+                    .padding(.vertical, 2)
+
+                HStack {
+                    Text("Quiet interval before music resumes")
+                        .font(.system(size: 12.5))
+                        .foregroundStyle(OrejaTheme.Palette.ink)
+                    Spacer(minLength: 8)
+                    Text("\(Int(model.settings.resumeDelay * 1000)) ms")
+                        .font(.system(size: 11, design: .monospaced))
+                        .monospacedDigit()
+                        .foregroundStyle(OrejaTheme.Palette.inkSoft)
+                }
+
+                Slider(
+                    value: Binding(
+                        get: { model.settings.resumeDelay },
+                        set: { model.settings.resumeDelay = $0 }
+                    ),
+                    in: AppSettings.resumeDelayRange,
+                    step: 0.05
+                )
+                .tint(OrejaTheme.Palette.accent)
+
+                Text("Longer values tolerate natural pauses between sentences; shorter values resume music faster. When the conversation hold above is on, that hold decides instead.")
+                    .font(OrejaTheme.Typography.micro)
+                    .foregroundStyle(OrejaTheme.Palette.inkSoft)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Hairline()
+                    .padding(.vertical, 2)
+
+                Toggle("Keep music paused through a whole conversation", isOn: Binding(
+                    get: { model.settings.holdThroughConversation },
+                    set: { model.settings.holdThroughConversation = $0 }
+                ))
+                .toggleStyle(.switch)
+                .tint(OrejaTheme.Palette.accent)
+                .font(.system(size: 12.5))
+
+                Text("In a spoken conversation most of the time nobody is talking: the assistant is working on the answer, you are answering it. With this on, music stays paused for the whole exchange and comes back only once the conversation has gone quiet.")
+                    .font(OrejaTheme.Typography.micro)
+                    .foregroundStyle(OrejaTheme.Palette.inkSoft)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                if model.settings.holdThroughConversation {
+                    HStack {
+                        Text("Music returns after")
+                            .font(.system(size: 12.5))
+                            .foregroundStyle(OrejaTheme.Palette.ink)
+                        Spacer(minLength: 8)
+                        Text(model.settings.conversationHold < 60
+                            ? "\(Int(model.settings.conversationHold)) s"
+                            : "\(Int(model.settings.conversationHold / 60)) min")
+                            .font(.system(size: 11, design: .monospaced))
+                            .monospacedDigit()
+                            .foregroundStyle(OrejaTheme.Palette.inkSoft)
+                    }
+
+                    Slider(
+                        value: Binding(
+                            get: { model.settings.conversationHold },
+                            set: { model.settings.conversationHold = $0 }
+                        ),
+                        in: AppSettings.conversationHoldRange,
+                        step: 1
+                    )
+                    .tint(OrejaTheme.Palette.accent)
+
+                    Text("Seconds of complete quiet that end the conversation. Raise it if music comes back while the assistant is still working on a long answer; lower it if you want music back sooner after a short question.")
+                        .font(OrejaTheme.Typography.micro)
+                        .foregroundStyle(OrejaTheme.Palette.inkSoft)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Hairline()
+                    .padding(.vertical, 2)
+
+                Toggle("Pause while I speak", isOn: Binding(
+                    get: { model.settings.pauseWhileISpeak },
+                    set: { model.settings.pauseWhileISpeak = $0 }
+                ))
+                .toggleStyle(.switch)
+                .tint(OrejaTheme.Palette.accent)
+                .font(.system(size: 12.5))
+
+                Text("For spoken conversations: music also stays paused while you answer, not only while the assistant talks. Uses the microphone, which is a separate permission. The microphone can only keep a pause alive; the assistant's answer is what starts it, so a speaker playing music can never keep Oreja looping.")
+                    .font(OrejaTheme.Typography.micro)
+                    .foregroundStyle(OrejaTheme.Palette.inkSoft)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                if let error = model.userSpeechError {
+                    InlineNotice(text: error, symbol: "mic.slash")
                 }
             }
+        }
+    }
 
-            Section("AI source") {
+    private var source: some View {
+        ThemeSection(
+            title: "AI source",
+            caption: "Browser sources capture every tab in that browser; use them only for dedicated ChatGPT windows."
+        ) {
+            HStack {
+                Text("Listen to")
+                    .font(.system(size: 12.5))
+                    .foregroundStyle(OrejaTheme.Palette.ink)
+                Spacer(minLength: 8)
                 Picker("Listen to", selection: Binding(
                     get: { model.settings.aiSource },
                     set: { model.selectSource($0) }
                 )) {
-                    Text("ChatGPT desktop app")
-                        .tag(AISourceSelection.chatGPTDesktop)
-                    Text("Google Chrome (experimental)").tag(AISourceSelection.chrome)
-                    Text("Safari (experimental)").tag(AISourceSelection.safari)
+                    ForEach(sourceOptions, id: \.bundleIdentifier) { option in
+                        Text(option.kind == .chatGPTDesktop ? "ChatGPT desktop app" : "\(option.displayName) (experimental)")
+                            .tag(option)
+                    }
                 }
-                Text("Browser sources capture every tab in that browser; use them only for dedicated ChatGPT windows.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                .labelsHidden()
+                .pickerStyle(.menu)
+                .frame(maxWidth: 240)
             }
+        }
+    }
 
-            Section("Music") {
-                Picker("Provider", selection: Binding(
-                    get: { model.settings.musicProvider },
-                    set: { model.settings.musicProvider = $0 }
-                )) {
-                    Text("Apple Music").tag(MediaProviderID.appleMusic)
-                }
+    /// The built-in choices, plus whatever is currently selected if onboarding picked a browser
+    /// that is not in the built-in list, so the picker never shows a blank selection.
+    private var sourceOptions: [AISourceSelection] {
+        var options: [AISourceSelection] = [.chatGPTDesktop, .chrome, .safari, .egoLite]
+        let current = model.settings.aiSource
+        if !options.contains(where: { $0.kind == current.kind && $0.bundleIdentifier == current.bundleIdentifier }) {
+            options.append(current)
+        }
+        return options
+    }
+
+    private var music: some View {
+        ThemeSection(title: "Music") {
+            VStack(alignment: .leading, spacing: 10) {
                 HStack {
-                    Button("Open Music") { model.launchMusic() }
-                    Button("Check permissions") { model.runConnectionCheck() }
+                    Text("Provider")
+                        .font(.system(size: 12.5))
+                        .foregroundStyle(OrejaTheme.Palette.ink)
+                    Spacer(minLength: 8)
+                    Picker("Provider", selection: Binding(
+                        get: { model.settings.musicProvider },
+                        set: { model.settings.musicProvider = $0 }
+                    )) {
+                        Text("Apple Music").tag(MediaProviderID.appleMusic)
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                    .frame(maxWidth: 200)
                 }
+
+                Hairline()
+
+                HStack(spacing: 10) {
+                    Button("Open Music") { model.launchMusic() }
+                        .controlSize(.small)
+                    Button("Check permissions") { model.runConnectionCheck() }
+                        .controlSize(.small)
+                        .disabled(model.isRunningCheck)
+                }
+
                 if !model.hasAudioPermission {
-                    Label("Audio recording permission is missing.", systemImage: "exclamationmark.triangle")
-                        .font(.caption)
-                        .foregroundStyle(.orange)
+                    InlineNotice(
+                        text: "Audio recording permission is missing.",
+                        symbol: "exclamationmark.triangle.fill"
+                    )
                 }
             }
+        }
+    }
 
-            Section("Startup") {
+    private var startup: some View {
+        ThemeSection(title: "Startup") {
+            VStack(alignment: .leading, spacing: 8) {
                 Toggle("Start Oreja at login", isOn: Binding(
                     get: { model.settings.launchAtLogin },
                     set: { model.settings.launchAtLogin = $0 }
                 ))
+                .toggleStyle(.switch)
+                .tint(OrejaTheme.Palette.accent)
+                .font(.system(size: 12.5))
+
                 if let error = model.launchAtLoginError {
-                    Text(error)
-                        .font(.caption)
-                        .foregroundStyle(.orange)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-
-            Section("Privacy") {
-                Toggle("Verbose diagnostics", isOn: Binding(
-                    get: { model.settings.verboseDiagnostics },
-                    set: { model.settings.verboseDiagnostics = $0 }
-                ))
-                Text("Diagnostics never contain audio, prompts or replies. Only Oreja's own state changes and permission results are kept, in memory.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            Section("Permissions") {
-                HStack {
-                    Button("Audio recording…") { model.openSystemAudioSettings() }
-                    Button("Automation…") { model.openAutomationSettings() }
+                    InlineNotice(text: error, symbol: "exclamationmark.triangle.fill")
                 }
             }
         }
-        .formStyle(.grouped)
-        .frame(minWidth: 520, minHeight: 540)
+    }
+
+    private var privacy: some View {
+        ThemeSection(
+            title: "Privacy",
+            caption: "Diagnostics never contain audio, prompts or replies. Only Oreja's own state changes and permission results are kept, in memory."
+        ) {
+            Toggle("Verbose diagnostics", isOn: Binding(
+                get: { model.settings.verboseDiagnostics },
+                set: { model.settings.verboseDiagnostics = $0 }
+            ))
+            .toggleStyle(.switch)
+            .tint(OrejaTheme.Palette.accent)
+            .font(.system(size: 12.5))
+        }
+    }
+
+    private var permissions: some View {
+        ThemeSection(title: "Permissions") {
+            HStack(spacing: 10) {
+                Button("Audio recording…") { model.openSystemAudioSettings() }
+                    .controlSize(.small)
+                Button("Automation…") { model.openAutomationSettings() }
+                    .controlSize(.small)
+            }
+        }
     }
 }

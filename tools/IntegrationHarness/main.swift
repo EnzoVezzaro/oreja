@@ -158,6 +158,8 @@ struct IntegrationHarness {
             switch event {
             case .monitorStarted(let description):
                 print("monitor: \(description)")
+            case .targetsChanged(let description):
+                print("monitor: re-targeted at \(description)")
             case .activityStarted(let levelDB):
                 activityStartedAt = now
                 print(String(format: "event: activity started at %.1f dBFS (t+%.3fs)", levelDB, now - launchedAt))

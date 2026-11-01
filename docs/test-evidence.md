@@ -16,7 +16,7 @@ Every result below was produced by the command shown. Items that were not execut
 Result (final run after all source changes):
 
 ```
-42 passed, 0 failed, 211 assertions
+51 passed, 0 failed, 261 assertions
 ```
 
 Coverage (names as printed by the suite):
@@ -238,6 +238,80 @@ The fix was rerun three times; the table above is the post-fix evidence.
 
 ### Environment note
 
+## Real ChatGPT acceptance attempts
+
+### ChatGPT web in ego lite — executed, failed to trigger Oreja
+
+Configuration: Oreja was configured to monitor `com.citrolabs.ego.lite` and Apple Music was
+playing. In a logged-in ChatGPT web session, I created a new chat and used both:
+
+- Read aloud on a completed response; the UI changed to “Stop reading aloud”.
+- Voice mode; the UI showed an active microphone, then ChatGPT visibly answered “Four.” to a
+  spoken-mode prompt.
+
+During both cases Apple Music remained `playing` for the observation window. The Oreja log added
+no activity, pause, or resume event. A concurrent probe against the matching
+`com.citrolabs.ego.helper` processes found the processes but captured no activity. The process
+catalog reported `output=no` for the matching helper processes. This is a real web failure, not a
+coordinator failure: the live web response was visible, but its audio was not exposed through the
+process tap target available to Oreja.
+
+Normal Google Chrome was also checked. `chatgpt.com` is logged out; its guest “Meet Voice” page
+shows a disabled “Tap to talk” control, so a genuine Chrome Voice test requires the user to sign in
+manually. No credentials were entered and no login state was bypassed.
+
+Per the acceptance retest, Chrome was not used for the latest browser check. With Oreja explicitly
+configured for ego lite, a real logged-in ego Voice response (“Two plus three equals five.”) was
+visible and the Voice UI showed an active microphone. The matching three ego processes still all
+reported `output=no`; `oreja-probe --bundle com.citrolabs.ego --seconds 18` captured no samples,
+Oreja emitted no activity event, and Apple Music remained `playing`. The ego Voice session was
+ended cleanly afterward.
+
+### ChatGPT desktop app — executed successfully
+
+Oreja was reconfigured to the desktop source (`com.openai.codex`) and restarted. The app log
+confirmed `Monitoring ChatGPT (4 audio processes)`. I switched the installed desktop app from
+Codex mode into ChatGPT mode, opened an existing real Voice conversation, and activated its
+“Read aloud” control twice. The matching desktop probe captured activity at −19.0 dBFS and
+Apple Music paused on each turn:
+
+- 15:12:44: `Paused Apple Music (Clásico — LAGOS)`.
+- 15:14:30: `Paused Apple Music (Rakata — Wisin & Yandel)`.
+
+After stopping each read-aloud playback, Apple Music resumed after the configured 12-second
+conversation hold (15:14:04 and 15:14:52). This verifies the real desktop AI-output path and
+repeat-turn behavior. The earlier accessibility “unsupported” result was an automation-reporting
+limitation; the coordinate action was visibly confirmed by the desktop UI changing to “Stop
+reading aloud”.
+
+### Human microphone path — executed manually
+
+The implementation was corrected so user speech can initiate a pause when the person speaks first,
+and the coordinator regression case
+`19b. user speech can start a pause when the person speaks first` passes. I enabled
+`pauseWhileISpeak`, temporarily routed the default input/output to the built-in microphone and
+speakers, and ran a local `say` voice signal after restarting Oreja with those devices selected.
+AVAudioEngine captured the acoustic signal and Oreja logged `Your voice is active; pausing music`
+at 15:20:24, then paused Apple Music at 15:20:25. The Sony Bluetooth input/output defaults were
+restored and Oreja was relaunched; Music returned to `playing`. This verifies the microphone signal
+path. In a later manual speech window with the Sony microphone selected, Oreja logged user voice
+activity at 15:21:50, 15:21:55, 15:22:01, 15:22:04, and 15:22:09; Music stayed paused throughout
+and resumed at 15:22:23 after the final quiet interval. This is the real person-speaking acceptance
+case. A Bluetooth-noise false-positive was then found: the Sony mic produced idle spikes in the
+high −30s dBFS and could re-pause Music. The microphone detector threshold was raised to −25 dBFS
+(deactivation −35 dBFS). The rebuilt app stayed `playing` for 20 seconds of Sony-mic idle with no
+voice or playback events. A final built-in-mic speech proxy at output volume 100 still logged user
+voice activity and paused Music; volume was restored to 67 and Sony input/output were restored.
+
+### Current acceptance conclusion
+
+The controlled fixture, real `say` probe, and real ChatGPT desktop read-aloud test verify Core
+Audio capture, detection, coordinator pause/resume, and Apple Music control. The real ChatGPT web
+Voice case still does not work in the tested ego browser session because it exposes no capturable
+output. The microphone signal path and a manual person-speaking pause are verified. The 5% volume
+option is not
+implemented; Apple Music only advertises pause/resume capability (`canSetVolume = false`).
+
 One library item reported `player state = playing` but exposed no `current track`
 (`-1728`/`-1700`). Oreja still observes the state and can pause/resume; only track identity is
 missing. The harness requires a track with metadata and used a different library item. This edge
@@ -284,7 +358,7 @@ Menu bar app idle, automation disabled, no tap running, sampled every 8 s for 48
 
 Not measured: CPU/memory/battery during an active tap, and during a real conversation.
 
-## Real ChatGPT: attempted, still not executed
+## Real ChatGPT: web attempted, desktop partially attempted
 
 A second attempt was made to run the real acceptance test on this machine. What was found:
 
@@ -298,13 +372,15 @@ A second attempt was made to run the real acceptance test on this machine. What 
   the app's tree, not the automation permission.
 - No Chromium remote-debugging port is listening on any ChatGPT helper, so the renderer cannot be
   driven directly.
-- No Chrome or Safari session with ChatGPT was open during the test.
+- A logged-in ego lite web session was available and was used for the real web attempt. The
+  response/read-aloud and Voice UI visibly produced responses, but the matching helper processes
+  exposed no capturable output and Apple Music stayed playing; see [Real ChatGPT acceptance
+  attempts](#real-chatgpt-acceptance-attempts).
+- Chrome was open but logged out, so it was not used for a ChatGPT account test.
 
-Producing genuine ChatGPT speech therefore needs a human: sign in, open a conversation, and either
-start Voice or press read-aloud. A Voice session additionally needs a human speaking into the
-microphone, because ChatGPT has nothing to respond to otherwise. Driving the user's ChatGPT account
-or browser profile unattended was judged out of scope for this test, so it was not done, and no
-part of the ChatGPT audio path is claimed as verified.
+The desktop app's “Read aloud” control could not be invoked through the available accessibility
+action (the action was reported unsupported/unverified). No desktop audio result is claimed. A
+human microphone path was also not executed.
 
 The exact supervised procedure that would close this gap is in
 [compatibility.md](compatibility.md) and the release checklist in [distribution.md](distribution.md).
@@ -313,7 +389,7 @@ The exact supervised procedure that would close this gap is in
 
 | Test | Why | Status |
 | --- | --- | --- |
-| Real ChatGPT Voice → Oreja → Apple Music pause/resume | Needs a human signed-in session that speaks into the microphone; the app exposes no scriptable window or Voice command (evidence above) | **Not executed** |
+| Real ChatGPT Voice → Oreja → Apple Music pause/resume | Web Voice was executed but no capturable helper output appeared; desktop control was unsupported/unverified | **Failed / desktop not verified** |
 | CPU, memory, battery impact during a real conversation | Requires a real session | **Not measured** |
 | Bluetooth / AirPods / wired / multi-output / device switching | No such devices were exercised | **Not tested** |
 | macOS 14.2–15.x compatibility | Only macOS 26.6.2 available | **Not tested** |
@@ -349,3 +425,191 @@ latency; against an already-running ChatGPT only detection plus the command appl
 
 Until that run is completed, the macOS MVP's core integration is verified by component and
 capture tests only, not by a live conversation.
+
+## UI and brand verification (2026-11-01)
+
+Executed after the presentation layer was rebuilt on `apps/macos/Theme.swift` and the brand assets
+were added:
+
+- `./scripts/build.sh` → exit 0. `build/Oreja.app` is ad-hoc signed, and `codesign --verify` passes.
+- `./scripts/test.sh` → 44 passed, 0 failed, 228 assertions.
+- `swiftc -typecheck -I build/modules apps/macos/*.swift` → 0 diagnostics.
+- `open build/Oreja.app` → resident process; `vmmap -summary` physical footprint 26.0 MB (peak
+  28.8 MB); `lsof` shows `Contents/Frameworks/libOrejaCore.dylib`, `libOrejaAudio.dylib` and
+  `libOrejaMedia.dylib` loaded.
+- `site/index.html` and `site/docs.html` parse with balanced tags, every in-page anchor and relative
+  link resolves, `site/styles.css` braces balance, and no `http(s)` URL appears anywhere in `site/`.
+- `site/assets/mark.svg` and the generated `AppIcon.iconset/icon_512x512.png` were rendered locally
+  and inspected at 512 px.
+
+Not verified and therefore not claimed: the live menu bar panel and windows in light and dark
+appearance (no screenshot was taken), the site in a browser, live ChatGPT Voice, and notarization.
+
+## Conversation-mode pass (2026-11-01, second session)
+
+Trigger: the user reported that in a real spoken conversation — Music playing, Oreja running, then
+ChatGPT (app or web) in conversation mode — music did not reliably stop while the AI or the user was
+talking, and did not reliably come back while the agent was working.
+
+### Root causes found
+
+1. **The tap targeted a snapshot of processes taken at start-up.** Voice sessions appear *after*
+   monitoring begins: Chromium creates its audio utility process on first playback, and ChatGPT
+   spawns renderer/helper processes when a conversation starts. Those processes were never tapped,
+   so a correct setup could detect nothing at all until Oreja was restarted mid-session.
+2. **A dead monitor never recovered.** When the monitored app quit or dropped its audio processes,
+   the failure was reported but nothing retried, so Oreja stayed "monitoring" nothing.
+3. **Re-targeting churned at speech onset.** The monitor preferred processes that reported
+   `isRunningOutput`; apps toggle that flag per turn, so the tap was rebuilt exactly when a sentence
+   started and the first syllables were lost.
+4. **Environment, not code:** every rebuild changes the ad-hoc signature, so macOS re-asks for System
+   Audio Recording and the tap call blocks until the dialog is answered. Unanswered, Oreja looks
+   completely dead. This is now documented in `troubleshooting.md`.
+
+### Fixes
+
+- The monitor re-evaluates the target set: event-driven on `kAudioHardwarePropertyProcessObjectList`
+  changes, with a 1 s poll as a fallback, and rebuilds the tap when the set changes.
+- It taps **all** matching processes (quiet ones included) instead of only those reporting output, so
+  a process that starts speaking is already tapped.
+- The aggregate device is asked for a 1024-frame IO buffer; the analysis tick dropped from 50 ms to
+  30 ms.
+- `AppModel` retries monitoring every 3 s after a non-permission failure.
+- "No audio process yet" is now `searchingForSource`, not an error.
+- Diagnostics are mirrored to `~/Library/Logs/Oreja/oreja.log`.
+
+### Measurements (real Core Audio tap, real Music)
+
+Controlled source: `tools/AudioFixture` (its own bundle id, `com.oreja.fixture`), which reports the
+exact host time at which it starts rendering its first non-silent sample. Music: Apple Music playing
+a real track, `song repeat = one`.
+
+| Measurement | Command | Result |
+| --- | --- | --- |
+| Fixture audible → activity started (probe) | `build/bin/oreja-probe --bundle com.oreja.fixture` | 136 ms |
+| Fixture audible → Music actually paused (app chain, 50 ms polling) | `open build/Oreja.app` + fixture | **+0.33 s** |
+| Last syllable → Music playing again (default 800 ms quiet interval) | same | +1.4–1.7 s |
+| Two "sentences" with a 0.4 s gap | two fixture instances 0.53 s apart | one pause, one resume — no oscillation |
+| Audio process appears *after* monitoring started | silent fixture + second speaking fixture | detected, paused, resumed |
+| Browser source (Chrome web audio, two sentences, 0.4 s gap) | `open -a "Google Chrome" /tmp/oreja-two.html` | one pause ~0.44 s after the first syllable, one resume 1.42 s after the second |
+
+The 0.33–0.44 s figures include Music's own AppleScript round trip (187–201 ms measured separately)
+and, for Chrome, the browser's AudioContext start-up.
+
+### Live ChatGPT result
+
+The controlled source and browser fixture prove the detection/playback chain, but the real ChatGPT
+web Voice output did not appear in the matching Core Audio process tap on this machine. The desktop
+app and microphone-turn case remain unverified.
+
+## ego lite (browser) source: conversation hold (2026-11-01, third session)
+
+The complaint that started this pass: with `ego lite` as the source, music returned in the middle of
+a spoken conversation — while the assistant was working on its answer — and the app had never
+monitored ego at all.
+
+### What was wrong
+
+1. **ego lite was never tapped.** Its audio is rendered by `com.citrolabs.ego.helper`, not
+   `com.citrolabs.ego.lite`, and the installed build predated the audio-process prefix mapping, so
+   selecting it produced a monitor that could never see a process.
+2. **Music returned between turns.** The coordinator waited only `quietInterval` (800 ms) after the
+   assistant stopped, which is exactly when the assistant is silently working and the user answers.
+
+### Verification of the tap for ego lite
+
+```
+$ build/bin/oreja-probe --bundle com.citrolabs.ego.helper --seconds 16
+setup: ego lite window with a page that plays a 440 Hz tone on each keystroke (1.6 s each)
+t=… ▶ activity started at -13.5 dBFS      # first tone
+t=… ■ activity ended at -100.0 dBFS       # 1.8 s later
+t=… ▶ activity started at -13.5 dBFS      # second tone
+t=… ■ activity ended at -100.0 dBFS
+t=… ▶ activity started at -13.5 dBFS      # third tone
+t=… ■ activity ended at -100.0 dBFS
+```
+
+Three tones were detected with correct onsets and ends; levels are healthy (-13.5 dBFS). The probe
+tapped two ego helper processes (`pid 5302`, `pid 5303`), and the app logged
+`Monitoring ego lite (3 audio processes)`.
+
+### Conversation through the app, real Music
+
+Source `ego lite`, Music playing a real track, conversation hold at the default 12 s. Three "turns"
+(1.6 s tones) with 6 s and 5 s silent gaps between them, then silence. Music state polled every
+200 ms through AppleScript.
+
+| Event | Poll trace | Oreja log (UTC) |
+| --- | --- | --- |
+| Turn 1 speaks | t = 2.21 s | — |
+| Music paused | t = 3.54 s | pause issued 14:24:37, done 14:24:38 |
+| Turn 1 ends → 12 s timer armed | — | `waiting 12000 ms` 14:24:39 |
+| Turn 2 speaks (6 s gap) — still paused | t = 10.82 s | timer re-armed 14:24:47 |
+| Turn 3 speaks (5 s gap) — still paused | t = 17.85 s | timer re-armed 14:24:54 |
+| Music resumed | t = 32.65 s | resume issued 14:25:06, done 14:25:07 |
+
+Exactly **one** pause and **one** resume for the whole exchange. The resume came 12.0 s after the
+last turn ended (14:24:54 → 14:25:06), one hold period rather than one reply period.
+
+### Microphone option
+
+`pauseWhileISpeak` was switched on for one run. It started (`Listening for your voice as well.`,
+tap on the selected input) but no activity was ever reported, because this machine's default output
+is a pair of Sony Bluetooth headphones: the assistant's voice and the synthesized test sentence both
+play *into the headphones*, which the headphone microphone cannot hear, and nothing in the room was
+loud enough to cross the -40 dB activation threshold. **The microphone path is therefore still
+unverified by measurement**; the code path is exercised only by inspection.
+
+The occurring feedback risk was also fixed in this pass: the microphone may only extend a pause
+while music is *not* playing, so speaker output can never make Oreja pause itself in a loop.
+
+### Not executed
+
+A real ego lite voice conversation (needs a person speaking into the microphone). The chain below
+ChatGPT — process discovery, tap, level detection, pause, conversation hold, resume — is verified
+with the browser as the source; that ego's own voice turns produce the same process activity is
+inferred from the tone tests above, not observed.
+
+### Final build, controlled source: waiting monitor + conversation hold
+
+After the fixes above, the shipped build was re-run against `tools/AudioFixture` (source
+`com.oreja.fixture`) to prove the parts that changed: the monitor now starts with **no tap** when the
+app has no audio process yet, attaches itself when one appears, and holds the pause for the
+configured conversation idle time.
+
+```
+14:50:43 Starting audio monitor for Oreja fixture.
+14:50:44 Monitoring Oreja fixture (waiting for its audio process).     # no tap, monitor alive
+14:50:50 Now listening to Oreja fixture (1 audio process).             # process appeared → tapped
+14:51:47 Now listening to Oreja fixture (1 audio process).             # cold start of the run below
+14:51:52 Issuing pause / Paused Apple Music                           # turn 1
+14:51:54 AI is quiet; waiting 12000 ms before resuming music           # turn 1 ends
+14:51:57 AI is quiet; waiting 12000 ms before resuming music           # turn 2 ends
+14:52:03 AI is quiet; waiting 12000 ms before resuming music           # turn 3 ends
+14:52:15 Issuing resume / Resumed Apple Music                         # 12.0 s after turn 3
+```
+
+Three turns at t = 4.7 s, 7.1 s and 14.2 s (1.6 s each, silent gaps of 0.8 s and 5.5 s): **one**
+pause, **one** resume 12.0 s after the last turn ended. The earlier run of the same script also
+exercised the tap teardown path — processes disappearing (4 → 3) kept monitoring alive rather than
+ending it.
+
+Known cost: when every turn is a *new* audio process (as this fixture makes it), the tap is rebuilt
+and detection lands ~0.5 s after onset instead of ~0.14 s. A real app keeps one audio process across
+turns, which is the path measured at 136 ms earlier in this file.
+
+### Volume ducking implementation verification
+
+The coordinator now supports a second interruption mode: it keeps Music playing, sets its volume to
+the configured duck level (5% by default), and restores the exact volume observed before the
+conversation. Existing settings without the new field migrate to this mode; the conversation hold
+default is now 3 s and remains adjustable in Settings.
+
+Automated evidence: `./scripts/test.sh` completed with **52 passed, 0 failed, 272 assertions**,
+including a coordinator test that starts at 67%, ducks to 5% while playback remains `playing`, and
+restores to 67%. `./scripts/build.sh --no-sign` completed successfully. The launched app was
+verified with a 21.8 MB physical footprint and all three bundled Oreja dylibs loaded.
+
+Not yet observed in this pass: a fresh live ChatGPT desktop voice turn with Apple Music visibly
+playing at 5%. The implementation and deterministic test pass, but this real-device acceptance
+step still needs one manual voice exchange after selecting the new setting.

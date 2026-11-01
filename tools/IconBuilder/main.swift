@@ -1,8 +1,9 @@
 import AppKit
 import Foundation
 
-/// Generates the Oreja app icon: an ear listening on a deep indigo field with a quiet swirl,
-/// a reference to the warm night paintings the name nods to. Run by scripts/build.sh.
+/// Generates the Oreja app icon: a cream ear on a deep indigo field, one wheat arc behind it, and
+/// a warm rim light. Matches the mark in `site/assets/mark.svg` and `docs/brand.md`.
+/// Run by scripts/build.sh.
 @main
 struct IconBuilder {
     static func main() {
@@ -76,8 +77,8 @@ struct IconBuilder {
         context.clip()
 
         let colors = [
-            NSColor(srgbRed: 0.24, green: 0.26, blue: 0.55, alpha: 1).cgColor,
-            NSColor(srgbRed: 0.09, green: 0.09, blue: 0.22, alpha: 1).cgColor,
+            NSColor(srgbRed: 0.141, green: 0.173, blue: 0.353, alpha: 1).cgColor,
+            NSColor(srgbRed: 0.090, green: 0.114, blue: 0.247, alpha: 1).cgColor,
         ] as CFArray
         if let gradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: colors, locations: [0, 1]) {
             context.drawLinearGradient(
@@ -88,63 +89,51 @@ struct IconBuilder {
             )
         }
 
-        // A single quiet swirl, kept subtle so the glyph stays legible at 16pt.
-        context.setStrokeColor(NSColor(srgbRed: 0.62, green: 0.68, blue: 1.0, alpha: 0.22).cgColor)
-        context.setLineWidth(side * 0.045)
+        // The listening mark: a bright dot with two waves, the same geometry as site/assets/mark.svg.
+        let dotCenter = CGPoint(x: body.midX - side * 0.06, y: body.midY)
+        let cream = NSColor(srgbRed: 0.969, green: 0.949, blue: 0.906, alpha: 1).cgColor
+        let wheat = NSColor(srgbRed: 0.906, green: 0.706, blue: 0.298, alpha: 1).cgColor
+        context.setStrokeColor(cream)
+        context.setLineWidth(side * 0.055)
         context.setLineCap(.round)
-        for index in 0..<2 {
-            let radius = side * (0.30 + 0.13 * CGFloat(index))
-            let center = CGPoint(
-                x: body.midX + side * 0.10,
-                y: body.midY + side * (0.16 - 0.05 * CGFloat(index))
+        context.addArc(
+            center: dotCenter,
+            radius: side * 0.155,
+            startAngle: -.pi * (50 / 180),
+            endAngle: .pi * (50 / 180),
+            clockwise: false
+        )
+        context.strokePath()
+        context.setStrokeColor(wheat)
+        context.addArc(
+            center: dotCenter,
+            radius: side * 0.265,
+            startAngle: -.pi * (50 / 180),
+            endAngle: .pi * (50 / 180),
+            clockwise: false
+        )
+        context.strokePath()
+        context.setFillColor(cream)
+        context.fillEllipse(
+            in: CGRect(
+                x: dotCenter.x - side * 0.055,
+                y: dotCenter.y - side * 0.055,
+                width: side * 0.11,
+                height: side * 0.11
             )
-            context.addArc(
-                center: center,
-                radius: radius,
-                startAngle: .pi * 0.75,
-                endAngle: .pi * 1.65,
-                clockwise: false
-            )
-            context.strokePath()
-        }
+        )
         context.restoreGState()
 
         // Warm cream rim light along the top edge.
         context.saveGState()
         context.addPath(squircle)
         context.clip()
-        context.setStrokeColor(NSColor(srgbRed: 1.0, green: 0.92, blue: 0.78, alpha: 0.30).cgColor)
+        context.setStrokeColor(NSColor(srgbRed: 0.969, green: 0.949, blue: 0.906, alpha: 0.30).cgColor)
         context.setLineWidth(side * 0.012)
         context.addPath(squircle)
         context.strokePath()
         context.restoreGState()
 
-        drawEar(in: context, body: body)
         return image
-    }
-
-    static func drawEar(in context: CGContext, body: CGRect) {
-        let configuration = NSImage.SymbolConfiguration(pointSize: body.width * 0.52, weight: .regular)
-        guard
-            let symbol = NSImage(systemSymbolName: "ear", accessibilityDescription: nil)?
-                .withSymbolConfiguration(configuration)
-        else { return }
-
-        let symbolSize = symbol.size
-        let target = CGRect(
-            x: body.midX - symbolSize.width / 2,
-            y: body.midY - symbolSize.height / 2,
-            width: symbolSize.width,
-            height: symbolSize.height
-        )
-
-        let tinted = NSImage(size: symbolSize)
-        tinted.lockFocus()
-        symbol.draw(in: CGRect(origin: .zero, size: symbolSize))
-        NSColor(srgbRed: 1.0, green: 0.90, blue: 0.76, alpha: 1).set()
-        CGRect(origin: .zero, size: symbolSize).fill(using: .sourceAtop)
-        tinted.unlockFocus()
-
-        tinted.draw(in: target, from: .zero, operation: .sourceOver, fraction: 1.0)
     }
 }

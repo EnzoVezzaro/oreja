@@ -135,9 +135,14 @@ struct AudioProbe {
         }
 
         for await event in monitor.events {
+            // Absolute host time so a harness can compare detection with the moment the target
+            // process actually started producing sound.
+            print(String(format: "t=%.3f ", Self.hostSeconds()), terminator: "")
             switch event {
             case .monitorStarted(let description):
                 print("• monitoring \(description)")
+            case .targetsChanged(let description):
+                print("• re-targeted: \(description)")
             case .activityStarted(let levelDB):
                 print("▶ activity started at \(String(format: "%.1f", levelDB)) dBFS")
             case .activityEnded(let levelDB):
@@ -153,5 +158,11 @@ struct AudioProbe {
         stopper.cancel()
         await monitor.stop()
         print("Done. No audio was stored.")
+    }
+
+    static func hostSeconds() -> Double {
+        var timebase = mach_timebase_info_data_t()
+        mach_timebase_info(&timebase)
+        return Double(mach_absolute_time()) * Double(timebase.numer) / Double(timebase.denom) / 1_000_000_000
     }
 }

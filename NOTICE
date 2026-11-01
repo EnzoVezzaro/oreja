@@ -1,0 +1,24 @@
+NOTICE
+=====
+Repository: https://github.com/EnzoVezzaro/oreja
+Copyright (c) 2026 Oreja de Van Gogh contributors
+License: GPL-3.0-only (see LICENSE)
+SPDX-License-Identifier: GPL-3.0-only
+
+AI-TRAINING / MACHINE-LEARNING USE
+----------------------------------
+ADDITIONAL LEGAL NOTICE
+-----------------------
+The GPL-3.0-only license governs all rights to copy, modify and distribute the
+source code. This notice does not add restrictions to, or remove rights granted
+by, that license.
+
+The project does not endorse or encourage bulk corporate scraping or use of
+the repository for model training. This is a request regarding intended use,
+not an additional restriction on rights granted by the GPL.
+
+The Oreja name, logo and other brand identifiers are not licensed by the GPL.
+Nothing in this repository grants permission to imply official origin,
+endorsement or affiliation. The rights holders reserve any remedies available
+under applicable law for actual infringement of copyright, trademark, patent or
+other rights.

@@ -124,6 +124,10 @@ final class ScriptedMediaController: MediaPlaybackController {
     func resume() async throws {
         resumeCalls += 1
     }
+
+    func setVolume(_ volume: Double) async throws {
+        snapshot.volume = min(max(volume, 0), 1)
+    }
 }
 
 @MainActor
@@ -136,17 +140,18 @@ final class CoordinatorFixture {
     let coordinator: PlaybackCoordinator
     private(set) var commands: [PlaybackCoordinator.Command] = []
 
-    init(mediaState: MediaPlaybackSnapshot.PlaybackState = .playing) {
+    init(mediaState: MediaPlaybackSnapshot.PlaybackState = .playing, policy: PlaybackPolicy = .default) {
         media = ScriptedMediaController(state: mediaState)
         let clock = clock
         let scheduler = scheduler
         let journal = journal
         let diagnostics = diagnostics
         coordinator = PlaybackCoordinator(
-            policy: .default,
+            policy: policy,
             scheduler: scheduler,
             diagnostics: diagnostics,
             journal: journal,
+            canSetVolume: true,
             now: { clock.now },
             dateProvider: { Date(timeIntervalSince1970: 1_700_000_000) }
         )
@@ -183,6 +188,9 @@ final class CoordinatorFixture {
             }
             if let track {
                 media.snapshot.track = track
+            }
+            if command.kind == .setVolume, let target = command.targetVolume {
+                media.snapshot.volume = target
             }
             media.snapshot.capturedAt = clock.now
             coordinator.complete(command.id, outcome: .succeeded(media.snapshot))

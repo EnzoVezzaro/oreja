@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Oreja de Van Gogh — your AI talks, your music listens</title>
-  <meta name="description" content="A macOS menu bar app that pauses Apple Music while ChatGPT speaks and resumes it when the reply ends. Local only: no account, no API key, no recording.">
+  <meta name="description" content="A macOS menu bar app that pauses Apple Music or lowers its volume while ChatGPT speaks, then restores playback when the reply ends. Local only: no account, no API key, no recording.">
   <meta name="theme-color" content="#f7f2e8" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#11100e" media="(prefers-color-scheme: dark)">
   <meta property="og:title" content="Oreja de Van Gogh">
@@ -55,14 +55,15 @@
       </span>
       <h1>Your AI talks.<br>Your music <em>listens.</em></h1>
       <p class="hero-sub">
-        Oreja pauses Apple Music while ChatGPT speaks, then puts it back exactly where it was when the
-        reply ends. One job, no account, no recording.
+        Oreja listens to the AI app you choose and lets you choose how Apple Music responds: pause and
+        resume, or keep playing at a lower volume and restore it when the reply ends. One job, no
+        account, no recording.
       </p>
       <div class="hero-actions">
         <a class="btn btn-primary" href="#get">Get Oreja</a>
         <a class="btn btn-ghost" href="#how">How it works</a>
       </div>
-      <p class="hero-meta">Free · Open source (MIT) · macOS 14.2+ · No network requests</p>
+      <p class="hero-meta">Free · Open source (GPL-3.0-only) · macOS 14.2+ · No network requests</p>
     </div>
 
     <div class="device-wrap">
@@ -116,7 +117,7 @@
           </div>
         </div>
       </div>
-      <p class="device-caption">The panel, shown while ChatGPT is answering. Nothing else appears on screen.</p>
+      <p class="device-caption">The panel, shown in pause mode while ChatGPT is answering. Nothing else appears on screen.</p>
     </div>
 
     <section id="how" class="container">
@@ -141,16 +142,16 @@
           <p class="step-num">02</p>
           <h3>Decide</h3>
           <p>
-            One deterministic coordinator weighs activity, silence and your own changes. Hysteresis
-            keeps music paused through the gaps between sentences.
+            One deterministic coordinator weighs activity, silence and your own changes. Choose whether
+            it pauses Music or lowers its volume through the gaps between sentences.
           </p>
         </div>
         <div class="step">
           <p class="step-num">03</p>
-          <h3>Resume</h3>
+          <h3>Hand back</h3>
           <p>
-            A single Apple Event pauses or resumes Music. Track, queue, position and volume are left
-            alone, and manual control always wins.
+            A single Apple Event pauses or resumes Music, or sets and restores its volume. Track, queue
+            and position stay intact, and manual control always wins.
           </p>
         </div>
       </div>
@@ -160,10 +161,10 @@
       <div class="container band-grid">
         <div>
           <p class="eyebrow">Privacy</p>
-          <h2>It hears a level, not a conversation.</h2>
+          <h2>It measures a level, not a conversation.</h2>
           <p class="lead">
-            No microphone. No recording. No transcript. No server. The app links no networking
-            framework at all and works with Wi-Fi off.
+            No microphone is needed by default. No recording, transcript or server either. If you opt
+            into “Pause while I speak,” Oreja uses your microphone only to keep playback interrupted.
           </p>
           <a class="band-link" href="docs.html#privacy">Read the privacy note <span aria-hidden="true">→</span></a>
         </div>
@@ -182,7 +183,7 @@
           </li>
           <li>
             <svg width="14" height="14" style="color: var(--wheat-bright)" aria-hidden="true"><use href="#check"/></svg>
-            <span>Oreja never launches Music, resets a track, clears a queue or changes the volume.</span>
+            <span>Oreja never launches Music, resets a track or clears a queue. Volume changes happen only when you choose lower-volume mode.</span>
           </li>
         </ul>
       </div>
@@ -280,6 +281,14 @@ open build/Oreja.app</code></pre>
           </p>
         </details>
         <details>
+          <summary>Can I pause Music or lower its volume?</summary>
+          <p>
+            Yes. Choose pause mode to stop Music while the AI speaks and resume it afterward, or choose
+            lower-volume mode to keep Music playing quietly and restore its original volume when the
+            reply ends. The setting is yours.
+          </p>
+        </details>
+        <details>
           <summary>Will a notification sound pause my music?</summary>
           <p>
             Possibly. Oreja reacts to output activity, not verified speech, so a sound played by the
@@ -291,8 +300,8 @@ open build/Oreja.app</code></pre>
           <summary>What if I pause or resume music myself?</summary>
           <p>
             Your choice wins. If you pause Music, Oreja will not resume it. If you resume Music while
-            ChatGPT is speaking, Oreja releases its claim and will pause again the next time ChatGPT
-            speaks.
+            ChatGPT is speaking, Oreja releases its claim and waits for the next activity before acting
+            again.
           </p>
         </details>
         <details>
@@ -337,12 +346,12 @@ open build/Oreja.app</code></pre>
           <a href="#verified">Verification</a>
           <a href="docs.html#privacy">Privacy</a>
           <a href="#get">Get Oreja</a>
-          <a href="https://opensource.org/license/mit">License (MIT)</a>
+          <a href="https://opensource.org/license/gpl-3.0">License (GPL-3.0-only)</a>
         </nav>
       </div>
       <p class="footer-fine">
-        Independent project. Not affiliated with OpenAI or Apple. Built with Swift and no third-party
-        dependencies.
+        Independent project. Not affiliated with OpenAI or Apple. Built with AI-assisted development
+        and human review.
       </p>
     </div>
   </footer>

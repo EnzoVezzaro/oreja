@@ -23,6 +23,8 @@ final class AppModel: ObservableObject {
     @Published private(set) var report: ConnectionCheckReport?
     @Published private(set) var isRunningCheck = false
     @Published private(set) var launchAtLoginError: String?
+    @Published private(set) var userSpeechError: String?
+    @Published private(set) var isListeningForUser = false
 
     @Published var settings: AppSettings {
         didSet {
@@ -45,8 +47,10 @@ final class AppModel: ObservableObject {
 
     private var monitor: (any AIAudioMonitoring)?
     private var eventTask: Task<Void, Never>?
+    private var speechMonitor: MicrophoneActivityMonitor?
+    private var speechEventTask: Task<Void, Never>?
+    private var activity = ActivityAggregator()
     private var observationTask: Task<Void, Never>?
-    private var sourceWatchTask: Task<Void, Never>?
     private var retryTask: Task<Void, Never>?
     private var hasRunStalePauseRecovery = false
     private var windows = WindowRegistry()
@@ -63,7 +67,8 @@ final class AppModel: ObservableObject {
         self.settingsStore = resolvedStore
         self.pauseJournal = resolvedJournal
         self.monitorFactory = monitorFactory ?? ProcessAudioMonitorFactory()
-        self.media = media ?? AppleMusicController()
+        let resolvedMedia = media ?? AppleMusicController()
+        self.media = resolvedMedia
         self.settings = loaded
 
         let diagnostics = DiagnosticsLog()
@@ -71,7 +76,8 @@ final class AppModel: ObservableObject {
         self.coordinator = PlaybackCoordinator(
             policy: loaded.policy,
             diagnostics: diagnostics,
-            journal: resolvedJournal
+            journal: resolvedJournal,
+            canSetVolume: resolvedMedia.capabilities.canSetVolume
         )
 
         coordinator.onCommand = { [weak self] command in
@@ -101,6 +107,7 @@ final class AppModel: ObservableObject {
             // triggers the system permission prompt, so it belongs to onboarding step 4.
             if settings.onboardingCompleted {
                 startMonitoringIfNeeded()
+                startUserSpeechMonitoring()
             }
         }
         publishCoordinatorState()
@@ -182,6 +189,14 @@ final class AppModel: ObservableObject {
             }
         }
 
+        if settings.pauseWhileISpeak != previous.pauseWhileISpeak {
+            if settings.pauseWhileISpeak, settings.automationEnabled {
+                startUserSpeechMonitoring()
+            } else {
+                stopUserSpeechMonitoring(reason: "option turned off")
+            }
+        }
+
         record(.info, .settings, "Settings updated.")
     }
 
@@ -197,13 +212,16 @@ final class AppModel: ObservableObject {
         monitor = newMonitor
         record(.info, .monitoring, "Starting audio monitor for \(descriptor.displayName).")
 
+        let monitorID = ObjectIdentifier(newMonitor as AnyObject)
         eventTask = Task { [weak self] in
             for await event in newMonitor.events {
                 guard let self else { return }
                 self.handle(event)
             }
             guard let self else { return }
-            self.monitorEndedUnexpectedly()
+            // An intentional stop also ends the stream; only a monitor that is still the current
+            // one has ended unexpectedly.
+            self.monitorEndedUnexpectedly(monitorID: monitorID)
         }
 
         Task { [weak self] in
@@ -218,14 +236,14 @@ final class AppModel: ObservableObject {
             }
         }
 
-        startSourceWatch()
+        startUserSpeechMonitoring()
     }
 
     func stopMonitoring(reason: String) {
+        stopUserSpeechMonitoring(reason: reason)
+        activity.reset()
         retryTask?.cancel()
         retryTask = nil
-        sourceWatchTask?.cancel()
-        sourceWatchTask = nil
         isMonitoring = false
 
         if let monitor {
@@ -244,6 +262,11 @@ final class AppModel: ObservableObject {
             hasAudioPermission = true
             sourceDescription = description
             coordinator.monitoringBecameAvailable(description: description)
+        case .targetsChanged(let description):
+            // The app opened a new audio process (for example the renderer that appears when a
+            // voice conversation starts). The tap was rebuilt; music must not resume because of it.
+            sourceDescription = description
+            record(.info, .monitoring, "Now listening to \(description).")
         case .monitorStopped(let reason):
             isMonitoring = false
             sourceDescription = ""
@@ -252,10 +275,99 @@ final class AppModel: ObservableObject {
             isMonitoring = false
             if failure.kind == .permissionDenied { hasAudioPermission = false }
             coordinator.monitoringFailed(failure)
+            // The monitored app quit or dropped all of its audio processes. Without this the tap
+            // would stay dead until the user toggled automation by hand.
+            if failure.kind != .permissionDenied {
+                scheduleMonitoringRetry()
+            }
         case .activityStarted(let levelDB):
-            coordinator.audioActivityStarted(levelDB: levelDB)
+            if activity.set(true, for: .ai) {
+                coordinator.audioActivityStarted(levelDB: levelDB)
+            }
         case .activityEnded:
+            if activity.set(false, for: .ai) {
+                coordinator.audioActivityEnded()
+            }
+        }
+        publishCoordinatorState()
+    }
+
+    // MARK: User speech
+
+    /// Starts the optional microphone monitor. Only ever called while automation is enabled and the
+    /// user turned the option on; it never runs by default.
+    func startUserSpeechMonitoring() {
+        guard settings.pauseWhileISpeak, settings.automationEnabled else { return }
+        guard #available(macOS 14.2, *) else { return }
+        guard speechMonitor == nil else { return }
+
+        let monitor = MicrophoneActivityMonitor()
+        speechMonitor = monitor
+        record(.info, .monitoring, "Listening for your voice as well.")
+
+        speechEventTask = Task { [weak self] in
+            for await event in monitor.events {
+                guard let self else { return }
+                self.handleSpeech(event)
+            }
+        }
+
+        Task { [weak self] in
+            do {
+                try await monitor.start()
+                guard let self else { return }
+                self.isListeningForUser = true
+                self.userSpeechError = nil
+            } catch {
+                guard let self else { return }
+                let message = (error as? AudioMonitoringFailure)?.message ?? error.localizedDescription
+                self.userSpeechError = message
+                self.isListeningForUser = false
+                self.record(.error, .permissions, "Microphone unavailable: \(message)")
+                self.stopUserSpeechMonitoring(reason: "microphone unavailable")
+            }
+        }
+    }
+
+    private func stopUserSpeechMonitoring(reason: String) {
+        guard let monitor = speechMonitor else { return }
+        speechMonitor = nil
+        speechEventTask?.cancel()
+        speechEventTask = nil
+        isListeningForUser = false
+        if activity.set(false, for: .user) {
             coordinator.audioActivityEnded()
+        }
+        Task { await monitor.stop() }
+        record(.info, .monitoring, "Stopped listening for your voice: \(reason).")
+        publishCoordinatorState()
+    }
+
+    private func handleSpeech(_ event: AudioActivityEvent) {
+        switch event {
+        case .monitorStarted:
+            isListeningForUser = true
+            userSpeechError = nil
+        case .targetsChanged:
+            break
+        case .monitorStopped:
+            isListeningForUser = false
+        case .monitorFailed(let failure):
+            isListeningForUser = false
+            userSpeechError = failure.message
+        case .activityStarted(let levelDB):
+            // User speech must be able to start a pause when the person speaks first. Headphones
+            // are recommended because speakers can feed Music back into this microphone. The
+            // coordinator still owns the pause and the activity aggregator prevents duplicate
+            // pause requests when AI and user activity overlap.
+            if activity.set(true, for: .user) {
+                record(.info, .monitoring, "Your voice is active; pausing music.")
+                coordinator.audioActivityStarted(levelDB: levelDB)
+            }
+        case .activityEnded:
+            if activity.set(false, for: .user) {
+                coordinator.audioActivityEnded()
+            }
         }
         publishCoordinatorState()
     }
@@ -276,8 +388,9 @@ final class AppModel: ObservableObject {
         }
     }
 
-    private func monitorEndedUnexpectedly() {
+    private func monitorEndedUnexpectedly(monitorID: ObjectIdentifier) {
         guard settings.automationEnabled else { return }
+        guard let monitor, ObjectIdentifier(monitor as AnyObject) == monitorID else { return }
         isMonitoring = false
         coordinator.sourceInvalidated(reason: "the audio monitor stopped")
         scheduleMonitoringRetry()
@@ -296,33 +409,11 @@ final class AppModel: ObservableObject {
     }
 
     private func stopMonitoringKeepRetry() {
-        sourceWatchTask?.cancel()
-        sourceWatchTask = nil
         if let monitor {
             self.monitor = nil
             eventTask?.cancel()
             eventTask = nil
             Task { await monitor.stop() }
-        }
-    }
-
-    /// Watches whether the selected application is still running, so Oreja never keeps a tap on a
-    /// process that no longer exists and the menu bar does not claim to monitor a closed app.
-    private func startSourceWatch() {
-        sourceWatchTask?.cancel()
-        sourceWatchTask = Task { [weak self] in
-            while !Task.isCancelled {
-                try? await Task.sleep(nanoseconds: 2_000_000_000)
-                guard let self, !Task.isCancelled else { return }
-                guard self.settings.automationEnabled else { return }
-                guard self.settings.aiSource.kind == .chatGPTDesktop else { continue }
-                if !self.isSourceApplicationRunning() {
-                    self.stopMonitoringKeepRetry()
-                    self.isMonitoring = false
-                    self.coordinator.sourceInvalidated(reason: "\(self.settings.aiSource.displayName) quit")
-                    self.scheduleMonitoringRetry()
-                }
-            }
         }
     }
 
@@ -401,11 +492,18 @@ final class AppModel: ObservableObject {
         Task { [weak self] in
             guard let self else { return }
             do {
-                let snapshot = switch command.kind {
+                let snapshot: MediaPlaybackSnapshot
+                switch command.kind {
                 case .pause:
-                    try await self.media.pauseReporting()
+                    snapshot = try await self.media.pauseReporting()
                 case .resume:
-                    try await self.media.resumeReporting()
+                    snapshot = try await self.media.resumeReporting()
+                case .setVolume:
+                    guard let target = command.targetVolume else {
+                        throw MediaControlError.commandFailed("No target volume was provided.")
+                    }
+                    try await self.media.setVolume(target)
+                    snapshot = await self.media.currentPlayback()
                 }
                 self.music = snapshot
                 self.coordinator.complete(command.id, outcome: .succeeded(snapshot))
