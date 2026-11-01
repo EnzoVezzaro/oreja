@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>en</string>
+	<key>CFBundleExecutable</key>
+	<string>Oreja</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
+	<key>CFBundleIdentifier</key>
+	<string>app.oreja.van-gogh</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>Oreja de Van Gogh</string>
+	<key>CFBundleDisplayName</key>
+	<string>Oreja de Van Gogh</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>0.1.0</string>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+	<key>LSApplicationCategoryType</key>
+	<string>public.app-category.utilities</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>14.2</string>
+	<key>LSUIElement</key>
+	<true/>
+	<key>NSHumanReadableCopyright</key>
+	<string>Oreja de Van Gogh — an independent audio companion. Not affiliated with OpenAI or Apple.</string>
+	<key>NSAudioCaptureUsageDescription</key>
+	<string>Oreja listens to the audio output of the app you select so it can pause your music while ChatGPT speaks. Audio is analyzed locally as level only; nothing is recorded, stored, or uploaded.</string>
+	<key>NSAppleEventsUsageDescription</key>
+	<string>Oreja controls the Music app to pause and resume your music when ChatGPT starts and stops speaking. Oreja never reads your library or conversations.</string>
+	<key>NSHighResolutionCapable</key>
+	<true/>
+	<key>NSSupportsAutomaticTermination</key>
+	<false/>
+	<key>NSSupportsSuddenTermination</key>
+	<false/>
+</dict>
+</plist>
