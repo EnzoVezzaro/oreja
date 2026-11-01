@@ -226,20 +226,23 @@
     <section id="get" class="container">
       <div class="section-head">
         <p class="eyebrow">Get Oreja</p>
-        <h2>Build it in one command.</h2>
+        <h2>Download Oreja for Mac.</h2>
         <p class="lead">
-          There is no notarized download yet. Oreja is a local, ad-hoc signed build: from a checkout
-          of the repository, run the script, then open the app.
+          Download the latest 0.1.0 DMG, or build Oreja locally from source. The download is
+          ad-hoc signed and not notarized yet.
         </p>
       </div>
       <div class="get-grid">
         <div>
+          <a class="btn btn-primary" href="https://github.com/EnzoVezzaro/oreja/releases/download/v0.1.0/Oreja-0.1.0.dmg">Download Oreja 0.1.0 for macOS</a>
+          <p class="note">
+            macOS may ask you to approve the app in System Settings › Privacy &amp; Security because
+            this build does not carry a Developer ID or notarization.
+          </p>
           <pre><code>./scripts/build.sh
 open build/Oreja.app</code></pre>
           <p class="note">
-            On another Mac, Gatekeeper may warn because the build carries no Developer ID. Build
-            locally, or allow it once in System Settings › Privacy &amp; Security. Oreja does not
-            disable Gatekeeper.
+            Building locally is also supported. Oreja does not disable Gatekeeper.
           </p>
         </div>
         <ul class="requirements">
