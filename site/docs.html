@@ -1,0 +1,327 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Documentation — Oreja de Van Gogh</title>
+  <meta name="description" content="Install, permissions, day-to-day use, troubleshooting and privacy for Oreja de Van Gogh, the macOS menu bar companion for ChatGPT and Apple Music.">
+  <meta name="theme-color" content="#f7f2e8" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#11100e" media="(prefers-color-scheme: dark)">
+  <link rel="icon" href="assets/mark.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <symbol id="mark-tile" viewBox="0 0 64 64">
+      <rect width="64" height="64" rx="18.5" fill="#242c5a"/>
+      <circle cx="25" cy="32" r="3.4" fill="#f7f2e8"/>
+      <path d="M31.43 24.34a10 10 0 0 1 0 15.32" fill="none" stroke="#f7f2e8" stroke-width="3.4" stroke-linecap="round"/>
+      <path d="M35.93 18.98a17 17 0 0 1 0 26.04" fill="none" stroke="#e7b44c" stroke-width="3.4" stroke-linecap="round"/>
+    </symbol>
+  </svg>
+
+  <header class="site-header">
+    <div class="container nav">
+      <a class="brand" href="index.html" aria-label="Oreja de Van Gogh — home">
+        <svg class="mark-tile mark-26" aria-hidden="true"><use href="#mark-tile"/></svg>
+        <span class="brand-lockup">
+          <span class="brand-name">oreja</span>
+          <span class="brand-suffix">DE VAN GOGH</span>
+        </span>
+      </a>
+      <nav class="nav-links" aria-label="Primary">
+        <a href="index.html#how">How it works</a>
+        <a href="index.html#privacy">Privacy</a>
+        <a href="index.html#verified">Verification</a>
+        <a href="docs.html" aria-current="page">Docs</a>
+      </nav>
+      <a class="btn btn-primary btn-small" href="index.html#get">Get Oreja</a>
+    </div>
+  </header>
+
+  <main id="main">
+    <div class="docs-hero container">
+      <p class="eyebrow">Documentation</p>
+      <h1>Everything Oreja does, and does not do.</h1>
+      <p class="lead">
+        Setup, the two permissions, what each panel state means, and the honest edges. Where a test
+        was not run, this page says so.
+      </p>
+    </div>
+
+    <div class="container docs-layout">
+      <nav class="docs-nav" aria-label="Documentation sections">
+        <a href="#start">Quick start</a>
+        <a href="#permissions">Permissions</a>
+        <a href="#using">Using Oreja</a>
+        <a href="#states">Panel states</a>
+        <a href="#troubleshooting">Troubleshooting</a>
+        <a href="#privacy">Privacy</a>
+        <a href="#architecture">Architecture</a>
+        <a href="#building">Build and test</a>
+        <a href="#more">More documentation</a>
+      </nav>
+
+      <article class="docs-body">
+        <section id="start">
+          <h2>Quick start</h2>
+          <p>
+            Oreja is a menu bar app for macOS with one job: pause Apple Music while the AI app you
+            choose is speaking, and resume it when the reply ends.
+          </p>
+          <h3>What you need</h3>
+          <ul>
+            <li><strong>macOS 14.2 or newer.</strong> The audio tap relies on Core Audio process taps.</li>
+            <li><strong>ChatGPT desktop app</strong> (<code>com.openai.chat</code>, <code>com.openai.chatgpt</code> or <code>com.openai.codex</code>), or ChatGPT in Safari/Chrome as an experimental source.</li>
+            <li><strong>The Music app</strong>, with a song loaded. An Apple Music subscription is not required by Oreja, but Music must be the app that is playing.</li>
+            <li><strong>Command Line Tools</strong> if you build from source. There are no third-party dependencies.</li>
+          </ul>
+          <h3>Build and open</h3>
+          <pre><code>./scripts/build.sh
+open build/Oreja.app</code></pre>
+          <p>
+            The first launch runs a six-step setup: welcome, AI source, music source, audio-capture
+            permission, live test, finish. After that the app lives only in the menu bar. To see setup
+            again, quit Oreja and run <code>defaults delete app.oreja.van-gogh</code>.
+          </p>
+          <p class="note">
+            The build is ad-hoc signed and not notarized. On another Mac, macOS may block the first
+            launch; allow it once in System Settings › Privacy &amp; Security. Do not disable
+            Gatekeeper for this.
+          </p>
+        </section>
+
+        <section id="permissions">
+          <h2>Permissions</h2>
+          <p>Oreja asks for two permissions, each with a specific purpose string.</p>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th scope="col">Permission</th><th scope="col">Why</th><th scope="col">Where</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>System audio recording</td><td>Read the selected app's output level through a Core Audio process tap.</td><td>System Settings › Privacy &amp; Security › Screen &amp; System Audio Recording</td></tr>
+                <tr><td>Automation (Music)</td><td>Pause and resume the Music app.</td><td>The macOS prompt on first control, then Privacy &amp; Security › Automation</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p>
+            No microphone, screen content, accessibility, full disk, contacts, location or network
+            access is used. If you rebuild the app, macOS may treat it as a new app because its
+            ad-hoc signature changed: grant audio capture again.
+          </p>
+          <pre><code>tccutil reset AudioCapture app.oreja.van-gogh
+tccutil reset AppleEvents app.oreja.van-gogh</code></pre>
+        </section>
+
+        <section id="using">
+          <h2>Using Oreja</h2>
+          <ul>
+            <li><strong>The switch</strong> in the panel enables or disables coordination. Turning it off while Oreja holds a pause resumes your music first.</li>
+            <li><strong>Resume delay</strong> (0.3–3.0 s, default 0.8 s) is how long ChatGPT must stay quiet before music resumes. It is layered on top of the detector's 0.25 s silence window.</li>
+            <li><strong>Manual control always wins.</strong> If you pause Music yourself, Oreja will not resume it. If you resume Music while ChatGPT speaks, Oreja releases its claim.</li>
+            <li><strong>Quitting</strong> while Oreja owns a pause restores playback before exit. The pause journal can restore it on the next launch, but only when the same track is still paused and the pause is recent.</li>
+          </ul>
+        </section>
+
+        <section id="states">
+          <h2>Panel states</h2>
+          <p>The panel shows one state at a time. This is the full list.</p>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th scope="col">State</th><th scope="col">Meaning</th><th scope="col">If it stays there</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>Automation off</td><td>The switch is off; Oreja does nothing.</td><td>Turn it on.</td></tr>
+                <tr><td>Looking for the AI source</td><td>Automation is on but no monitor is running.</td><td>Open ChatGPT; check the selected source matches the app that is running.</td></tr>
+                <tr><td>Monitoring ChatGPT</td><td>The monitor is alive and the AI is quiet.</td><td>Ask ChatGPT a question and watch for "ChatGPT is speaking".</td></tr>
+                <tr><td>Music playing</td><td>The AI is quiet and music is playing.</td><td>Normal while ChatGPT is silent.</td></tr>
+                <tr><td>ChatGPT is speaking</td><td>Activity detected; music should be paused.</td><td>If music continues, check Automation permission for Music.</td></tr>
+                <tr><td>Music paused by Oreja</td><td>Oreja owns the pause.</td><td>It resumes after the quiet interval.</td></tr>
+                <tr><td>Waiting for silence</td><td>The AI stopped; the resume delay is counting.</td><td>Adjust the delay in Settings.</td></tr>
+                <tr><td>Resuming music</td><td>A resume command is in flight.</td><td>A failure is shown with a reason.</td></tr>
+                <tr><td>Suspended</td><td>The Mac slept.</td><td>Wake it; state reconciles automatically.</td></tr>
+                <tr><td>Permission required</td><td>Audio capture or Automation is denied.</td><td>See Troubleshooting below.</td></tr>
+                <tr><td>Needs attention</td><td>Repeated command failures or a monitor error.</td><td>Open Diagnostics, fix the reason, then Retry.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section id="troubleshooting">
+          <h2>Troubleshooting</h2>
+          <p>
+            Start with the panel: it shows one state and a reason. Diagnostics lists recent state
+            transitions and a connection test with per-step results.
+          </p>
+
+          <h3>"Permission required" for audio</h3>
+          <ol>
+            <li>Open System Settings › Privacy &amp; Security › Screen &amp; System Audio Recording.</li>
+            <li>Enable Oreja, or remove it with "−" and relaunch Oreja to prompt again.</li>
+            <li>Restart Oreja after changing the setting.</li>
+            <li>If you rebuilt the app, its ad-hoc signature changed: grant again.</li>
+          </ol>
+          <p>Do not grant Microphone or Accessibility. They are not used.</p>
+
+          <h3>Music never pauses</h3>
+          <ul>
+            <li>Check that the AI source selection matches the app that is talking. ChatGPT app versus browser is a common mismatch.</li>
+            <li>Check that Music is the app that is playing, not Spotify or a browser tab.</li>
+            <li>Watch Diagnostics for activity events. If none appear, the tap is not receiving audio: re-grant audio capture.</li>
+            <li>If activity appears but no pause is issued, Music was already paused, a command is pending, or a manual override was detected. Diagnostics says which.</li>
+          </ul>
+
+          <h3>Music keeps toggling</h3>
+          <ul>
+            <li>Increase the resume delay. Pauses shorter than the delay keep music paused.</li>
+            <li>Switch away from a browser source, or use a dedicated browser window: other tabs can look like AI audio.</li>
+          </ul>
+
+          <h3>Oreja left my music paused</h3>
+          <ul>
+            <li>If Oreja is running and still owns the pause, turn automation off or use "Resume music now".</li>
+            <li>If it crashed, relaunch it. The journal restores playback only when the same track is still paused and the pause is younger than 12 hours.</li>
+            <li>If Music quit or the track changed meanwhile, Oreja leaves playback alone. Press play in Music.</li>
+          </ul>
+
+          <h3>The app is not in the menu bar</h3>
+          <ul>
+            <li>It is a menu bar app with no Dock icon by design. Look for the listening glyph.</li>
+            <li>If the menu bar is full, quit another menu bar app or use a menu bar manager.</li>
+            <li>Launch it from Terminal to see errors: <code>build/Oreja.app/Contents/MacOS/Oreja</code>.</li>
+          </ul>
+        </section>
+
+        <section id="privacy">
+          <h2>Privacy</h2>
+          <p>
+            Oreja is local-first and has no server. It does not record, transcribe, store or upload
+            audio, prompts or replies.
+          </p>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th scope="col">Data</th><th scope="col">Collected</th><th scope="col">Stored</th><th scope="col">Transmitted</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>Conversation audio</td><td>No</td><td>No</td><td>No</td></tr>
+                <tr><td>Transcripts, prompts, replies</td><td>No</td><td>No</td><td>No</td></tr>
+                <tr><td>Audio levels (dBFS)</td><td>Computed in memory</td><td>Discarded immediately</td><td>No</td></tr>
+                <tr><td>Track identity while paused</td><td>Held in memory</td><td><code>UserDefaults</code>, for crash recovery only</td><td>No</td></tr>
+                <tr><td>Settings</td><td>Yes</td><td><code>UserDefaults</code> on this Mac</td><td>No</td></tr>
+                <tr><td>Diagnostic events</td><td>Oreja's own state changes</td><td>In-memory buffer, up to 300 events</td><td>No</td></tr>
+                <tr><td>Account, analytics, crash reporting</td><td>No</td><td>No</td><td>No</td></tr>
+                <tr><td>Network requests</td><td>None</td><td>—</td><td>—</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p>
+            The app links no networking framework. It works offline, without an OpenAI API key and
+            without an account. Remove all local state with
+            <code>defaults delete app.oreja.van-gogh</code>.
+          </p>
+        </section>
+
+        <section id="architecture">
+          <h2>Architecture</h2>
+          <p>
+            Oreja taps the output of the selected application's Core Audio processes, unmuted, so the
+            app keeps playing normally while Oreja listens to a copy. The tap is private, targeted at
+            that application's processes and helpers, and torn down when monitoring stops.
+          </p>
+          <p>
+            The decision to pause or resume lives in one deterministic state machine with no AppKit,
+            no Core Audio and no AppleScript, so it is fully unit-tested. Platform code sits behind
+            ports.
+          </p>
+          <pre><code>ChatGPT output audio → Core Audio process tap → level analysis → coordinator
+                                                              │
+Apple Music playback ← Apple Events ← pause / resume commands ┘</code></pre>
+          <ul>
+            <li><code>packages/OrejaCore</code> — domain, ports, coordinator, settings, diagnostics. No platform imports.</li>
+            <li><code>packages/OrejaAudio</code> — process discovery, taps, level sampling, activity detector.</li>
+            <li><code>packages/OrejaMedia</code> — Apple Music control through Apple Events, plus a mock provider.</li>
+            <li><code>apps/macos</code> — SwiftUI menu bar app, onboarding, settings, diagnostics.</li>
+          </ul>
+        </section>
+
+        <section id="building">
+          <h2>Build and test</h2>
+          <pre><code>./scripts/build.sh            # build/Oreja.app, ad-hoc signed
+./scripts/build.sh --probe    # plus the oreja-probe audio diagnostic
+./scripts/build.sh --harness  # plus the real capture → Music harness
+./scripts/build.sh --no-sign  # skip signing
+
+./scripts/test.sh             # automated suite
+./scripts/test.sh resume      # filter by test name</code></pre>
+          <p>
+            This machine has Command Line Tools only and its SwiftPM manifest library is broken, which
+            is why the scripts invoke <code>swiftc</code> directly. <code>Package.swift</code> is kept
+            for full Xcode installations.
+          </p>
+          <h3>Verify the audio path yourself</h3>
+          <pre><code>./build/bin/oreja-probe --list
+./build/bin/oreja-probe --pid &lt;pid&gt; --seconds 6</code></pre>
+          <p>
+            The probe prints levels only; it never stores audio. Find a process with
+            <code>output=yes</code>. If tap creation fails with OSStatus -50 or -4, audio-capture
+            permission is missing for the app running the probe.
+          </p>
+        </section>
+
+        <section id="more">
+          <h2>More documentation</h2>
+          <p>
+            This page covers what you need to run Oreja. The longer notes live in the repository,
+            beside the app, as Markdown:
+          </p>
+          <ul class="doc-index">
+            <li><code>docs/architecture.md</code><span>The full design and state machine.</span></li>
+            <li><code>docs/permissions.md</code><span>Purpose strings, reset commands, what not to grant.</span></li>
+            <li><code>docs/troubleshooting.md</code><span>The longer troubleshooting guide.</span></li>
+            <li><code>docs/privacy.md</code><span>The complete data statement.</span></li>
+            <li><code>docs/test-evidence.md</code><span>Commands, raw output, dates and limitations.</span></li>
+            <li><code>docs/compatibility.md</code><span>Release, hardware and source matrix.</span></li>
+            <li><code>docs/distribution.md</code><span>Signing and notarization status.</span></li>
+            <li><code>docs/brand.md</code><span>Palette, type, voice and mark usage.</span></li>
+          </ul>
+        </section>
+      </article>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-top">
+        <div>
+          <div class="footer-brand">
+            <svg class="mark-tile mark-26" aria-hidden="true"><use href="#mark-tile"/></svg>
+            <span class="brand-lockup">
+              <span class="brand-name">oreja</span>
+              <span class="brand-suffix">DE VAN GOGH</span>
+            </span>
+          </div>
+          <p class="footer-note">
+            A local menu bar companion for ChatGPT and Apple Music. One job, no account, no recording.
+          </p>
+        </div>
+        <nav class="footer-links" aria-label="Footer">
+          <a href="index.html">Home</a>
+          <a href="index.html#verified">Verification</a>
+          <a href="#start">Quick start</a>
+          <a href="#privacy">Privacy</a>
+          <a href="https://opensource.org/license/mit">License (MIT)</a>
+        </nav>
+      </div>
+      <p class="footer-fine">
+        Independent project. Not affiliated with OpenAI or Apple. Built with Swift and no third-party
+        dependencies.
+      </p>
+    </div>
+  </footer>
+</body>
+</html>

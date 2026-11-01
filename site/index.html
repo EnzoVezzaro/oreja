@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Oreja de Van Gogh — your AI talks, your music listens</title>
+  <meta name="description" content="A macOS menu bar app that pauses Apple Music while ChatGPT speaks and resumes it when the reply ends. Local only: no account, no API key, no recording.">
+  <meta name="theme-color" content="#f7f2e8" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#11100e" media="(prefers-color-scheme: dark)">
+  <meta property="og:title" content="Oreja de Van Gogh">
+  <meta property="og:description" content="Your AI talks. Your music listens. A local menu bar app for ChatGPT and Apple Music.">
+  <meta property="og:type" content="website">
+  <link rel="icon" href="assets/mark.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <symbol id="mark-tile" viewBox="0 0 64 64">
+      <rect width="64" height="64" rx="18.5" fill="#242c5a"/>
+      <circle cx="25" cy="32" r="3.4" fill="#f7f2e8"/>
+      <path d="M31.43 24.34a10 10 0 0 1 0 15.32" fill="none" stroke="#f7f2e8" stroke-width="3.4" stroke-linecap="round"/>
+      <path d="M35.93 18.98a17 17 0 0 1 0 26.04" fill="none" stroke="#e7b44c" stroke-width="3.4" stroke-linecap="round"/>
+    </symbol>
+    <symbol id="check" viewBox="0 0 16 16">
+      <path d="M3.2 8.4l3.1 3.1 6.5-6.6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+    </symbol>
+  </svg>
+
+  <header class="site-header">
+    <div class="container nav">
+      <a class="brand" href="index.html" aria-label="Oreja de Van Gogh — home">
+        <svg class="mark-tile mark-26" aria-hidden="true"><use href="#mark-tile"/></svg>
+        <span class="brand-lockup">
+          <span class="brand-name">oreja</span>
+          <span class="brand-suffix">DE VAN GOGH</span>
+        </span>
+      </a>
+      <nav class="nav-links" aria-label="Primary">
+        <a href="#how">How it works</a>
+        <a href="#privacy">Privacy</a>
+        <a href="#verified">Verification</a>
+        <a href="docs.html">Docs</a>
+      </nav>
+      <a class="btn btn-primary btn-small" href="#get">Get Oreja</a>
+    </div>
+  </header>
+
+  <main id="main">
+    <div class="hero container">
+      <span class="pill">
+        <svg class="mark-tile mark-20" aria-hidden="true"><use href="#mark-tile"/></svg>
+        Menu bar app for macOS
+      </span>
+      <h1>Your AI talks.<br>Your music <em>listens.</em></h1>
+      <p class="hero-sub">
+        Oreja pauses Apple Music while ChatGPT speaks, then puts it back exactly where it was when the
+        reply ends. One job, no account, no recording.
+      </p>
+      <div class="hero-actions">
+        <a class="btn btn-primary" href="#get">Get Oreja</a>
+        <a class="btn btn-ghost" href="#how">How it works</a>
+      </div>
+      <p class="hero-meta">Free · Open source (MIT) · macOS 14.2+ · No network requests</p>
+    </div>
+
+    <div class="device-wrap">
+      <div class="device" role="img" aria-label="The Oreja menu bar panel while ChatGPT is speaking: music paused by Oreja, with a Resume music now button.">
+        <div class="device-screen">
+          <div class="menubar" aria-hidden="true">
+            <div class="menubar-group">
+              <span>Finder</span>
+              <span class="wide muted">File</span>
+              <span class="wide muted">Edit</span>
+              <span class="wide muted">View</span>
+            </div>
+            <div class="menubar-group">
+              <svg class="mark-tile mark-12"><use href="#mark-tile"/></svg>
+              <span>Mon 9:41</span>
+            </div>
+          </div>
+          <div class="desktop" aria-hidden="true">
+            <div class="panel">
+              <div class="mp-head">
+                <span class="mp-mark">
+                  <svg class="mark-12"><use href="#mark-tile"/></svg>
+                </span>
+                <span class="mp-word">oreja</span>
+                <span class="mp-suffix">DE VAN GOGH</span>
+                <span class="mp-switch"></span>
+              </div>
+              <div class="mp-status">
+                <span class="mp-dot"></span>
+                <div>
+                  <div class="mp-title">Music paused by Oreja</div>
+                  <div class="mp-detail">Paused because ChatGPT is speaking. It resumes after the quiet interval.</div>
+                </div>
+              </div>
+              <div class="mp-music">
+                <span>♪</span>
+                <span>Apple Music is paused</span>
+                <span class="mp-track">· Clair de Lune</span>
+              </div>
+              <div class="mp-cta">
+                <span>▶</span>
+                <span>Resume music now</span>
+              </div>
+              <div class="mp-rows">
+                <div class="mp-row"><span>Connection test</span></div>
+                <div class="mp-row"><span>Settings</span><span class="mp-hint">⌘,</span></div>
+                <div class="mp-row"><span>Diagnostics</span></div>
+                <div class="mp-row"><span>Quit Oreja</span><span class="mp-hint">⌘Q</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <p class="device-caption">The panel, shown while ChatGPT is answering. Nothing else appears on screen.</p>
+    </div>
+
+    <section id="how" class="container">
+      <div class="section-head">
+        <p class="eyebrow">How it works</p>
+        <h2>Three quiet steps. None of them yours.</h2>
+        <p class="lead">
+          Oreja watches the audio output of one application, decides once, and hands playback back.
+          The decision lives in a single tested state machine, not in a view.
+        </p>
+      </div>
+      <div class="steps">
+        <div class="step">
+          <p class="step-num">01</p>
+          <h3>Listen</h3>
+          <p>
+            A Core Audio process tap copies the selected app's output. Only a level is computed, in
+            memory, and discarded immediately.
+          </p>
+        </div>
+        <div class="step">
+          <p class="step-num">02</p>
+          <h3>Decide</h3>
+          <p>
+            One deterministic coordinator weighs activity, silence and your own changes. Hysteresis
+            keeps music paused through the gaps between sentences.
+          </p>
+        </div>
+        <div class="step">
+          <p class="step-num">03</p>
+          <h3>Resume</h3>
+          <p>
+            A single Apple Event pauses or resumes Music. Track, queue, position and volume are left
+            alone, and manual control always wins.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <section id="privacy" class="band">
+      <div class="container band-grid">
+        <div>
+          <p class="eyebrow">Privacy</p>
+          <h2>It hears a level, not a conversation.</h2>
+          <p class="lead">
+            No microphone. No recording. No transcript. No server. The app links no networking
+            framework at all and works with Wi-Fi off.
+          </p>
+          <a class="band-link" href="docs.html#privacy">Read the privacy note <span aria-hidden="true">→</span></a>
+        </div>
+        <ul class="checks">
+          <li>
+            <svg width="14" height="14" style="color: var(--wheat-bright)" aria-hidden="true"><use href="#check"/></svg>
+            <span>Audio levels exist for milliseconds in memory and are never written to disk.</span>
+          </li>
+          <li>
+            <svg width="14" height="14" style="color: var(--wheat-bright)" aria-hidden="true"><use href="#check"/></svg>
+            <span>No account, no API key, no analytics SDK, no crash reporting.</span>
+          </li>
+          <li>
+            <svg width="14" height="14" style="color: var(--wheat-bright)" aria-hidden="true"><use href="#check"/></svg>
+            <span>Diagnostics keep Oreja's own state changes in memory, and forget them when it quits.</span>
+          </li>
+          <li>
+            <svg width="14" height="14" style="color: var(--wheat-bright)" aria-hidden="true"><use href="#check"/></svg>
+            <span>Oreja never launches Music, resets a track, clears a queue or changes the volume.</span>
+          </li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="verified" class="container">
+      <div class="section-head">
+        <p class="eyebrow">Verification</p>
+        <h2>The honest version.</h2>
+        <p class="lead">
+          A small app that claims little is easier to trust. This is what has actually been executed
+          on the development machine, and what has not.
+        </p>
+      </div>
+      <div class="evidence">
+        <div class="evidence-card">
+          <h3>Executed</h3>
+          <ul>
+            <li><span class="status-dot status-ok" aria-hidden="true"></span><span>The automated suite covers the coordinator, detector, settings, pause journal and AppleScript parsing.</span></li>
+            <li><span class="status-dot status-ok" aria-hidden="true"></span><span>The app bundle builds, signs, launches, and stays resident in the menu bar.</span></li>
+            <li><span class="status-dot status-ok" aria-hidden="true"></span><span>Core Audio process tap capture was verified with a local probe against a real audio-producing process.</span></li>
+            <li><span class="status-dot status-ok" aria-hidden="true"></span><span>Apple Music pause and resume were verified end to end with the integration harness and a controlled audio fixture.</span></li>
+          </ul>
+        </div>
+        <div class="evidence-card">
+          <h3>Not yet</h3>
+          <ul>
+            <li><span class="status-dot status-open" aria-hidden="true"></span><span>A live ChatGPT Voice session has not been run. The ChatGPT audio path is unverified against real replies.</span></li>
+            <li><span class="status-dot status-open" aria-hidden="true"></span><span>CPU and battery impact, Bluetooth and AirPods switching, and live end-to-end latency are unmeasured.</span></li>
+            <li><span class="status-dot status-open" aria-hidden="true"></span><span>The build is ad-hoc signed and not notarized.</span></li>
+            <li><span class="status-dot status-open" aria-hidden="true"></span><span>Browser sources are experimental and capture every tab in that browser.</span></li>
+          </ul>
+        </div>
+      </div>
+      <p class="evidence-foot">
+        Commands, raw output and dates live in <code>docs/test-evidence.md</code> in the repository.
+      </p>
+    </section>
+
+    <section id="get" class="container">
+      <div class="section-head">
+        <p class="eyebrow">Get Oreja</p>
+        <h2>Build it in one command.</h2>
+        <p class="lead">
+          There is no notarized download yet. Oreja is a local, ad-hoc signed build: from a checkout
+          of the repository, run the script, then open the app.
+        </p>
+      </div>
+      <div class="get-grid">
+        <div>
+          <pre><code>./scripts/build.sh
+open build/Oreja.app</code></pre>
+          <p class="note">
+            On another Mac, Gatekeeper may warn because the build carries no Developer ID. Build
+            locally, or allow it once in System Settings › Privacy &amp; Security. Oreja does not
+            disable Gatekeeper.
+          </p>
+        </div>
+        <ul class="requirements">
+          <li><span aria-hidden="true">·</span><span><strong>macOS 14.2 or newer.</strong> Core Audio process taps require it.</span></li>
+          <li><span aria-hidden="true">·</span><span><strong>ChatGPT desktop app</strong>, or ChatGPT in Safari/Chrome as an experimental source.</span></li>
+          <li><span aria-hidden="true">·</span><span><strong>The Music app</strong>, already playing something. Oreja never opens it for you.</span></li>
+          <li><span aria-hidden="true">·</span><span><strong>Command Line Tools</strong> if you build from source. No third-party dependencies.</span></li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="faq" class="container">
+      <div class="section-head">
+        <p class="eyebrow">Questions</p>
+        <h2>The short answers.</h2>
+      </div>
+      <div class="faq">
+        <details>
+          <summary>Does Oreja record or transcribe what ChatGPT says?</summary>
+          <p>
+            No. It reads the output level of the selected application's audio and keeps only a
+            boolean "active" state. No samples are stored, no speech is recognised, and no content
+            leaves the Mac. There is no networking code in the app.
+          </p>
+        </details>
+        <details>
+          <summary>Do I need an OpenAI account or API key?</summary>
+          <p>
+            No. Oreja does not talk to OpenAI at all. It observes the local audio output of the app
+            you choose, and controls Apple Music through macOS automation.
+          </p>
+        </details>
+        <details>
+          <summary>Why only Apple Music?</summary>
+          <p>
+            Apple Music is the only provider in this release. Other players would need their own
+            adapter, capability declarations and tests; guessing at provider state is not something
+            Oreja does. The music adapter is a port, so another provider is possible later.
+          </p>
+        </details>
+        <details>
+          <summary>Will a notification sound pause my music?</summary>
+          <p>
+            Possibly. Oreja reacts to output activity, not verified speech, so a sound played by the
+            same application counts. Browser sources are worse: they capture every tab in that
+            browser. Use the desktop app, or a dedicated browser window.
+          </p>
+        </details>
+        <details>
+          <summary>What if I pause or resume music myself?</summary>
+          <p>
+            Your choice wins. If you pause Music, Oreja will not resume it. If you resume Music while
+            ChatGPT is speaking, Oreja releases its claim and will pause again the next time ChatGPT
+            speaks.
+          </p>
+        </details>
+        <details>
+          <summary>What happens if Oreja quits or crashes?</summary>
+          <p>
+            Quitting while Oreja owns a pause resumes the music first. After a crash, the pause
+            journal restores playback on the next launch only when the same track is still paused
+            and the pause is recent. If the track changed or Music quit, Oreja deliberately leaves it
+            alone.
+          </p>
+        </details>
+        <details>
+          <summary>Is it notarized? Is it affiliated with OpenAI or Apple?</summary>
+          <p>
+            It is ad-hoc signed and not notarized, so another Mac may need a one-time Gatekeeper
+            approval. It is an independent project: not affiliated with, endorsed by, or supported by
+            OpenAI or Apple.
+          </p>
+        </details>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-top">
+        <div>
+          <div class="footer-brand">
+            <svg class="mark-tile mark-26" aria-hidden="true"><use href="#mark-tile"/></svg>
+            <span class="brand-lockup">
+              <span class="brand-name">oreja</span>
+              <span class="brand-suffix">DE VAN GOGH</span>
+            </span>
+          </div>
+          <p class="footer-note">
+            A local menu bar companion for ChatGPT and Apple Music. One job, no account, no recording.
+          </p>
+        </div>
+        <nav class="footer-links" aria-label="Footer">
+          <a href="#how">How it works</a>
+          <a href="docs.html">Documentation</a>
+          <a href="#verified">Verification</a>
+          <a href="docs.html#privacy">Privacy</a>
+          <a href="#get">Get Oreja</a>
+          <a href="https://opensource.org/license/mit">License (MIT)</a>
+        </nav>
+      </div>
+      <p class="footer-fine">
+        Independent project. Not affiliated with OpenAI or Apple. Built with Swift and no third-party
+        dependencies.
+      </p>
+    </div>
+  </footer>
+</body>
+</html>

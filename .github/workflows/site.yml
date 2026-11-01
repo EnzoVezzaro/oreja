@@ -1,0 +1,39 @@
+name: Site
+
+# Vercel deploys site/ from main through its Git integration (production branch
+# main, root directory site). This workflow is the gate in front of that deploy:
+# it rejects malformed pages, broken internal links and undefined anchors before
+# the change reaches production. It does not deploy; a second deploy path would
+# race the Vercel integration.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "site/**"
+      - "scripts/check-site.py"
+      - ".github/workflows/site.yml"
+  pull_request:
+    paths:
+      - "site/**"
+      - "scripts/check-site.py"
+      - ".github/workflows/site.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: site-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check static site structure and links
+        run: python3 scripts/check-site.py

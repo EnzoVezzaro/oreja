@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Oreja listening mark">
+  <defs>
+    <linearGradient id="field" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#2B3468"/>
+      <stop offset="1" stop-color="#171D3F"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="18.5" fill="url(#field)"/>
+  <circle cx="25" cy="32" r="3.4" fill="#F7F2E8"/>
+  <path d="M31.43 24.34a10 10 0 0 1 0 15.32" fill="none" stroke="#F7F2E8" stroke-width="3.4" stroke-linecap="round"/>
+  <path d="M35.93 18.98a17 17 0 0 1 0 26.04" fill="none" stroke="#E7B44C" stroke-width="3.4" stroke-linecap="round"/>
+</svg>
