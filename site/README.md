@@ -36,6 +36,7 @@ Vercel's Git integration owns the deploy; GitHub Actions owns the check.
 | Root directory | `site` |
 | Framework | Other (static output; no `package.json`, so no build or install runs) |
 | Ignored Build Step | `git diff HEAD^ HEAD --quiet -- .` — build only when `site/` changed |
+| Deployment Checks | GitHub check `check` on the same commit must pass before production is aliased |
 
 On a push to `main` that touches `site/`, Vercel publishes production. Pull requests and other
 branches get preview deployments. Pushes that only change the macOS app, packages, docs, or
@@ -50,12 +51,17 @@ pull requests. The check fails on unbalanced HTML, duplicate ids, broken interna
 anchors, external assets, or unbalanced CSS. It deliberately does not deploy: a second deploy path
 would race the Vercel integration.
 
+The workflow's `check` job is imported as a Vercel Deployment Check for production. Vercel builds
+the deployment, then aliases it to the production domain only after that GitHub check passes. A
+failed or missing check leaves the previous production deployment serving traffic. Renaming the job
+requires updating the Deployment Check in Vercel, because Vercel matches the check run name.
+
 ```bash
 python3 scripts/check-site.py   # same check the CI job runs
 ```
 
-Automatic deploy only works once `site/` is committed to `main`. Until then the remote has no site
-to publish.
+Vercel builds a deployment for every push that touches `site/`, then aliases it to production only
+after the `check` Deployment Check passes.
 
 ## Rules
 
