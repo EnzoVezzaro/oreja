@@ -6,8 +6,8 @@ name: Site
 # the change reaches production. It does not deploy; a second deploy path would
 # race the Vercel integration.
 #
-# Vercel only builds when a push touches site/ (the root directory filter), so a
-# workflow-only change is checked here without creating a new deployment.
+# Vercel's Ignored Build Step (git diff HEAD^ HEAD --quiet -- .) only builds when
+# site/ changed, so a workflow-only commit is checked without deploying.
 on:
   push:
     branches: [main]
