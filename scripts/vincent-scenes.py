@@ -182,7 +182,11 @@ def write_scene_svg(path, layers, order, w, h, extra=""):
                     if x is not None:
                         prev = x
             paths.append(f'<path fill="{colour}" d="{"".join(d)}"/>')
-        groups.append(f'<g id="{name}">{"".join(paths)}</g>')
+        # The blink lids are skin, so the still frame has to start with them hidden: without this
+        # attribute every consumer that does not run the page's CSS — the social card, a no-JS
+        # browser, an image viewer — would show him with his eyes closed.
+        hidden = ' opacity="0"' if name == "eyes" else ""
+        groups.append(f'<g id="{name}"{hidden}>{"".join(paths)}</g>')
 
     # No <style> block. The scene is inlined into the page by landing.js so night.css owns the
     # animation, which is the only way `prefers-reduced-motion` on the page can reach these layers:

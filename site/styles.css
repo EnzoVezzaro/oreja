@@ -455,9 +455,7 @@ code {
 /* Vincent is a five-frame pixel sprite: idle, idle blink, listening, listening blink, ouch.
    The sheet is 5 frames wide, so background-position percentages address a frame by
    frame / 4 * 100%. Sizes stay multiples of the 40px grid, which keeps every pixel square.
-   The site holds him on the first frame and never moves it: no frame animation, no blink, no
-   bob, float, drift or parallax, on scroll or otherwise. Frames belong to the app, where they
-   mark a state the user just triggered. */
+   This page holds him on the first frame and never moves it. */
 .vincent {
   position: relative;
   width: 320px;

@@ -4,13 +4,155 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Oreja de Van Gogh: pause Apple Music while ChatGPT speaks</title>
-  <meta name="description" content="A menu bar app for macOS that pauses or lowers Apple Music while ChatGPT speaks, then returns it at the level and position you chose. Runs on your Mac and records nothing.">
+  <meta name="description" content="A macOS menu bar app that pauses or lowers Apple Music while ChatGPT speaks, then puts it back where you left it. Local only, records nothing.">
+  <link rel="canonical" href="https://oreja-tau.vercel.app/">
+  <meta name="robots" content="index, follow, max-image-preview:large">
   <meta name="theme-color" content="#080a20">
   <meta name="color-scheme" content="dark">
-  <meta property="og:title" content="Oreja de Van Gogh">
-  <meta property="og:description" content="Pauses or lowers Apple Music while ChatGPT speaks, then gives it back. A local menu bar app for macOS.">
+
   <meta property="og:type" content="website">
-  <meta property="og:image" content="assets/oreja-vincent.png">
+  <meta property="og:site_name" content="Oreja de Van Gogh">
+  <meta property="og:locale" content="en_US">
+  <meta property="og:url" content="https://oreja-tau.vercel.app/">
+  <meta property="og:title" content="Oreja de Van Gogh: pause Apple Music while ChatGPT speaks">
+  <meta property="og:description" content="Your AI talks, your music waits its turn. A macOS menu bar app that gets Apple Music out of the way while ChatGPT speaks, then puts it back where you left it.">
+  <meta property="og:image" content="https://oreja-tau.vercel.app/assets/og.png">
+  <meta property="og:image:type" content="image/png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Vincent sits at a desk in headphones beside a record player, under a painted night sky. The card reads: Your AI talks. Your music waits its turn.">
+
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Oreja de Van Gogh: pause Apple Music while ChatGPT speaks">
+  <meta name="twitter:description" content="Your AI talks, your music waits its turn. A macOS menu bar app that gets Apple Music out of the way while ChatGPT speaks, then puts it back.">
+  <meta name="twitter:image" content="https://oreja-tau.vercel.app/assets/og.png">
+  <meta name="twitter:image:alt" content="Vincent sits at a desk in headphones beside a record player, under a painted night sky. The card reads: Your AI talks. Your music waits its turn.">
+
+  <!-- One graph, so the crawler sees who publishes the app, which page it belongs to, what the
+       software is, and the answers the page itself prints. The FAQ entries are held to the visible
+       <summary> text by scripts/check-site.py; structured data may not promise more than the page. -->
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "Organization",
+          "@id": "https://oreja-tau.vercel.app/#publisher",
+          "name": "Oreja de Van Gogh",
+          "url": "https://oreja-tau.vercel.app/",
+          "logo": {
+            "@type": "ImageObject",
+            "url": "https://oreja-tau.vercel.app/assets/mark.png"
+          },
+          "sameAs": ["https://github.com/EnzoVezzaro/oreja"]
+        },
+        {
+          "@type": "WebSite",
+          "@id": "https://oreja-tau.vercel.app/#website",
+          "url": "https://oreja-tau.vercel.app/",
+          "name": "Oreja de Van Gogh",
+          "inLanguage": "en",
+          "publisher": { "@id": "https://oreja-tau.vercel.app/#publisher" }
+        },
+        {
+          "@type": "SoftwareApplication",
+          "@id": "https://oreja-tau.vercel.app/#app",
+          "name": "Oreja de Van Gogh",
+          "alternateName": "Oreja",
+          "url": "https://oreja-tau.vercel.app/",
+          "downloadUrl": "https://oreja-tau.vercel.app/downloads/Oreja-0.1.0.dmg",
+          "image": "https://oreja-tau.vercel.app/assets/og.png",
+          "description": "A macOS menu bar app that pauses or lowers Apple Music while ChatGPT speaks, then returns it at the level and position you chose.",
+          "applicationCategory": "MultimediaApplication",
+          "applicationSubCategory": "Menu bar utility",
+          "operatingSystem": "macOS 14.2 or later",
+          "softwareVersion": "0.1.0",
+          "license": "https://www.gnu.org/licenses/gpl-3.0.html",
+          "isAccessibleForFree": true,
+          "publisher": { "@id": "https://oreja-tau.vercel.app/#publisher" },
+          "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+          "featureList": [
+            "Pauses or lowers Apple Music while ChatGPT speaks",
+            "Returns playback at the level and position you chose",
+            "Follows the app's audio level instead of recognising words",
+            "Runs on the Mac, with no account and no recording"
+          ]
+        },
+        {
+          "@type": "FAQPage",
+          "@id": "https://oreja-tau.vercel.app/#faq",
+          "isPartOf": { "@id": "https://oreja-tau.vercel.app/#website" },
+          "mainEntity": [
+            {
+              "@type": "Question",
+              "name": "Does Oreja record or transcribe what ChatGPT says?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "No. It reads the output level of the selected application's audio and keeps only an active or quiet state. No samples are stored, no speech is recognised, and the app contains no networking code."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "Do I need an OpenAI account or API key?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "No. Oreja does not talk to OpenAI. It observes the local audio output of the app you choose and controls Apple Music through macOS automation."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "Why only Apple Music?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Apple Music is the one player Oreja controls today. More players are coming."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "Pause, or just lower it?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Both. Pause mode stops Music while the AI speaks and resumes it afterward. Lower-volume mode keeps Music playing quietly and restores the level you set when the reply ends."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "Will a notification sound pause my music?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Not a normal one. Oreja listens for the shape of speech, the loudness rising and falling with every syllable, so a short blip, a steady alert tone or a chime that fades once is ignored, and Diagnostics tells you when that happened. A melody-style ringtone can still pass, and browser sources capture every tab in that browser, so a dedicated window or the desktop app gives the cleanest signal."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "What if I pause or resume music myself?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Your choice wins. If you pause Music, Oreja will not resume it. If you resume Music while ChatGPT is speaking, Oreja releases its claim and waits for the next activity before acting again."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "What happens if Oreja quits or crashes?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Quitting while Oreja owns a pause resumes the music first. After a crash, the pause journal restores playback on the next launch only when the same track is still paused and the pause is recent. If the track changed or Music quit, Oreja leaves it alone."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "Is it notarized, and who makes it?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "It is ad-hoc signed and not notarized, so another Mac may ask for a one-time Gatekeeper approval. It is an independent project, not affiliated with, endorsed by or supported by OpenAI or Apple."
+              }
+            }
+          ]
+        }
+      ]
+    }
+  </script>
+
   <link rel="icon" href="assets/mark-128.png" type="image/png" sizes="128x128">
   <link rel="apple-touch-icon" href="assets/mark.png">
   <!-- The engine's floor loads first; night.css owns everything the brand cares about. -->

@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Oreja de Van Gogh — social card</title>
+<!--
+  The 1200 x 630 card that og:image and twitter:image point at.
+
+  It is not a page of the site: nothing links here, check-site.py never sees it, and it is never
+  deployed. It exists so the card is built from the same paint, the same pixel art and the same two
+  fonts as the landing page instead of being a screenshot of whatever the hero happened to look
+  like, or a hand-made file that drifts the first time the brand changes.
+
+  Regenerate after a brand change:
+
+    open scripts/og-card.html             # in a window 1200 x 630, at 100% zoom
+    ego-browser: page.screenshot({ path: "site/assets/og.png",
+                                   clip: { x: 0, y: 0, width: 1200, height: 630 } })
+
+  Then check the file is still 1200 x 630 (identify, or scripts/check-site.py, which asserts it).
+-->
+<style>
+@font-face {
+  font-family: "Manrope";
+  src: url("../site/assets/fonts/manrope-variable.ttf") format("truetype-variations");
+  font-weight: 200 800;
+  font-display: block;
+}
+@font-face {
+  font-family: "Instrument Serif";
+  src: url("../site/assets/fonts/instrument-serif-italic.woff2") format("woff2");
+  font-weight: 400;
+  font-style: italic;
+  font-display: block;
+}
+
+:root {
+  --night: #080a20;
+  --cream: #f6ecd9;
+  --cream-soft: rgba(246, 236, 217, 0.74);
+  --cream-faint: rgba(246, 236, 217, 0.5);
+  --wheat: #efc36a;
+  --serif: "Instrument Serif", "Iowan Old Style", Georgia, serif;
+  --sans: "Manrope", -apple-system, "SF Pro Text", system-ui, sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, monospace;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body {
+  width: 1200px;
+  height: 630px;
+  overflow: hidden;
+  background: var(--night);
+}
+
+.card {
+  position: relative;
+  width: 1200px;
+  height: 630px;
+  overflow: hidden;
+  font-family: var(--sans);
+  color: var(--cream);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* The hero's own painted sky, at its native 2400 px so the card is a 2x crop, not an upscale. */
+.sky {
+  position: absolute;
+  inset: 0;
+  background: url("../site/assets/night-sky.png") center / cover no-repeat;
+}
+
+/* Two scrims: one for text contrast on the left, one to seat the scene on the right. */
+.scrim {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(100deg, rgba(5, 6, 18, 0.94) 0%, rgba(5, 6, 18, 0.82) 34%, rgba(5, 6, 18, 0.18) 62%, rgba(5, 6, 18, 0.55) 100%),
+    radial-gradient(80% 70% at 18% 44%, rgba(8, 10, 32, 0.55), transparent 70%);
+}
+
+.copy {
+  position: absolute;
+  left: 76px;
+  top: 76px;
+  width: 600px;
+}
+
+.lockup {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.mark {
+  width: 62px;
+  height: 62px;
+  border-radius: 17px;
+  display: block;
+}
+
+.wordmark {
+  display: grid;
+  gap: 1px;
+  line-height: 1;
+}
+
+.wordmark .name {
+  font-size: 27px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.wordmark .sub {
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--cream-faint);
+}
+
+.kicker {
+  margin-top: 42px;
+  font-family: var(--mono);
+  font-size: 13px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--wheat);
+}
+
+h1 {
+  margin-top: 18px;
+  font-size: 66px;
+  font-weight: 800;
+  line-height: 0.99;
+  letter-spacing: -0.035em;
+}
+
+h1 em {
+  font-family: var(--serif);
+  font-style: italic;
+  font-weight: 400;
+  letter-spacing: -0.004em;
+  color: var(--wheat);
+}
+
+.lede {
+  margin-top: 24px;
+  max-width: 520px;
+  font-size: 20px;
+  line-height: 1.5;
+  color: var(--cream-soft);
+}
+
+.facts {
+  margin-top: 30px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--cream-faint);
+}
+
+.facts i {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: rgba(246, 236, 217, 0.35);
+}
+
+/* The desk, exactly as the landing page draws it, sitting in its own pool of lamplight. */
+.scene {
+  position: absolute;
+  right: 26px;
+  bottom: -22px;
+  width: 456px;
+}
+
+.scene .glow {
+  position: absolute;
+  inset: 6% -6% 0;
+  border-radius: 50%;
+  background: radial-gradient(circle at 52% 46%, rgba(240, 165, 110, 0.34), transparent 66%);
+  filter: blur(26px);
+}
+
+.scene img {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: auto;
+  image-rendering: pixelated;
+  filter: drop-shadow(0 30px 46px rgba(2, 3, 12, 0.7));
+  -webkit-mask-image: radial-gradient(ellipse 78% 76% at 50% 48%, #000 64%, transparent 100%);
+  mask-image: radial-gradient(ellipse 78% 76% at 50% 48%, #000 64%, transparent 100%);
+}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="sky"></div>
+  <div class="scrim"></div>
+
+  <div class="scene">
+    <span class="glow"></span>
+    <img src="../site/assets/vincent-desk.svg" width="448" height="352" alt="">
+  </div>
+
+  <div class="copy">
+    <div class="lockup">
+      <img class="mark" src="../site/assets/mark.png" width="62" height="62" alt="">
+      <span class="wordmark">
+        <span class="name">oreja</span>
+        <span class="sub">de van gogh</span>
+      </span>
+    </div>
+
+    <p class="kicker">macOS menu bar · 14.2+</p>
+
+    <h1>Your AI talks.<br>Your music<br><em>waits its turn.</em></h1>
+
+    <p class="lede">
+      Oreja pauses Apple Music while ChatGPT speaks, or lowers it to the level you pick, then puts
+      it back where you left it.
+    </p>
+
+    <p class="facts">
+      <span>Free</span><i></i><span>GPL-3.0</span><i></i><span>No account</span><i></i><span>Records nothing</span>
+    </p>
+  </div>
+</div>
+</body>
+</html>
