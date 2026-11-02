@@ -12,6 +12,7 @@ identically on a laptop and on a GitHub Actions runner.
 from __future__ import annotations
 
 import json
+import re
 import struct
 import sys
 import xml.etree.ElementTree as ET
@@ -447,6 +448,29 @@ def check_css(path: Path) -> list[str]:
     return errors
 
 
+def check_js(path: Path, defined: set[str]) -> list[str]:
+    """A page script may only reach for globals another page script defines.
+
+    Renaming a script's global without renaming its caller leaves the page silently
+    inert: the file loads, nothing throws, and no scroll act ever mounts. That is a
+    deploy-time failure the browser cannot report, so it is checked here."""
+    text = path.read_text(encoding="utf-8")
+    missing = [
+        name
+        for name in sorted(set(re.findall(r"window\.([A-Z]\w*)", text)))
+        if name not in defined
+    ]
+    return [f"window.{name} is used but no site script defines it" for name in missing]
+
+
+def site_globals() -> set[str]:
+    defined: set[str] = set()
+    for script in SITE.rglob("*.js"):
+        text = script.read_text(encoding="utf-8")
+        defined.update(re.findall(r"(?:window|global)\.([A-Z]\w*)\s*=", text))
+    return defined
+
+
 def check_svg(path: Path) -> list[str]:
     try:
         root = ET.parse(path).getroot()
@@ -531,6 +555,18 @@ def main() -> int:
     for stylesheet in sorted(SITE.rglob("*.css")):
         errors = check_css(stylesheet)
         relative = stylesheet.relative_to(SITE)
+        if errors:
+            failures += 1
+            print(f"FAIL {relative}")
+            for error in errors:
+                print(f"  - {error}")
+        else:
+            print(f"ok   {relative}")
+
+    defined_globals = site_globals()
+    for script in sorted(SITE.rglob("*.js")):
+        errors = check_js(script, defined_globals)
+        relative = script.relative_to(SITE)
         if errors:
             failures += 1
             print(f"FAIL {relative}")

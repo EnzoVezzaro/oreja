@@ -3,8 +3,8 @@
 // or resume: the canvas draws the two levels the app reports, and the act's progress is read back
 // from the engine's published --sc-p.
 
-if (window.ScrollCraft) {
-  ScrollCraft.mount(document.body);
+if (window.PageMotion) {
+  PageMotion.mount(document.body);
 }
 
 const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
