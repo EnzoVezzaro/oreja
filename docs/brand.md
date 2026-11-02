@@ -97,8 +97,9 @@ and a coat are enough to read the name, and the name is the joke — one ear is 
   timer so he is alive without moving constantly. He never appears in a place where he would suggest
   a feature that does not exist.
 - He does not float, bob, drift or parallax, on the website or in the app. He blinks in place and
-  plays the ouch frame when clicked; the only movement allowed is a two-pixel shake during that
-  click. Pixel art stays on whole pixels, so no rotation or fractional offset.
+  plays the ouch frame when clicked; the only movement allowed is the ouch shake — 4% of his width
+  per step, four steps inside 810 ms, one pixel-granular squirm either way. Pixel art stays on whole
+  pixels, so no rotation or fractional offset.
 - Minimum size: 40px. Do not rotate, recolor, blur, or add props to him. The hat, bandage, beard
   and coat are fixed; a brush, a pipe, an easel or a headphone cup would crowd a 40px grid.
 - Illustration colours live in the generator, not in the UI palette: straw `#E7B44C`, beard

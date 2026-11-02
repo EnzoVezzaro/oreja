@@ -1,7 +1,5 @@
 # Oreja visual direction
 
-<!-- impeccable:design-schema 1 -->
-
 ## Direction
 
 Oreja is a warm, character-led product about one small handoff: an AI voice gets the room, then the
@@ -33,28 +31,28 @@ The first viewport should feel like a painting that happens to be a product page
   timings, percentages and version labels.
 - Controls: pill buttons, black primary actions, rounded chips for the three conversation moments.
   Active states are unmistakable through position, colour and label.
-- Motion: the painting moves, Vincent does not. On the site he is one still frame — no blink, bob,
-  float or parallax, on scroll or otherwise — and the life in the first screen comes from the paint:
+- Motion: the painting moves, Vincent does not. On the site he holds the idle frame and switches to
+  the ouch on a click — the bandage leaves his head and the figure steps −4%, +4%, −2%, rest over
+  810 ms, the app's exact sequence — with a blink on a slow timer and no bob, float or parallax, on
+  scroll or otherwise; the life in the first screen comes from the paint:
   three masked currents at 41 s, 57 s and 68 s, a moonlight band at 38 s, and a star field with
-  embers and a rare shooting star. In the app he holds the idle frame and switches to listening, or
-  to the ouch frame on a click (the bandage leaves his head) with a two-pixel shake. Interface
-  transitions stay at 160–260 ms. Reduced motion stops every loop and keeps each state legible in
-  text.
-- Scroll: the landing page runs on the scroll-craft engine (`site/scrollcraft.js`, unedited). A
-  pinned act holds the conversation while three moments cross over, a rail pans the three behaviors
-  sideways, and the rest of the page is ordinary flow with one reveal per section. The signature
-  move is the conversation rail: scroll drives the AI and Apple Music levels the app would actually
-  report. `docs/scroll-craft.md` has the brief and the score.
+  embers and a rare shooting star. In the app he holds the idle frame and switches to listening. The
+  click joke is identical in both places. Interface transitions stay at 160–260 ms. Reduced motion
+  stops every loop, keeps each state legible in text, and drops the shake while keeping the frame.
+- Scroll: the landing page runs on its own scroll runtime (`site/motion.js`). A pinned act holds
+  the conversation while three moments cross over, a rail pans the three behaviors sideways, and
+  the rest of the page is ordinary flow with one reveal per section. The signature move is the
+  conversation rail: scroll drives the AI and Apple Music levels the app would actually report.
 - Native app: the same paper/card/ink/coral system, Vincent at 80 pt in the panel and in Settings,
   rounded cards at 18 pt.
 
-## HeyTaby reference translation
+## What the first viewport must do
 
-Borrow the reference's qualities, not its identity: a character in the first viewport, short human
-copy, one interactive "pick a moment and watch" demo, generous rounded controls, and a
-local/private story that is demonstrated rather than buried. Do not copy Taby's character, logo,
-illustrations, layout or wording. Oreja's own artefact is a five-frame pixel ear (idle, blink,
-listening, listening blink, ouch).
+Four things, in this order: show a character, say what the product does in one sentence, offer the
+download, and demonstrate the handoff with a pick-a-moment demo rather than a paragraph about it.
+The controls stay generous and rounded, and the privacy story is shown in the page's own behaviour
+before it is claimed in copy. Every artefact is drawn for this product: the five-frame pixel ear
+(idle, blink, listening, listening blink, ouch), the painted night, the desk scene.
 
 ## Product truth
 
@@ -84,9 +82,8 @@ away through the FAQ, which now sits above it.
 
 ## Review pass, November 2026
 
-Run with `better-interface` and its six domain skills (accessibility, layout, writing, typography,
-colors, UI), then `scroll-craft` and `humanizer` for grammar and copy. Findings that were fixed,
-with the evidence that produced them:
+A review pass across accessibility, layout, writing, typography, colour and UI state, followed by a
+copy edit. Findings that were fixed, with the evidence that produced them:
 
 | Finding | Before | After |
 | --- | --- | --- |
@@ -107,6 +104,6 @@ the scene caption lost a clipped "never to the room" tail, the third card's frag
 sentence, the privacy heading states both halves of a real claim, and no em dash remains in visible
 copy. The claims, numbers and caveats are unchanged.
 
-Deliberately not taken from `scroll-craft`: a filmic scroll grammar with generated photographic
-planes. Oreja is an illustrated, quiet utility, and its signature move is the moment picker that
-already rewrites the stage, so the page keeps its single static character and its blink.
+Deliberately rejected: a filmic scroll grammar with generated photographic planes. Oreja is an
+illustrated, quiet utility, and its signature move is the moment picker that already rewrites the
+stage, so the page keeps its single static character and its blink.

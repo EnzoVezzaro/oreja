@@ -1,5 +1,5 @@
 /* ============================================================================
-   scrollcraft: a scroll-driven interaction runtime
+   motion: the site's scroll-driven interaction runtime
    ----------------------------------------------------------------------------
    Vanilla JS. Zero dependencies. Zero DOM generation.
 
@@ -285,7 +285,7 @@
 
     // Teardown for client-side routers (issue #6). mount() registers window
     // listeners, starts two self-rescheduling rAF loops, and pushes onto
-    // ScrollCraft.instances, so without destroy() every re-mount leaves the old
+    // PageMotion.instances, so without destroy() every re-mount leaves the old
     // instance running for the life of the tab. `on` records what it registered
     // and the two loops keep their live handle, so destroy() can undo exactly
     // what this mount did and nothing else: its window listeners, both rAF
@@ -615,7 +615,7 @@
         a.stageChecked = true;
         var pos = getComputedStyle(a.stage).position;
         if (pos !== 'sticky' && pos !== '-webkit-sticky') {
-          console.warn('[scrollcraft] act "' + (a.el.id || a.device) + '" will not pin: its stage computes ' +
+          console.warn('[motion] act "' + (a.el.id || a.device) + '" will not pin: its stage computes ' +
             'position:' + pos + ', not sticky. Something is overriding .sc-stage.', a.stage);
         }
       });
@@ -625,18 +625,18 @@
         if (W.checked) return;
         W.checked = true;
         if (!W.stage) {
-          console.warn('[scrollcraft] worldflight has no [data-sc-world] stage; nothing will fly.', W.el);
+          console.warn('[motion] worldflight has no [data-sc-world] stage; nothing will fly.', W.el);
           return;
         }
         if (!W.spacer) {
-          console.warn('[scrollcraft] worldflight has no [data-sc-spacer]; the page has no scroll track.', W.el);
+          console.warn('[motion] worldflight has no [data-sc-spacer]; the page has no scroll track.', W.el);
         }
         // The same silent failure as an unpinned act, one level worse: a stage
         // that is not fixed scrolls away and takes the whole page with it, while
         // every progress number still reads correctly.
         var wp = getComputedStyle(W.stage).position;
         if (wp !== 'fixed') {
-          console.warn('[scrollcraft] worldflight stage computes position:' + wp + ', not fixed. ' +
+          console.warn('[motion] worldflight stage computes position:' + wp + ', not fixed. ' +
             'Something is overriding .sc-world, and the flight will scroll off screen.', W.stage);
         }
       });
@@ -1197,7 +1197,7 @@
     // exactly the scroll position at which its cue has not opened yet, so focus
     // lands on a control nobody can see and every automated opacity check still
     // passes. Centring the act instead is a position where the cue is lit by
-    // definition. behavior:'instant' on purpose: scrollcraft.css sets
+    // definition. behavior:'instant' on purpose: motion.css sets
     // scroll-behavior:smooth, so the default animates the jump and focus sits
     // off screen for the whole of a multi-screen glide.
     on('focusin', function (e) {
@@ -1263,15 +1263,15 @@
           V.objectURL = null;
         }
       }
-      var at = global.ScrollCraft.instances.indexOf(api);
-      if (at !== -1) global.ScrollCraft.instances.splice(at, 1);
+      var at = global.PageMotion.instances.indexOf(api);
+      if (at !== -1) global.PageMotion.instances.splice(at, 1);
       // Document-global, while the instance is not: only the last one out drops
       // it, or a second stage on the page loses its no-transition guard.
-      if (!global.ScrollCraft.instances.length) {
+      if (!global.PageMotion.instances.length) {
         document.documentElement.classList.remove('sc-ready');
       }
     };
-    global.ScrollCraft.instances.push(api);
+    global.PageMotion.instances.push(api);
     return api;
   }
 
@@ -1279,5 +1279,5 @@
   // harness reads the real playhead records: a screenshot taken mid-lerp is a
   // frame the page never actually holds, so the harness has to be able to ask
   // whether the playhead has arrived rather than guess with a timeout.
-  global.ScrollCraft = { mount: mount, reduce: reduce, instances: [] };
+  global.PageMotion = { mount: mount, reduce: reduce, instances: [] };
 })(window);

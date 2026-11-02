@@ -1504,7 +1504,7 @@ td code {
 }
 
 /* ---------- Scroll acts ----------
-   The page runs on the scrollcraft engine (site/scrollcraft.js, copied unedited from the skill).
+   The page runs on its own scroll runtime (site/motion.js).
    The engine ships its own token floor; this block maps those tokens onto the brand palette and
    composes the two acts. The character is never part of an act that moves: Vincent holds a single
    frame, and scroll only ever moves light, readouts and copy around him. */

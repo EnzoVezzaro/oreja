@@ -14,7 +14,7 @@ goes quiet, Music resumes or its original volume returns exactly where it left o
 
 ## Download
 
-[Oreja 0.2.0](https://github.com/EnzoVezzaro/oreja/releases/latest) is a disk image for macOS 14.2
+[Oreja 0.2.1](https://github.com/EnzoVezzaro/oreja/releases/latest) is a disk image for macOS 14.2
 or newer, also served from [the landing page](https://oreja-tau.vercel.app/). It is ad-hoc signed
 and not notarized, so the first launch on another Mac needs one Gatekeeper approval (System
 Settings › Privacy & Security › Open Anyway). What changed: [CHANGELOG.md](CHANGELOG.md).
@@ -194,6 +194,9 @@ There is no analytics SDK and no server. Full text: [docs/privacy.md](docs/priva
 
 See [docs/roadmap.md](docs/roadmap.md). Next milestone: a supervised live test against a real
 ChatGPT Voice session and Apple Music, including measured pause/resume latency and a device matrix.
+Then breadth: more music players (Spotify and the other desktop players) and more coding harnesses
+(Claude Code, Codex and the other terminal agents), each behind the same ports and capability
+declarations.
 
 ## Brand and site
 

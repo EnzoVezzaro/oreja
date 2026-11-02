@@ -9,8 +9,8 @@ site/
   docs.html         documentation (setup, permissions, states, troubleshooting, privacy)
   styles.css        design system for the documentation page
   night.css         the landing page: palette, painted hero, act, dawn, phone layout
-  scrollcraft.css   vendor scroll engine stylesheet (copied unedited, MIT)
-  scrollcraft.js    vendor scroll engine (copied unedited, MIT)
+  motion.css        the scroll runtime's stylesheet: token floor and the devices it drives
+  motion.js         the scroll runtime: acts, clip maps, the conversation rail
   landing.js        mounts the engine, paints the waveform, star field and click joke
   assets/mark.png   the brand mark: Vincent's head, rendered from the app's BrandMark
   assets/mark-128.png  the same mark at favicon size
@@ -53,11 +53,11 @@ otherwise: the frame animation was removed because it read as the character scro
 in the app, where they mark a state the user just triggered. `scripts/vincent-sprite.py --preview 2`
 writes `build/vincent-preview.png` at the 80 px size the sprite has to read at.
 
-The landing page is scroll-driven through the [scroll-craft](https://github.com/nateherkai/scroll-craft)
-engine: a pinned conversation act, a lateral behaviors rail, and flow reveals. `docs/scroll-craft.md`
-records the brief, the chosen grammar and the signature move. The two `scrollcraft.*` files are the
-vendor engine and are never edited here; theme through the `--sc-*` tokens at the end of
-`styles.css`.
+The landing page is scroll-driven: a pinned conversation act, a lateral behaviors rail, and flow
+reveals. `motion.js` reads the `data-sc-*` attributes the HTML already carries and drives them from
+one scroll value on one rAF loop; it generates no DOM and styles no components. It is loaded before
+`landing.js`, which mounts it and paints everything that is not scroll-driven. Theme it through the
+`--sc-*` tokens at the end of `styles.css`, not by editing the runtime.
 
 ## Preview
 

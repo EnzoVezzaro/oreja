@@ -33,6 +33,25 @@ made, not the day it was published.
 - **More coding harnesses.** ChatGPT is the one source today. Claude Code, Codex and the other
   terminal agents are next, with the same rule: read the level of the app you choose, keep nothing.
 
+## [0.2.1] - 2026-11-02
+
+One fix, plus the repository clean-up that preceded the public release.
+
+### Fixed
+
+- **Pause while I speak survived sleep again.** `AVAudioEngine` can stop delivering input while the
+  Mac sleeps, and the app kept the dead monitor: after waking, the microphone level froze and the
+  feature only returned after a restart. The monitor is now stopped on sleep and rebuilt on wake,
+  so every wake starts a fresh tap. Coordinator decisions and the Apple Music path are unchanged.
+
+### Changed
+
+- The landing page's scroll runtime is `site/motion.js` with its stylesheet `site/motion.css`. It
+  is the same runtime, under the site's own name, and it is documented in `site/README.md`.
+- The repository no longer ships internal design-process notes or the two-agent notice board, so
+  what remains is what a reader of the project needs. Their conclusions live in `DESIGN.md` and
+  `docs/design-tokens.md`.
+
 ## [0.2.0] - 2026-11-02
 
 The character release: the app, the icon and the website are one drawing now.

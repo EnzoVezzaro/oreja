@@ -84,7 +84,7 @@ Only `transform`, `opacity` and `clip-path` animate. Every motion respects
 
 ## Engine bridge
 
-`scrollcraft.css` ships its own six colour tokens and two font tokens; the brand overrides them at
+`motion.css` ships its own six colour tokens and two font tokens; the brand overrides them at
 the end of `styles.css`:
 
 | Engine token | Brand token | Resolves to |

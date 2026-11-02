@@ -68,9 +68,14 @@ macOS app for hypothetical portability.
 5. Harden AppleScript error mapping with real denial/quit scenarios.
 6. Optional: microphone-based "pause while I speak" (separate permission, explicit opt-in).
 7. Optional: volume ducking where the provider supports it, restoring gain precisely.
-8. Optional: a tiny local VAD to reduce false positives from notification sounds.
-9. Add Spotify/VLC adapters behind capability declarations.
-10. Developer ID signing, notarization, DMG, and a clean-machine install test.
+8. Speech-shape filter for notification-shaped sounds: shipped (envelope-shape heuristics, on by default).
+   A real local VAD would only be worth adding if field reports show modulated non-speech still
+   slipping through.
+9. **More music players:** Spotify and VLC adapters behind capability declarations, then the rest of
+   the desktop players.
+10. **More coding harnesses:** Claude Code, Codex and the other terminal agents as audio sources,
+    with the same rule as ChatGPT: read the level of the app the user picks, keep nothing.
+11. Developer ID signing, notarization, DMG, and a clean-machine install test.
 
 ## Non-goals
 
