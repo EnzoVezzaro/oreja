@@ -241,18 +241,17 @@ def draw_vincent(listening=False, blink=False, ouch=False) -> Pixels:
 
     # --- The ear that still works, on the other side of the bandage ----------------------
     ear = Pixels()
-    ear.fill_ellipse(31.7, 23.4, 2.2, 3.3, SKIN)
+    ear.fill_ellipse(31.2, 23.4, 1.9, 2.9, SKIN)
     stamp(art, ear)
     # An ink edge on the inner side too, or at 8x the ear reads as a lump on the cheek.
-    art.arc(31.7, 23.4, 2.2, 96, 264, OUTLINE, thickness=1.0)
-    art.arc(32.6, 23.4, 1.3, 300, 60, SKIN_SHADOW, thickness=1.0)
-    art.set(31, 22, EAR_INNER)
+    art.arc(31.2, 23.4, 1.9, 96, 264, OUTLINE, thickness=1.0)
+    art.arc(31.9, 23.4, 1.2, 300, 60, SKIN_SHADOW, thickness=1.0)
     art.set(31, 23, EAR_INNER)
     art.set(31, 24, EAR_INNER)
     if listening:
-        art.set(31, 22, EAR_LIGHT)
         art.set(31, 23, EAR_LIGHT)
         art.set(31, 24, EAR_LIGHT)
+        art.set(30, 22, EAR_LIGHT)
 
     if ouch:
         # The click joke, drawn last so nothing covers it: the patch leaves his head and hangs
