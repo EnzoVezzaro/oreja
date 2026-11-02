@@ -5,7 +5,6 @@ build/
 DerivedData/
 .vercel
 .env.local
-.impeccable/
 
 # Agent tooling installed locally (skills, plugin metadata); never part of the site or the app.
 .agents/
