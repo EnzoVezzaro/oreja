@@ -16,7 +16,8 @@ site/
   assets/mark-128.png  the same mark at favicon size
   assets/night-sky.png, night-hills.png, night-front.png   the painting, generated
   assets/oreja-vincent.png   Vincent's five-frame pixel sprite
-  assets/vincent-desk.png, vincent-back.png   two further poses, generated
+  assets/vincent-desk.svg   the desk scene, generated as named layers so it can move
+  assets/vincent-back.png   the back view, generated
   assets/fonts/     Manrope variable + Instrument Serif italic/regular (OFL)
 ```
 

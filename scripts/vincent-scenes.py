@@ -6,12 +6,16 @@
 `scripts/vincent-sprite.py` draws Vincent himself. This script draws the two scenes the site
 needs around him, in the same palette and on the same kind of pixel grid:
 
-    site/assets/vincent-desk.png   56 x 44 cells, x8   Vincent listening at his desk, with a
+    site/assets/vincent-desk.svg   56 x 44 cells, x8   Vincent listening at his desk, with a
                                                       record player, a mug and a small painting
     site/assets/vincent-back.png   32 x 40 cells, x8   Vincent from behind, watching the sunrise
 
-Both are static images. The site animates the light around them (a lamp pulse, a rising sun),
-never the character's pose, and the app keeps owning the real state frames.
+The desk is an SVG rather than a PNG because it moves. The scene is painted into named layers
+(wall, painting, stars, desk, deck, vinyl, tonearm, vincent, eyes, led, mug, stool, steam) and
+each layer becomes a `<g>` with its own CSS animation: the steam rises and fades, a sheen travels
+round the record, the two stars twinkle, the headphone LED breathes and he blinks. Vincent himself never leaves his chair — pose
+and position are fixed, the app still owns the state frames — and every animation stops under
+`prefers-reduced-motion`.
 """
 
 import math
@@ -106,6 +110,10 @@ class Pixels:
         for (x, y) in points:
             self.set(x, y, color)
 
+    def merge(self, other):
+        """Copy every painted cell over this surface, leaving the rest untouched."""
+        self.cells.update(other.cells)
+
     def write(self, path, scale):
         rows = bytearray()
         for y in range(self.h):
@@ -140,6 +148,56 @@ class Pixels:
         )
         path.write_bytes(png)
         print(f"{path.relative_to(OUT.parent.parent)}  {self.w * scale}x{self.h * scale}  {len(png) // 1024} KB")
+
+
+# Paint order for the desk scene. Each name becomes one `<g>` in the SVG, and the PNG-era
+# "draw it all on one surface" order is this same list.
+DESK_W, DESK_H = 56, 44
+DESK_ORDER = [
+    "wall", "painting", "stars-a", "stars-b", "desk", "deck", "vinyl", "tonearm",
+    "vincent", "eyes", "led", "mug", "stool", "steam-a", "steam-b",
+]
+
+def write_scene_svg(path, layers, order, w, h, extra=""):
+    """Emit one `<g>` per layer, merging each colour into horizontal runs of rects."""
+    groups = []
+    for name in order:
+        cells = layers[name].cells
+        if not cells:
+            continue
+        rows = {}
+        for (x, y), colour in cells.items():
+            rows.setdefault(colour, {}).setdefault(y, []).append(x)
+        paths = []
+        for colour in sorted(rows):
+            d = []
+            for y in sorted(rows[colour]):
+                xs = sorted(rows[colour][y])
+                start = prev = xs[0]
+                for x in xs[1:] + [None]:
+                    if x is None or x != prev + 1:
+                        d.append(f"M{start} {y}h{prev - start + 1}v1H{start}z")
+                        if x is not None:
+                            start = x
+                    if x is not None:
+                        prev = x
+            paths.append(f'<path fill="{colour}" d="{"".join(d)}"/>')
+        groups.append(f'<g id="{name}">{"".join(paths)}</g>')
+
+    # No <style> block. The scene is inlined into the page by landing.js so night.css owns the
+    # animation, which is the only way `prefers-reduced-motion` on the page can reach these layers:
+    # CSS inside an SVG loaded through <img> is its own document and ignores the page's preference.
+    svg = (
+        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {w} {h}" '
+        f'width="{w * 8}" height="{h * 8}" shape-rendering="crispEdges" role="img"\n'
+        '     aria-label="Vincent at his desk in headphones, next to a record player and a mug of '
+        'something warm">\n'
+        + "".join(f"  {group}\n" for group in groups)
+        + extra
+        + "</svg>\n"
+    )
+    path.write_text(svg, encoding="utf-8")
+    print(f"{path.relative_to(OUT.parent.parent)}  {w}x{h} cells  {len(svg) // 1024} KB")
 
 
 def vincent_head(p, cx, cy, hat=True, phones=False):
@@ -187,79 +245,154 @@ def vincent_head(p, cx, cy, hat=True, phones=False):
 
 
 def build_desk():
-    w, h = 56, 44
-    p = Pixels(w, h, WALL)
+    w, h = DESK_W, DESK_H
+    L = {name: Pixels(w, h) for name in DESK_ORDER}
 
     # The wall glow: rings of slightly warmer indigo behind the desk.
-    p.ellipse(34, 20, 26, 18, WALL_LIGHT)
-    p.ellipse(34, 21, 18, 14, WALL_GLOW)
-    p.ellipse(33, 21, 12, 10, "#33284F")
+    wall = L["wall"]
+    for y in range(h):
+        for x in range(w):
+            wall.set(x, y, WALL)
+    wall.ellipse(34, 20, 26, 18, WALL_LIGHT)
+    wall.ellipse(34, 21, 18, 14, WALL_GLOW)
+    wall.ellipse(33, 21, 12, 10, "#33284F")
     # A warm pool from the little lamp on the desk, behind his shoulder.
-    p.ellipse(44, 22, 8, 7, "#3E2A44")
-    p.ellipse(44, 22, 5, 4, "#4A2E42")
+    wall.ellipse(44, 22, 8, 7, "#3E2A44")
+    wall.ellipse(44, 22, 5, 4, "#4A2E42")
 
-    # A small painting on the wall: a night of his own, two cells of star and a swirl.
-    p.rect(5, 6, 17, 18, FRAME)
-    p.rect(6, 7, 16, 17, NIGHT_PAINT)
-    p.ellipse(11, 13, 4, 3, PAINT_LIGHT)
-    p.ellipse(11, 13, 2, 2, NIGHT_PAINT)
-    p.set(13, 10, PAINT_STAR)
-    p.set(9, 15, PAINT_STAR)
-    p.set(8, 9, "#8E6A3A")
-    p.set(16, 18, "#8E6A3A")
+    # A small painting on the wall: a night of his own, a swirl and (above, in their own layers) two
+    # stars that twinkle.
+    painting = L["painting"]
+    painting.rect(5, 6, 17, 18, FRAME)
+    painting.rect(6, 7, 16, 17, NIGHT_PAINT)
+    painting.ellipse(11, 13, 4, 3, PAINT_LIGHT)
+    painting.ellipse(11, 13, 2, 2, NIGHT_PAINT)
+    painting.set(8, 9, "#8E6A3A")
+    painting.set(16, 18, "#8E6A3A")
+    L["stars-a"].set(13, 10, PAINT_STAR)
+    L["stars-b"].set(9, 15, PAINT_STAR)
 
     # Desk slab: top edge, body, then a darker shadow under it.
-    p.rect(0, 30, w - 1, 31, "#8A6238")
-    p.rect(0, 32, w - 1, 37, WOOD)
-    p.rect(0, 32, w - 1, 32, WOOD_TOP)
-    p.rect(0, 38, w - 1, 40, WOOD_DEEP)
+    desk = L["desk"]
+    desk.rect(0, 30, w - 1, 31, "#8A6238")
+    desk.rect(0, 32, w - 1, 37, WOOD)
+    desk.rect(0, 32, w - 1, 32, WOOD_TOP)
+    desk.rect(0, 38, w - 1, 40, WOOD_DEEP)
 
-    # Record player, left of the desk.
-    p.rect(3, 23, 23, 31, "#4E3520")
-    p.rect(3, 23, 23, 23, "#8A6238")
-    p.rect(4, 24, 22, 30, "#2A1D14")
-    p.ellipse(12, 27, 7.4, 3.4, "#1F1B28")
+    # Record player, left of the desk. Body, disc and arm are separate layers so the disc can carry
+    # a rotating sheen without dragging the box around with it.
+    deck = L["deck"]
+    deck.rect(3, 23, 23, 31, "#4E3520")
+    deck.rect(3, 23, 23, 23, "#8A6238")
+    deck.rect(4, 24, 22, 30, "#2A1D14")
+
+    vinyl = L["vinyl"]
+    vinyl.ellipse(12, 27, 7.4, 3.4, "#1F1B28")
     for r in (6.4, 5.2, 4.0):
-        p.ellipse(12, 27, r, r * 0.46, "#2E2938" if int(r) % 2 == 0 else "#1F1B28")
-    p.ellipse(12, 27, 2.0, 1.0, LABEL)
-    p.set(11, 27, "#F7DFA6")
-    p.set(12, 27, OUTLINE)
-    # Tonearm: one clean L, arm down onto the record. Anything curvier reads as a scribble.
-    p.rect(18, 23, 21, 23, "#CFC7BC")
-    p.line(18, 23, 14, 26, METAL)
-    p.set(21, 23, METAL)
-    p.set(13, 26, "#CFC7BC")
+        vinyl.ellipse(12, 27, r, r * 0.46, "#2E2938" if int(r) % 2 == 0 else "#1F1B28")
+    vinyl.ellipse(12, 27, 2.0, 1.0, LABEL)
+    vinyl.set(11, 27, "#F7DFA6")
+    vinyl.set(12, 27, OUTLINE)
+
+    # Tonearm: one clean L, arm down onto the record. Anything curvier reads as a scribble, and the
+    # pivot stays two cells wide so the arm does not read as a ladle standing in the box.
+    arm = L["tonearm"]
+    arm.rect(19, 23, 20, 23, "#B4ABA0")
+    arm.line(19, 23, 15, 26, "#8E867C")
+    arm.set(20, 23, METAL)
+    arm.set(14, 26, "#B4ABA0")
 
     # Vincent, seated behind the desk.
-    p.ellipse(36, 33, 12, 10, COAT)
-    p.ellipse(36, 34, 11, 8, COAT_DEEP)
-    p.ellipse(29, 33, 3.2, 7.0, COAT_LIGHT)
+    vincent = L["vincent"]
+    vincent.ellipse(36, 33, 12, 10, COAT)
+    vincent.ellipse(36, 34, 11, 8, COAT_DEEP)
+    vincent.ellipse(29, 33, 3.2, 7.0, COAT_LIGHT)
     # Arm forward, hand resting on the desk.
-    p.line(30, 30, 26, 33, COAT_DEEP, thick=2)
-    p.ellipse(25, 33, 1.8, 1.4, SKIN)
-    vincent_head(p, 36, 19, hat=True, phones=True)
+    vincent.line(30, 30, 26, 33, COAT_DEEP, thick=2)
+    vincent.ellipse(25, 33, 1.8, 1.4, SKIN)
+    vincent_head(vincent, 36, 19, hat=True, phones=True)
     # Coat collar around the beard, a lapel line and a button.
-    p.ellipse(36, 28, 8.5, 3.0, COAT_DEEP)
-    p.set(29, 27, COAT_LIGHT)
-    p.line(31, 29, 34, 34, COAT_LIGHT)
-    p.line(41, 29, 38, 34, COAT_DEEP)
-    p.set(36, 33, HAT_SHADE)
+    vincent.ellipse(36, 28, 8.5, 3.0, COAT_DEEP)
+    vincent.set(29, 27, COAT_LIGHT)
+    vincent.line(31, 29, 34, 34, COAT_LIGHT)
+    vincent.line(41, 29, 38, 34, COAT_DEEP)
+    vincent.set(36, 33, HAT_SHADE)
 
-    # Mug of something warm, in front of the record player, with two curls of steam.
-    p.rect(25, 27, 28, 30, MUG)
-    p.rect(29, 28, 30, 29, MUG)
-    p.rect(25, 30, 28, 30, "#D9CCB8")
-    p.set(26, 28, "#FFFFFF")
-    for (sx, sy) in ((26, 26), (27, 25), (27, 24), (26, 23), (26, 22), (27, 21)):
-        p.set(sx, sy, STEAM)
-    for (sx, sy) in ((29, 26), (30, 25), (30, 24), (29, 23), (29, 22)):
-        p.set(sx, sy, "#B9B0A2")
+    # Blink, at the sprite's own eye cells: two lids of skin that the SVG fades in for a frame.
+    for ex in (33, 38):
+        L["eyes"].rect(ex, 18, ex + 1, 19, SKIN)
+
+    # The headphone LEDs: the cups keep their dark interior here, and the lit pixel lives on its
+    # own layer so it can breathe.
+    led = L["led"]
+    for side in (-1, 1):
+        ex = int(36 + side * 7.1)
+        vincent.set(ex, 20, HEADPHONE_LIGHT)
+        led.set(ex, 20, LABEL)
+
+    # Mug of something warm, at his elbow on the right of the desk: the one spot where the mug is not
+    # in front of the record and its steam rises against bare wall instead of his face. Outlined
+    # like every other prop, because a cream mug at this grid size without an edge reads as paper.
+    mug = L["mug"]
+    mug.rect(48, 27, 53, 32, OUTLINE)
+    mug.rect(49, 28, 52, 31, MUG)
+    mug.rect(49, 28, 52, 28, "#4A2E1C")  # the coffee
+    mug.rect(49, 29, 49, 30, "#FFFFFF")  # rim light
+    mug.rect(49, 32, 52, 32, "#D9CCB8")  # shadow on the desk
+    mug.rect(54, 29, 55, 29, OUTLINE)  # handle
+    mug.set(55, 30, OUTLINE)
+    mug.set(54, 30, MUG)
+    mug.set(54, 31, OUTLINE)
+
+    # Two curls of steam, one layer each, so they rise out of phase. Each curl is two cells wide and
+    # drawn tall: at the size the page renders the scene a single 1-cell plume disappears, and the
+    # whole point of the layer is that you can see the mug is warm.
+    # Each curl is one cell wide and drifts a cell outwards as it rises, the way a plume actually
+    # moves. A cell-per-row zigzag was tried first and read as a lightning bolt, not as steam.
+    for (sx, sy) in (
+        (49, 26), (50, 26),
+        (49, 25), (50, 25),
+        (49, 24),
+        (49, 23),
+        (48, 22),
+        (48, 21),
+        (49, 20),
+        (49, 19),
+        (49, 18),
+    ):
+        L["steam-a"].set(sx, sy, STEAM)
+    for (sx, sy) in (
+        (51, 26), (52, 26),
+        (51, 25), (52, 25),
+        (52, 24),
+        (52, 23),
+        (53, 22),
+        (53, 21),
+        (52, 20),
+        (52, 19),
+        (52, 18),
+    ):
+        L["steam-b"].set(sx, sy, "#B9B0A2")
 
     # Stool legs under him, so he is sitting rather than floating.
-    p.rect(32, 37, 33, 40, WOOD_DEEP)
-    p.rect(40, 37, 41, 40, WOOD_DEEP)
+    stool = L["stool"]
+    stool.rect(32, 37, 33, 40, WOOD_DEEP)
+    stool.rect(40, 37, 41, 40, WOOD_DEEP)
 
-    p.write(OUT / "vincent-desk.png", 8)
+    write_scene_svg(
+        OUT / "vincent-desk.svg",
+        L,
+        DESK_ORDER,
+        w,
+        h,
+        # A dashed sheen travelling around the disc. The disc itself is pixel art and stays still —
+        # rotating the pixels would smear them; a light that travels reads as a record playing. The
+        # ellipse is the disc's own perspective (rx 5.2, ry 5.2 * 0.46) and only the dash offset
+        # moves, so the light never leaves the rim.
+        extra='  <g id="sheen"><ellipse cx="12" cy="27" rx="5.2" ry="2.4" fill="none" '
+        'stroke="#9C93C0" stroke-width="0.45" stroke-linecap="round" '
+        'stroke-dasharray="3 6" opacity="0.7"/></g>\n',
+    )
 
 
 def build_back():

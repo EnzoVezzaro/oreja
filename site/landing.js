@@ -392,6 +392,14 @@ const eggButton = document.querySelector("[data-egg]");
 const eggNote = document.querySelector("[data-egg-note]");
 let blinkTimer = 0;
 let eggTimer = 0;
+let noteTimer = 0;
+let isOuching = false;
+
+/* The app's numbers: the shake occupies 810ms, and with reduced motion he simply holds the ouch
+   frame for 900ms. Same sprite, same timings, same joke. */
+const OUCH_MS = 810;
+const OUCH_REDUCED_MS = 900;
+const NOTE_MS = 1900;
 
 function scheduleBlink() {
   if (!heroVincent || reduceMotion) return;
@@ -407,18 +415,72 @@ function scheduleBlink() {
 
 if (heroVincent) scheduleBlink();
 
-if (eggButton) {
-  eggButton.addEventListener("click", () => {
-    heroVincent.classList.remove("is-blink");
-    heroVincent.classList.add("is-ouch");
-    if (eggNote) {
-      eggNote.textContent = "Careful. He uses that one.";
-      eggNote.classList.add("is-shown");
-    }
-    clearTimeout(eggTimer);
-    eggTimer = window.setTimeout(() => {
-      heroVincent.classList.remove("is-ouch");
-      if (eggNote) eggNote.classList.remove("is-shown");
-    }, 1900);
+function snipHero() {
+  if (!heroVincent || !eggButton || isOuching) return;
+  isOuching = true;
+  heroVincent.classList.remove("is-blink");
+  // The app takes 4% of the sprite's size, rounded to whole pixels, so the step follows whatever
+  // width the hero happens to render at instead of being tuned for one breakpoint.
+  const step = Math.max(1, Math.round(heroVincent.getBoundingClientRect().width * 0.04));
+  heroVincent.style.setProperty("--ouch-step", `${step}px`);
+  heroVincent.classList.add("is-ouch");
+  if (eggNote) {
+    eggNote.textContent = "Careful. He uses that one.";
+    eggNote.classList.add("is-shown");
+  }
+  clearTimeout(eggTimer);
+  eggTimer = window.setTimeout(() => {
+    heroVincent.classList.remove("is-ouch");
+    isOuching = false;
+  }, reduceMotion ? OUCH_REDUCED_MS : OUCH_MS);
+  // The line outlives the sprite: 810ms is the app's animation, not enough time to read anything.
+  clearTimeout(noteTimer);
+  noteTimer = window.setTimeout(() => eggNote?.classList.remove("is-shown"), NOTE_MS);
+}
+
+if (eggButton) eggButton.addEventListener("click", snipHero);
+
+/* The copy column is a full-width panel stacked above the figure, so a click aimed at Vincent lands
+   on empty space inside that panel instead of on his button — his shake never played at all. Rather
+   than reorder the paint (the copy is meant to sit in front), forward clicks that fall inside his
+   sprite box. Links and controls that happen to overlap him still win. */
+const heroClickTarget = document.querySelector(".n-hero");
+if (heroClickTarget && heroVincent) {
+  heroClickTarget.addEventListener("click", (event) => {
+    if (event.target.closest("[data-egg], a, button, input, select, textarea, label")) return;
+    const box = heroVincent.getBoundingClientRect();
+    const inside =
+      event.clientX >= box.left &&
+      event.clientX <= box.right &&
+      event.clientY >= box.top &&
+      event.clientY <= box.bottom;
+    if (inside) snipHero();
   });
 }
+
+/* ------------------------------------------------------------- the desk scene -- */
+
+/* The desk is one generated SVG (`assets/vincent-desk.svg`) made of named layers. It ships as an
+   <img> so it renders with no JavaScript and no extra request logic, then this swaps the file for
+   its own markup so night.css can animate the steam, the stars, the LED and the blink. Animation
+   written inside the file would be a document of its own and would ignore the page's
+   `prefers-reduced-motion`, which is the one thing it must not do. If the fetch fails — opened from
+   disk with file://, or offline — the still image stays and the page is unchanged. */
+const deskFigure = document.querySelector(".n-desk");
+const deskImage = deskFigure ? deskFigure.querySelector("img") : null;
+
+if (deskImage) {
+  fetch(deskImage.getAttribute("src"))
+    .then((response) => (response.ok ? response.text() : Promise.reject(new Error("desk"))))
+    .then((markup) => {
+      const svg = new DOMParser().parseFromString(markup, "image/svg+xml").documentElement;
+      if (!svg || svg.nodeName.toLowerCase() !== "svg") return;
+      svg.setAttribute("class", "n-desk-art");
+      svg.setAttribute("aria-hidden", "true");
+      svg.removeAttribute("role");
+      svg.removeAttribute("aria-label");
+      deskImage.replaceWith(svg);
+    })
+    .catch(() => {});
+}
+
