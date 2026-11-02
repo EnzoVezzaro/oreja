@@ -8,7 +8,7 @@ struct SettingsView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 22) {
+            VStack(alignment: .leading, spacing: 28) {
                 header
                 behavior
                 source
@@ -18,7 +18,7 @@ struct SettingsView: View {
                 permissions
                 versionFooter
             }
-            .frame(maxWidth: 480, alignment: .leading)
+            .frame(maxWidth: 500, alignment: .leading)
             .frame(maxWidth: .infinity, alignment: .center)
             .padding(.horizontal, 28)
             .padding(.top, 24)
@@ -30,14 +30,22 @@ struct SettingsView: View {
     }
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("Settings")
-                .font(OrejaTheme.Typography.pageTitle)
-                .tracking(-0.5)
-                .foregroundStyle(OrejaTheme.Palette.ink)
-            Text("Oreja only touches playback while the selected AI source is speaking.")
-                .font(OrejaTheme.Typography.caption)
-                .foregroundStyle(OrejaTheme.Palette.inkSoft)
+        HStack(alignment: .center, spacing: 20) {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 14) {
+                    BrandMark(size: 36)
+                    BrandWordmark(size: 23)
+                }
+                Text("Settings")
+                    .font(OrejaTheme.Typography.pageTitle)
+                    .foregroundStyle(OrejaTheme.Palette.ink)
+                Text("Oreja only touches playback while the selected AI source is speaking.")
+                    .font(OrejaTheme.Typography.caption)
+                    .foregroundStyle(OrejaTheme.Palette.inkSoft)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+            VincentCompanion(size: 80, isListening: model.state.isActive, isMusicPlaying: model.music?.isPlaying == true)
         }
     }
 
@@ -53,14 +61,16 @@ struct SettingsView: View {
 
     private var behavior: some View {
         ThemeSection(title: "Behavior") {
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 14) {
+                behaviorPreview
+
                 Toggle("Automation enabled", isOn: Binding(
                     get: { model.settings.automationEnabled },
                     set: { model.setAutomationEnabled($0) }
                 ))
                 .toggleStyle(.switch)
                 .tint(OrejaTheme.Palette.accent)
-                .font(.system(size: 12.5))
+                .font(.system(size: 13))
 
                 Text("When off, Oreja never touches playback.")
                     .font(OrejaTheme.Typography.micro)
@@ -68,7 +78,7 @@ struct SettingsView: View {
 
                 HStack {
                     Text("While ChatGPT speaks")
-                        .font(.system(size: 12.5))
+                        .font(.system(size: 13))
                         .foregroundStyle(OrejaTheme.Palette.ink)
                     Spacer(minLength: 8)
                     Picker("Playback behavior", selection: Binding(
@@ -85,7 +95,7 @@ struct SettingsView: View {
                 if model.settings.interruptionMode == .duck {
                     HStack {
                         Text("Keep Music at")
-                            .font(.system(size: 12.5))
+                            .font(.system(size: 13))
                             .foregroundStyle(OrejaTheme.Palette.ink)
                         Spacer(minLength: 8)
                         Text("\(model.settings.duckVolumePercent)%")
@@ -109,7 +119,7 @@ struct SettingsView: View {
 
                     HStack {
                         Text("Return Music to")
-                            .font(.system(size: 12.5))
+                            .font(.system(size: 13))
                             .foregroundStyle(OrejaTheme.Palette.ink)
                         Spacer(minLength: 8)
                         Text("\(model.settings.restoreVolumePercent)%")
@@ -137,7 +147,7 @@ struct SettingsView: View {
 
                 HStack {
                     Text("Quiet interval before music resumes")
-                        .font(.system(size: 12.5))
+                        .font(.system(size: 13))
                         .foregroundStyle(OrejaTheme.Palette.ink)
                     Spacer(minLength: 8)
                     Text("\(Int(model.settings.resumeDelay * 1000)) ms")
@@ -170,7 +180,7 @@ struct SettingsView: View {
                 ))
                 .toggleStyle(.switch)
                 .tint(OrejaTheme.Palette.accent)
-                .font(.system(size: 12.5))
+                .font(.system(size: 13))
 
                 Text("In a spoken conversation most of the time nobody is talking: the assistant is working on the answer, you are answering it. With this on, music stays paused for the whole exchange and comes back only once the conversation has gone quiet.")
                     .font(OrejaTheme.Typography.micro)
@@ -180,7 +190,7 @@ struct SettingsView: View {
                 if model.settings.holdThroughConversation {
                     HStack {
                         Text("Music returns after")
-                            .font(.system(size: 12.5))
+                            .font(.system(size: 13))
                             .foregroundStyle(OrejaTheme.Palette.ink)
                         Spacer(minLength: 8)
                         Text(model.settings.conversationHold < 60
@@ -216,7 +226,7 @@ struct SettingsView: View {
                 ))
                 .toggleStyle(.switch)
                 .tint(OrejaTheme.Palette.accent)
-                .font(.system(size: 12.5))
+                .font(.system(size: 13))
 
                 Text("For spoken conversations: music also stays paused while you answer, not only while the assistant talks. Uses the microphone, which is a separate permission. The microphone can only keep a pause alive; the assistant's answer is what starts it, so a speaker playing music can never keep Oreja looping.")
                     .font(OrejaTheme.Typography.micro)
@@ -230,6 +240,30 @@ struct SettingsView: View {
         }
     }
 
+    private var behaviorPreview: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top, spacing: 14) {
+                BrandMark(size: 32)
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(spacing: 7) {
+                        StatusDot(color: model.settings.automationEnabled ? OrejaTheme.Palette.wheat : OrejaTheme.Palette.inkSoft, isActive: model.settings.automationEnabled)
+                        Text(model.settings.interruptionMode == .duck ? "Oreja makes room" : "Oreja pauses Music")
+                            .font(OrejaTheme.Typography.sectionTitle)
+                            .foregroundStyle(OrejaTheme.Palette.ink)
+                    }
+                    if model.settings.interruptionMode == .duck {
+                        Text("Music \(model.settings.duckVolumePercent)% while AI speaks · \(model.settings.restoreVolumePercent)% when quiet")
+                    } else {
+                        Text("Music resumes after the conversation is quiet")
+                    }
+                }
+                .font(OrejaTheme.Typography.caption)
+                .foregroundStyle(OrejaTheme.Palette.inkSoft)
+                Spacer(minLength: 0)
+            }
+        }
+    }
+
     private var source: some View {
         ThemeSection(
             title: "AI source",
@@ -237,7 +271,7 @@ struct SettingsView: View {
         ) {
             HStack {
                 Text("Listen to")
-                    .font(.system(size: 12.5))
+                    .font(.system(size: 13))
                     .foregroundStyle(OrejaTheme.Palette.ink)
                 Spacer(minLength: 8)
                 Picker("Listen to", selection: Binding(
@@ -269,10 +303,10 @@ struct SettingsView: View {
 
     private var music: some View {
         ThemeSection(title: "Music") {
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 14) {
                 HStack {
                     Text("Provider")
-                        .font(.system(size: 12.5))
+                        .font(.system(size: 13))
                         .foregroundStyle(OrejaTheme.Palette.ink)
                     Spacer(minLength: 8)
                     Picker("Provider", selection: Binding(
@@ -288,11 +322,11 @@ struct SettingsView: View {
 
                 Hairline()
 
-                HStack(spacing: 10) {
+                HStack(spacing: 14) {
                     Button("Open Music") { model.launchMusic() }
-                        .controlSize(.small)
+                        .controlSize(.regular)
                     Button("Check permissions") { model.runConnectionCheck() }
-                        .controlSize(.small)
+                        .controlSize(.regular)
                         .disabled(model.isRunningCheck)
                 }
 
@@ -315,7 +349,7 @@ struct SettingsView: View {
                 ))
                 .toggleStyle(.switch)
                 .tint(OrejaTheme.Palette.accent)
-                .font(.system(size: 12.5))
+                .font(.system(size: 13))
 
                 if let error = model.launchAtLoginError {
                     InlineNotice(text: error, symbol: "exclamationmark.triangle.fill")
@@ -335,17 +369,17 @@ struct SettingsView: View {
             ))
             .toggleStyle(.switch)
             .tint(OrejaTheme.Palette.accent)
-            .font(.system(size: 12.5))
+            .font(.system(size: 13))
         }
     }
 
     private var permissions: some View {
         ThemeSection(title: "Permissions") {
-            HStack(spacing: 10) {
+            HStack(spacing: 14) {
                 Button("Audio recording…") { model.openSystemAudioSettings() }
-                    .controlSize(.small)
+                    .controlSize(.regular)
                 Button("Automation…") { model.openAutomationSettings() }
-                    .controlSize(.small)
+                    .controlSize(.regular)
             }
         }
     }

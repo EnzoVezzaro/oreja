@@ -135,11 +135,16 @@ struct OnboardingView: View {
 
     private var welcome: some View {
         VStack(alignment: .leading, spacing: 18) {
-            pageHeader(
-                "Welcome",
-                "One job, done automatically.",
-                "Oreja pauses Apple Music or lowers its volume when ChatGPT starts speaking, then restores playback when the reply ends. It sits in the menu bar and stays out of the way."
-            )
+            HStack(alignment: .top, spacing: 18) {
+                pageHeader(
+                    "Welcome",
+                    "One job, done automatically.",
+                    "Oreja pauses Apple Music or lowers its volume when ChatGPT starts speaking, then restores playback when the reply ends. It sits in the menu bar and stays out of the way."
+                )
+                Spacer(minLength: 12)
+                VincentCompanion(size: 80, isListening: false, isMusicPlaying: false)
+                    .padding(.top, 4)
+            }
             ThemeCard {
                 BulletList(items: [
                     "It listens to ChatGPT's own audio output. Microphone access is optional if you want Music to stay interrupted while you speak.",

@@ -1,54 +1,43 @@
 import AppKit
 import SwiftUI
 
-/// Brand tokens for every surface of the app.
-///
-/// Colours are dynamic, so a view never branches on `colorScheme` to stay legible. The palette is
-/// the same one published in `docs/brand.md` and used by the landing page: warm paper, warm ink,
-/// a deep indigo for brand and focus, and a single wheat accent. Everything else is a neutral.
+/// Warm, quiet brand surfaces with appearance-aware contrast.
 enum OrejaTheme {
     enum Palette {
-        /// Panel and window wash. Kept close to the system material so the menu bar popover does not
-        /// look like a rectangle pasted on top of the desktop.
-        static let paper = Color(nsColor: .oreja(light: 0xF7F2E8, dark: 0x11100E))
-        /// Cards and grouped rows.
-        static let card = Color(nsColor: .oreja(light: 0xFFFCF4, dark: 0x1B1916))
-        static let cardMuted = Color(nsColor: .oreja(light: 0xF1EADA, dark: 0x17150F))
-        static let ink = Color(nsColor: .oreja(light: 0x14120E, dark: 0xF3EEE2))
-        static let inkSoft = Color(nsColor: .oreja(light: 0x6C6559, dark: 0xA8A091))
-        static let hairline = Color(nsColor: .oreja(light: 0xE1D7C4, dark: 0x2C2823))
-        /// Brand indigo. Lifts to a periwinkle in dark appearance so it still reads as an accent.
-        static let accent = Color(nsColor: .oreja(light: 0x242C5A, dark: 0xB9C0F0))
-        /// Text and glyphs placed on `accent`. In light appearance the accent is deep indigo, so this
-        /// is cream; in dark appearance the accent lifts, so this returns to deep indigo.
-        static let onAccent = Color(nsColor: .oreja(light: 0xF7F2E8, dark: 0x171D3F))
-        static let accentWash = Color(nsColor: .oreja(light: 0xE9E6F3, dark: 0x232841))
-        /// The one warm accent. Used for emphasis and for "music paused", never for body text.
-        static let wheat = Color(nsColor: .oreja(light: 0x8A6318, dark: 0xE7B44C))
+        static let paper = Color(nsColor: .oreja(light: 0xFBF7F0, dark: 0x16130F))
+        static let card = Color(nsColor: .oreja(light: 0xFFFDFA, dark: 0x221E19))
+        static let cardMuted = Color(nsColor: .oreja(light: 0xF8F0E4, dark: 0x1B1713))
+        static let ink = Color(nsColor: .oreja(light: 0x242320, dark: 0xFAF9F6))
+        static let inkSoft = Color(nsColor: .oreja(light: 0x706C65, dark: 0xBDB6AC))
+        static let hairline = Color(nsColor: .oreja(light: 0xE5DFD7, dark: 0x494139))
+        static let accent = Color(nsColor: .oreja(light: 0xA7472A, dark: 0xF3A88E))
+        static let onAccent = Color(nsColor: .oreja(light: 0xFFFFFF, dark: 0x242320))
+        static let accentWash = Color(nsColor: .oreja(light: 0xFDE7D5, dark: 0x33241C))
+        /// Coral is decorative; interactive controls use the higher-contrast accent.
+        static let coral = Color(nsColor: .srgb(0xE77952))
+        // Compatibility for status presenters outside these views.
+        static let wheat = accent
         static let positive = Color(nsColor: .oreja(light: 0x4C6A51, dark: 0x9CC2A3))
-        static let warning = Color(nsColor: .oreja(light: 0xA9502C, dark: 0xE8A183))
-        /// Fixed cream, for artwork placed on indigo. Never used for text on a dynamic background.
-        static let cream = Color(nsColor: NSColor(srgbRed: 0.969, green: 0.949, blue: 0.906, alpha: 1))
-        static let indigo = Color(nsColor: NSColor(srgbRed: 0.141, green: 0.173, blue: 0.353, alpha: 1))
-        static let indigoDeep = Color(nsColor: NSColor(srgbRed: 0.090, green: 0.114, blue: 0.247, alpha: 1))
+        static let warning = accent
+        static let cream = Color(nsColor: .srgb(0xFAF9F6))
     }
 
     enum Metrics {
-        static let panelWidth: CGFloat = 324
-        static let gutter: CGFloat = 16
-        static let cardRadius: CGFloat = 12
-        static let controlRadius: CGFloat = 8
+        static let panelWidth: CGFloat = 352
+        static let gutter: CGFloat = 20
+        static let cardRadius: CGFloat = 18
+        static let controlRadius: CGFloat = 9
     }
 
     enum Typography {
-        static let eyebrow = Font.system(size: 10, weight: .semibold, design: .monospaced)
+        static let eyebrow = Font.system(size: 12, weight: .medium)
         static let wordmark = Font.system(size: 13, weight: .semibold)
         static let wordmarkSuffix = Font.system(size: 8.5, weight: .semibold)
         static let pageTitle = Font.system(size: 25, weight: .semibold)
         static let sectionTitle = Font.system(size: 14, weight: .semibold)
         static let body = Font.system(size: 12.5)
-        static let caption = Font.system(size: 11)
-        static let micro = Font.system(size: 10)
+        static let caption = Font.system(size: 12)
+        static let micro = Font.system(size: 11)
     }
 }
 
@@ -76,84 +65,131 @@ private extension NSColor {
 
 // MARK: - Shared small views
 
-/// The listening mark: a dot with two waves. It is the same geometry as `site/assets/mark.svg`,
-/// the app icon and the wordmark, drawn from primitives so it stays crisp at every size and needs
-/// no symbol artwork.
+/// The shared ear geometry, in the same 64-point coordinates as the website mark.
 struct ListeningMark: View {
-    var color: Color = OrejaTheme.Palette.cream
-    var accent: Color = OrejaTheme.Palette.wheat
+    var color: Color = OrejaTheme.Palette.accent
 
     var body: some View {
         GeometryReader { proxy in
             let scale = min(proxy.size.width, proxy.size.height) / 64
-            let center = CGPoint(x: 25 * scale, y: 32 * scale)
-            ZStack {
-                Circle()
-                    .fill(color)
-                    .frame(width: 6.8 * scale, height: 6.8 * scale)
-                    .position(center)
-                arc(center: center, radius: 10 * scale)
-                    .stroke(color, style: StrokeStyle(lineWidth: 3.4 * scale, lineCap: .round))
-                arc(center: center, radius: 17 * scale)
-                    .stroke(accent, style: StrokeStyle(lineWidth: 3.4 * scale, lineCap: .round))
+            Path { path in
+                path.move(to: CGPoint(x: 22, y: 29))
+                path.addCurve(to: CGPoint(x: 45, y: 29), control1: CGPoint(x: 22, y: 12), control2: CGPoint(x: 45, y: 12))
+                path.addCurve(to: CGPoint(x: 34, y: 46), control1: CGPoint(x: 45, y: 38), control2: CGPoint(x: 34, y: 38))
+                path.addCurve(to: CGPoint(x: 23, y: 45), control1: CGPoint(x: 34, y: 53), control2: CGPoint(x: 23, y: 53))
+                path.move(to: CGPoint(x: 29, y: 29))
+                path.addCurve(to: CGPoint(x: 38, y: 29), control1: CGPoint(x: 29, y: 21), control2: CGPoint(x: 38, y: 21))
+                path.addCurve(to: CGPoint(x: 30, y: 39), control1: CGPoint(x: 38, y: 34), control2: CGPoint(x: 30, y: 33))
             }
+            .applying(CGAffineTransform(scaleX: scale, y: scale))
+            .stroke(color, style: StrokeStyle(lineWidth: 4 * scale, lineCap: .round, lineJoin: .round))
         }
         .accessibilityHidden(true)
     }
-
-    private func arc(center: CGPoint, radius: CGFloat) -> Path {
-        Path { path in
-            path.addArc(
-                center: center,
-                radius: radius,
-                startAngle: .degrees(-50),
-                endAngle: .degrees(50),
-                clockwise: false
-            )
-        }
-    }
 }
 
-/// The brand lockup used in the panel and windows.
 struct BrandMark: View {
-    var size: CGFloat = 22
+    var size: CGFloat = 28
     var cornerRadius: CGFloat?
 
     var body: some View {
-        RoundedRectangle(cornerRadius: cornerRadius ?? size * 0.29, style: .continuous)
-            .fill(
-                LinearGradient(
-                    colors: [OrejaTheme.Palette.indigo, OrejaTheme.Palette.indigoDeep],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-            )
-            .overlay {
-                ListeningMark()
-                    .frame(width: size * 0.62, height: size * 0.62)
-            }
+        RoundedRectangle(cornerRadius: cornerRadius ?? size * 0.25, style: .continuous)
+            .fill(OrejaTheme.Palette.accentWash)
+            .overlay { ListeningMark().padding(size * 0.02) }
             .frame(width: size, height: size)
             .accessibilityHidden(true)
     }
 }
 
-/// Lowercase wordmark with the quiet suffix. Live text, never a traced image.
 struct BrandWordmark: View {
-    var size: CGFloat = 13
+    var size: CGFloat = 16
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 5) {
-            Text("oreja")
-                .font(.system(size: size, weight: .semibold))
-                .tracking(-size * 0.02)
-                .foregroundStyle(OrejaTheme.Palette.ink)
-            Text("DE VAN GOGH")
-                .font(.system(size: size * 0.63, weight: .semibold))
-                .tracking(size * 0.09)
-                .foregroundStyle(OrejaTheme.Palette.inkSoft)
+        Text("oreja")
+            .font(.system(size: size, weight: .semibold, design: .rounded))
+            .tracking(-size * 0.02)
+            .foregroundStyle(OrejaTheme.Palette.ink)
+            .accessibilityLabel("Oreja de Van Gogh")
+    }
+}
+
+/// Vincent, the pixel painter. The bundle ships one five-frame sprite sheet (idle, idle blink,
+/// listening, listening blink, ouch) generated by `scripts/vincent-sprite.py`, so the app and the
+/// website always show the same character. A missing asset leaves no placeholder or footprint.
+///
+/// Clicking him is the joke, not a control: he plays the ouch frame (the bandage leaves his head)
+/// and shakes for a moment. Nothing is sent anywhere and no playback state changes.
+struct VincentCompanion: View {
+    var size: CGFloat = 64
+    var isListening = false
+    var isMusicPlaying = false
+
+    /// Frames in `oreja-vincent.png`, left to right. Keep in sync with the generator and the site CSS.
+    static let frameCount = 5
+    private static let ouchFrame = 4
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var isOuching = false
+    @State private var shake: CGFloat = 0
+
+    private static let sheet: NSImage? = {
+        guard let url = Bundle.main.url(forResource: "oreja-vincent", withExtension: "png") else { return nil }
+        return NSImage(contentsOf: url)
+    }()
+
+    private var isActive: Bool { isListening || isMusicPlaying }
+
+    var body: some View {
+        if let sheet = Self.sheet {
+            TimelineView(.periodic(from: .now, by: 0.5)) { context in
+                let tick = Int(context.date.timeIntervalSinceReferenceDate / 0.5)
+                // A blink every seven ticks keeps him alive without costing a frame budget.
+                let blink = tick % 7 == 3
+                let frame = isOuching
+                    ? Self.ouchFrame
+                    : (isActive ? 2 : 0) + (blink ? 1 : 0)
+                Image(nsImage: sheet)
+                    .resizable()
+                    .interpolation(.none)
+                    .frame(width: size * CGFloat(Self.frameCount), height: size, alignment: .topLeading)
+                    .offset(x: -CGFloat(frame) * size)
+                    .frame(width: size, height: size, alignment: .topLeading)
+                    .clipped()
+            }
+            .frame(width: size, height: size)
+            // Whole-point steps only: a rotated or fractional pixel would blur the sprite.
+            .offset(x: shake)
+            .contentShape(Rectangle())
+            .onTapGesture(perform: snip)
+            .help("Leave the other one alone.")
+            .accessibilityHidden(true)
         }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Oreja de Van Gogh")
+    }
+
+    /// A short self-contained sequence, and re-entrant taps are ignored until it finishes, so a
+    /// click storm cannot stack animations or freeze him mid-ouch.
+    private func snip() {
+        guard !isOuching else { return }
+        isOuching = true
+        guard !reduceMotion else {
+            Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(900))
+                isOuching = false
+            }
+            return
+        }
+        Task { @MainActor in
+            let step = max(1, (size * 0.04).rounded())
+            withAnimation(.linear(duration: 0.06)) { shake = -step }
+            try? await Task.sleep(for: .milliseconds(70))
+            withAnimation(.linear(duration: 0.06)) { shake = step }
+            try? await Task.sleep(for: .milliseconds(70))
+            withAnimation(.linear(duration: 0.06)) { shake = -step / 2 }
+            try? await Task.sleep(for: .milliseconds(70))
+            withAnimation(.linear(duration: 0.08)) { shake = 0 }
+            try? await Task.sleep(for: .milliseconds(520))
+            isOuching = false
+        }
     }
 }
 
@@ -189,9 +225,9 @@ struct Eyebrow: View {
     var text: String
 
     var body: some View {
-        Text(text.uppercased())
+        Text(text)
             .font(OrejaTheme.Typography.eyebrow)
-            .tracking(1.3)
+            .tracking(0)
             .foregroundStyle(OrejaTheme.Palette.inkSoft)
     }
 }
@@ -208,7 +244,7 @@ struct ThemeCard<Content: View>: View {
 
     var body: some View {
         content()
-            .padding(14)
+            .padding(18)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(
                 RoundedRectangle(cornerRadius: OrejaTheme.Metrics.cardRadius, style: .continuous)
@@ -288,7 +324,7 @@ struct QuietRow: View {
                 }
             }
             .padding(.horizontal, 8)
-            .padding(.vertical, 6)
+            .padding(.vertical, 9)
             .contentShape(Rectangle())
             .background(
                 RoundedRectangle(cornerRadius: 7, style: .continuous)

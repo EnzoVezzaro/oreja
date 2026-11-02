@@ -13,11 +13,15 @@ Every result below was produced by the command shown. Items that were not execut
 ./scripts/test.sh
 ```
 
-Result (final run after all source changes):
+Result (historical run recorded below; current UI release verification is listed separately):
 
 ```
 51 passed, 0 failed, 261 assertions
 ```
+
+Current UI release verification (2026-11-01): `./scripts/test.sh` → **54 passed, 0 failed, 283
+assertions**; `python3 scripts/check-site.py` → site consistent; `git diff --check` → clean;
+`./scripts/build.sh` → app valid on disk and satisfies its designated requirement.
 
 Coverage (names as printed by the suite):
 

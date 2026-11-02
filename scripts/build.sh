@@ -143,6 +143,10 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" "$APP/Contents/Framewor
 cp "$BUILD/bin/Oreja" "$APP/Contents/MacOS/Oreja"
 cp packaging/Info.plist "$APP/Contents/Info.plist"
 cp "$BUILD/AppIcon.icns" "$APP/Contents/Resources/AppIcon.icns"
+# Optional shared pixel character; a missing illustration never prevents a native build.
+if [ -f "$ROOT/site/assets/oreja-vincent.png" ]; then
+    cp "$ROOT/site/assets/oreja-vincent.png" "$APP/Contents/Resources/oreja-vincent.png"
+fi
 cp "$LIB/libOrejaCore.dylib" "$LIB/libOrejaAudio.dylib" "$LIB/libOrejaMedia.dylib" "$APP/Contents/Frameworks/"
 printf 'APPL????' > "$APP/Contents/PkgInfo"
 

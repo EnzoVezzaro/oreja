@@ -1,8 +1,7 @@
 import AppKit
 import Foundation
 
-/// Generates the Oreja app icon: a cream ear on a deep indigo field, one wheat arc behind it, and
-/// a warm rim light. Matches the mark in `site/assets/mark.svg` and `docs/brand.md`.
+/// Generates the warm-white Oreja icon with the shared coral ear outline.
 /// Run by scripts/build.sh.
 @main
 struct IconBuilder {
@@ -72,65 +71,25 @@ struct IconBuilder {
             transform: nil
         )
 
-        context.saveGState()
         context.addPath(squircle)
-        context.clip()
+        context.setFillColor(NSColor(srgbRed: 251 / 255, green: 247 / 255, blue: 240 / 255, alpha: 1).cgColor)
+        context.fillPath()
 
-        let colors = [
-            NSColor(srgbRed: 0.141, green: 0.173, blue: 0.353, alpha: 1).cgColor,
-            NSColor(srgbRed: 0.090, green: 0.114, blue: 0.247, alpha: 1).cgColor,
-        ] as CFArray
-        if let gradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: colors, locations: [0, 1]) {
-            context.drawLinearGradient(
-                gradient,
-                start: CGPoint(x: body.minX, y: body.maxY),
-                end: CGPoint(x: body.maxX, y: body.minY),
-                options: []
-            )
-        }
-
-        // The listening mark: a bright dot with two waves, the same geometry as site/assets/mark.svg.
-        let dotCenter = CGPoint(x: body.midX - side * 0.06, y: body.midY)
-        let cream = NSColor(srgbRed: 0.969, green: 0.949, blue: 0.906, alpha: 1).cgColor
-        let wheat = NSColor(srgbRed: 0.906, green: 0.706, blue: 0.298, alpha: 1).cgColor
-        context.setStrokeColor(cream)
-        context.setLineWidth(side * 0.055)
+        // Flip the drawing coordinates to match SwiftUI and the SVG's top-left origin.
+        context.saveGState()
+        context.translateBy(x: body.minX, y: body.maxY)
+        context.scaleBy(x: side / 64, y: -side / 64)
+        context.setStrokeColor(NSColor(srgbRed: 201 / 255, green: 95 / 255, blue: 60 / 255, alpha: 1).cgColor)
+        context.setLineWidth(4)
         context.setLineCap(.round)
-        context.addArc(
-            center: dotCenter,
-            radius: side * 0.155,
-            startAngle: -.pi * (50 / 180),
-            endAngle: .pi * (50 / 180),
-            clockwise: false
-        )
-        context.strokePath()
-        context.setStrokeColor(wheat)
-        context.addArc(
-            center: dotCenter,
-            radius: side * 0.265,
-            startAngle: -.pi * (50 / 180),
-            endAngle: .pi * (50 / 180),
-            clockwise: false
-        )
-        context.strokePath()
-        context.setFillColor(cream)
-        context.fillEllipse(
-            in: CGRect(
-                x: dotCenter.x - side * 0.055,
-                y: dotCenter.y - side * 0.055,
-                width: side * 0.11,
-                height: side * 0.11
-            )
-        )
-        context.restoreGState()
-
-        // Warm cream rim light along the top edge.
-        context.saveGState()
-        context.addPath(squircle)
-        context.clip()
-        context.setStrokeColor(NSColor(srgbRed: 0.969, green: 0.949, blue: 0.906, alpha: 0.30).cgColor)
-        context.setLineWidth(side * 0.012)
-        context.addPath(squircle)
+        context.setLineJoin(.round)
+        context.move(to: CGPoint(x: 22, y: 29))
+        context.addCurve(to: CGPoint(x: 45, y: 29), control1: CGPoint(x: 22, y: 12), control2: CGPoint(x: 45, y: 12))
+        context.addCurve(to: CGPoint(x: 34, y: 46), control1: CGPoint(x: 45, y: 38), control2: CGPoint(x: 34, y: 38))
+        context.addCurve(to: CGPoint(x: 23, y: 45), control1: CGPoint(x: 34, y: 53), control2: CGPoint(x: 23, y: 53))
+        context.move(to: CGPoint(x: 29, y: 29))
+        context.addCurve(to: CGPoint(x: 38, y: 29), control1: CGPoint(x: 29, y: 21), control2: CGPoint(x: 38, y: 21))
+        context.addCurve(to: CGPoint(x: 30, y: 39), control1: CGPoint(x: 38, y: 34), control2: CGPoint(x: 30, y: 33))
         context.strokePath()
         context.restoreGState()
 

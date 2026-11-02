@@ -8,8 +8,20 @@ site/
   index.html        landing page
   docs.html         documentation (setup, permissions, states, troubleshooting, privacy)
   styles.css        the whole design system, shared by both pages
+  landing.js        the three conversation moments in the interactive demo
   assets/mark.svg   canonical brand mark
+  assets/oreja-vincent.png   Vincent's four-frame pixel sprite
+  assets/fonts/manrope-variable.ttf   the one self-hosted font (OFL)
 ```
+
+Vincent is generated from `scripts/vincent-sprite.py`; do not hand-edit the PNG. The sprite is five
+40×40 frames wide (idle, idle blink, listening, listening blink, ouch) and the CSS addresses frames
+by `background-position` percentages over a 500% background; the site uses the first four, and the
+fifth is the click joke in the app. The macOS app ships the same file, so a change here must be
+regenerated and rebuilt, not edited in two places.
+
+Vincent blinks in place. He does not bob, float or parallax on scroll; `scripts/vincent-sprite.py
+--preview 2` writes `build/vincent-preview.png` at the 80 px size the sprite has to read at.
 
 ## Preview
 
@@ -68,8 +80,8 @@ after the `check` Deployment Check passes.
 - Tokens in `styles.css` mirror `apps/macos/Theme.swift` and `docs/brand.md`. Change them together.
 - The mark geometry is duplicated as an inline `<symbol id="mark-tile">` in both pages. If
   `assets/mark.svg` changes, change both symbols and `apps/macos/Theme.swift` (`ListeningMark`).
-- No external fonts, analytics, images or scripts. The product mock is CSS, not a screenshot, and
-  its caption says so.
+- No external fonts, analytics, images or scripts. Manrope is self-hosted from `assets/fonts/`, and
+  the only raster asset is Vincent's generated sprite. His caption is real text, not an image.
 - Copy states only what `docs/test-evidence.md` supports. Keep the "Not yet" list honest when a test
   is finally run, and move the item rather than deleting the section.
 - The deployed folder must be self-contained: every `href` resolves inside `site/` or is an explicit

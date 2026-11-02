@@ -1,8 +1,8 @@
 # Brand
 
 Oreja de Van Gogh is a small, local utility. The brand is small and local too: warm paper, warm
-black, one indigo, one wheat. No illustration of a robot, no gradient headline, no promise the app
-cannot keep.
+black, apricot for the companion, coral for the listening light. One character, no robot, no gradient
+headline, no promise the app cannot keep.
 
 Everything here is implemented in three places and they must stay in step:
 
@@ -12,6 +12,7 @@ Everything here is implemented in three places and they must stay in step:
 | `site/styles.css` | The same tokens as CSS custom properties |
 | `tools/IconBuilder/main.swift` | The app icon, drawn from the mark geometry |
 | `site/assets/mark.svg` | The canonical mark |
+| `scripts/vincent-sprite.py` | Vincent's four-frame pixel sprite, shared by the site and the app |
 
 ## Name
 
@@ -55,15 +56,39 @@ Rules that outrank tone:
 The listening mark is a filled dot with two waves opening to the right. It works because it is made
 of four primitives and survives a 16pt menu bar.
 
-- Inner wave: cream. Outer wave: wheat. Dot: cream.
-- On indigo for the app icon; on paper for print or a single-colour lockup (use ink for all three
-  shapes, then).
+- Inner wave: coral deep. Outer wave: coral. Dot: coral deep.
+- On apricot wash for the tile, on paper, and on ink for a single-colour lockup (use cream for all
+  three shapes, then).
 - Clear space: half the mark's width on every side.
 - Minimum size: 16pt for the icon; 20pt for the mark on its own.
 - Never rotate it, gradient the strokes, outline the dot, add a third wave, or place it on a photo.
 
 `site/assets/mark.svg` is canonical. The app draws the same geometry in `ListeningMark`, and the
 icon generator draws it in Core Graphics. If the mark changes, all three change together.
+
+## Vincent
+
+Vincent is the one illustration in the product: a small pixel painter in a straw hat and a rust
+beard, with a cream bandage over the ear he gave away and a listening ear on the other side. He is a
+character, not a portrait and not a likeness of any painted self-portrait: a hat, a beard, a bandage
+and a coat are enough to read the name, and the name is the joke — one ear is still listening.
+
+- The sprite is a 40×40 grid, five frames wide: idle, idle blink, listening, listening blink, ouch.
+  The ouch frame is the click joke: the bandage leaves his head, his eyes shut and he shouts.
+- Generate it with `python3 scripts/vincent-sprite.py`; never draw frames by hand or in a second
+  style. The same PNG ships in the app bundle and on the website.
+- Display it at an integer multiple of the grid (40, 80, 120, 160, 200 px) so pixels stay square.
+- Vincent reacts to real state. Listening means the AI source is active; the app blinks on a slow
+  timer so he is alive without moving constantly. He never appears in a place where he would suggest
+  a feature that does not exist.
+- He does not float, bob, drift or parallax, on the website or in the app. He blinks in place and
+  plays the ouch frame when clicked; the only movement allowed is a two-pixel shake during that
+  click. Pixel art stays on whole pixels, so no rotation or fractional offset.
+- Minimum size: 40px. Do not rotate, recolor, blur, or add props to him. The hat, bandage, beard
+  and coat are fixed; a brush, a pipe, an easel or a headphone cup would crowd a 40px grid.
+- Illustration colours live in the generator, not in the UI palette: straw `#E7B44C`, beard
+  `#B4502F`, bandage `#FFF6EC`, coat `#33506F`, ear `#E77952`. They are the one cool family in an
+  otherwise warm interface, and they stay inside the sprite.
 
 ## Wordmark
 
@@ -78,53 +103,51 @@ tracked capitals in the soft ink. On paper, the whole lockup is ink; on indigo, 
 
 | Token | Light | Dark (app) | Use |
 | --- | --- | --- | --- |
-| `paper` | `#F7F2E8` | `#11100E` | Page and window wash |
-| `card` | `#FFFCF4` | `#1B1916` | Cards, grouped rows |
-| `card-muted` | `#F1EADA` | `#17150F` | Hover, quiet fills |
-| `ink` | `#14120E` | `#F3EEE2` | Primary text |
-| `ink-soft` | `#6C6559` | `#A8A091` | Secondary text, captions |
-| `hairline` | `#E1D7C4` | `#2C2823` | Borders, dividers |
-| `accent` | `#242C5A` | `#B9C0F0` | Focus, links, speaking state |
-| `accent-wash` | `#E9E6F3` | `#232841` | Selected rows |
-| `wheat` | `#8A6318` | `#E7B44C` | Quiet highlights, pause held |
-| `wheat-bright` | `#E7B44C` | `#E7B44C` | Non-text accents on indigo |
+| `paper` | `#FBF7F0` | `#16130F` | Page and window wash |
+| `card` | `#FFFDFA` | `#221E19` | Cards, grouped rows |
+| `card-muted` | `#F8F0E4` | `#1B1713` | Hover, quiet fills |
+| `ink` | `#24211D` | `#F7F1E6` | Primary text, primary button |
+| `ink-soft` | `#6F675C` | `#B0A696` | Secondary text, captions |
+| `hairline` | `#E8DFD2` | `#322C25` | Borders, dividers |
+| `accent` | `#A7472A` | `#F3A88E` | Focus, links, controls |
+| `accent-wash` | `#FDE7D5` | `#33241C` | Selected rows, mark tile |
+| `coral` | `#E77952` | `#EF8A5F` | Listening light, Vincent's inner ear |
+| `apricot` | `#F8C39B` | `#E8A97F` | Vincent's body, scene glow |
 | `positive` | `#4C6A51` | `#9CC2A3` | Verified, playing |
 | `warning` | `#A9502C` | `#E8A183` | Errors, missing permission |
-| `indigo` | `#242C5A` | `#242C5A` | Mark and icon field |
-| `indigo-deep` | `#171D3F` | `#171D3F` | Dark bands, icon gradient |
 
 Rules:
 
-- **One accent per screen.** Indigo is the working accent; wheat marks a held pause or a verified
-  step and is never used for a warning.
-- Wheat and warning are text colours only at the light values above. `#E7B44C` never carries text on
-  paper; it is for the icon, arcs, and one large display detail.
+- **One accent per screen.** Coral is the working accent; apricot is material, not a status colour.
+- Buttons are pills. The primary action is ink with paper text, or paper with ink text inside the
+dark band; there is never more than one filled primary per surface.
 - No colour alone carries meaning: pair every status colour with a word or a glyph.
-- No gradients on text, buttons, or surfaces except the icon field. No drop shadows except the
-  single product mock on the landing page.
+- No gradients on text or buttons. The only soft gradients are the scene glow behind Vincent and the
+  warm wash inside the download card.
 
 ## Typography
 
-System fonts only. The app must build without network access and the site must load without a
-third-party font request.
+The app uses the system sans and must build without network access. The site self-hosts one font
+from the same folder and makes no third-party request.
 
-- Display and UI: the system sans (`SF Pro` on macOS). Headlines at `-0.03em` to `-0.045em`
+- Display and UI, site: Manrope (variable), `assets/fonts/manrope-variable.ttf`, OFL, weight 800 for
+  display with `-0.05em` tracking and 1.0 line height.
+- Display and UI, app: the system sans (`SF Pro` on macOS). Headlines at `-0.03em` to `-0.045em`
   tracking, weight 600.
-- Body: system sans, 12.5–17px, line height 1.55–1.65.
-- Labels and measurements: system monospace, 9.5–11px, uppercase with `+0.12em` tracking for
-  eyebrows.
-- One serif italic per page at most, for a single pull quote. Never for UI.
+- Body: 12.5–17px, line height 1.55–1.65.
+- Labels and measurements: monospace, 9.5–11px, uppercase with `+0.12em` tracking for eyebrows.
 
-Scale used by the site: 11 (eyebrow), 14 (caption), 17 (body), 21 (lead), 28 (section), 44–92
-(display, fluid). The app uses 10, 11, 12.5, 14, 25.
+Scale used by the site: 11.5 (eyebrow), 13 (caption), 16.5 (body), 16.5 (lead), 30–44 (section),
+42–78 (display, fluid). The app uses 10, 11, 12.5, 14, 25.
 
 ## Space, shape, motion
 
 - Spacing scale: 4, 8, 12, 16, 24, 32, 48, 64, 96, 128.
-- Radii: 8 (controls), 12 (cards, panel), 18 (device), 999 (pills).
-- Borders: 1px hairline. Prefer a line to a shadow.
-- Motion: 160–260ms, ease-out, one element at a time. No bounce, no parallax. Honour
-  `prefers-reduced-motion` and `accessibilityReduceMotion`.
+- Radii: 9 (controls), 18 (cards, panel), 22 (stage), 30–36 (large surfaces), 999 (pills).
+- Borders: 1px hairline. Prefer a line to a shadow; the soft shadow belongs to floating cards.
+- Motion: 160–260ms for interface, 1.8–5.6s for Vincent and the glow. One element at a time, no
+  bounce, no parallax. Honour `prefers-reduced-motion` and `accessibilityReduceMotion`; with reduced
+  motion Vincent holds a single frame and every state stays readable in text.
 
 ## Surfaces
 
@@ -138,12 +161,15 @@ one filled button per page.
 **Settings and diagnostics.** Eyebrow, card, rows separated by hairlines. Numerals in monospace.
 Diagnostics is dense but never decorative.
 
-**Landing.** Generous whitespace, one product mock, one dark band. Every claim links to evidence or
-is softened to what was measured.
+**Landing.** A floating pill nav, a short centred headline, one big character, two floating status
+cards, one interactive three-scene demo, three feature cards, one dark privacy band, the evidence
+cards, one download card and the FAQ. Every claim links to evidence or is softened to what was
+measured.
 
 ## Do not
 
-- Do not add a second illustration style, a mascot, or stock photography.
+- Do not add a second illustration style, a second mascot, or stock photography. Vincent is the only
+  character and he is generated by one script.
 - Do not use the app icon as a decorative bullet; it is the icon.
 - Do not lowercase the full name in running text.
 - Do not promise a live ChatGPT Voice test, notarization, or measured latency that is not in

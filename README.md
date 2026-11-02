@@ -122,7 +122,7 @@ attention.
 
 Executed on this machine (macOS 26.6.2, Apple M2, Swift 6.3.3):
 
-- ✅ **53/53 automated tests pass** (278 assertions): pause, resume, stale-state recovery, sentence gaps, conversation hold, volume ducking, user-first speech pause, manual pause and resume, process exit, Music exit, permission revoked, device change, rapid responses, sleep/wake, ownership reconciliation, quit restoration, delayed commands, command-failure limits, detector thresholds/hysteresis, AppleScript parsing, one-round-trip command scripts, settings, journal recovery.
+- ✅ **54/54 automated tests pass** (283 assertions): pause, resume, stale-state recovery, sentence gaps, conversation hold, volume ducking, user-first speech pause, manual pause and resume, process exit, Music exit, permission revoked, device change, rapid responses, sleep/wake, ownership reconciliation, quit restoration, delayed commands, command-failure limits, detector thresholds/hysteresis, AppleScript parsing, one-round-trip command scripts, settings, journal recovery, and reactive playback settings.
 - ✅ **App bundle builds, signs, and launches**: the menu bar app stays resident, maps only its own
   `Contents/Frameworks` dylibs, and idles at 0.0–0.1% CPU with a ~37–54 MB physical footprint.
   A packaging bug that made the app abort in dyld at launch was found and fixed; see
@@ -190,10 +190,17 @@ ChatGPT Voice session and Apple Music, including measured pause/resume latency a
 
 ## Brand and site
 
-One brand system across the app and the site: warm paper, warm ink, one indigo for focus and one
-wheat accent for a held pause. Palette, type scale, voice rules and mark usage are in
-[docs/brand.md](docs/brand.md); the tokens live in `apps/macos/Theme.swift` and `site/styles.css`
-and must change together.
+**Website: https://oreja-tau.vercel.app** — landing page, documentation and the current DMG.
+
+One brand system across the app and the site: warm white paper, charcoal ink, a straw-hatted pixel
+Vincent with a bandaged ear, and coral for the listening light. Palette, type scale, voice rules,
+mark and character usage are in [docs/brand.md](docs/brand.md); the tokens live in
+`apps/macos/Theme.swift` and `site/styles.css` and must change together.
+
+Vincent's five frames are generated, not drawn by hand: `python3 scripts/vincent-sprite.py` writes
+`site/assets/oreja-vincent.png`, which the website animates as a sprite sheet and `scripts/build.sh`
+copies into the app bundle. Clicking him in the app plays the fifth frame: the bandage leaves his
+head and he shouts.
 
 The landing and documentation pages are static and need no build step:
 

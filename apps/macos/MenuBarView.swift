@@ -27,8 +27,8 @@ struct MenuBarView: View {
 
     private var header: some View {
         HStack(spacing: 9) {
-            BrandMark(size: 22)
-            BrandWordmark(size: 13)
+            BrandMark(size: 32)
+            BrandWordmark(size: 19)
             Spacer(minLength: 8)
             Toggle(
                 "Automation",
@@ -39,14 +39,14 @@ struct MenuBarView: View {
             )
             .toggleStyle(.switch)
             .labelsHidden()
-            .controlSize(.small)
+            .controlSize(.regular)
             .tint(OrejaTheme.Palette.accent)
             .accessibilityLabel("Automation")
             .accessibilityHint("Pauses music while ChatGPT speaks and resumes it afterwards.")
         }
         .padding(.horizontal, OrejaTheme.Metrics.gutter)
-        .padding(.top, 13)
-        .padding(.bottom, 11)
+        .padding(.top, 18)
+        .padding(.bottom, 16)
     }
 
     // MARK: Status
@@ -61,7 +61,7 @@ struct MenuBarView: View {
                     .tracking(-0.15)
                     .foregroundStyle(OrejaTheme.Palette.ink)
                 Text(model.state.detail)
-                    .font(.system(size: 11.5))
+                    .font(.system(size: 12))
                     .lineSpacing(1.5)
                     .foregroundStyle(OrejaTheme.Palette.inkSoft)
                     .fixedSize(horizontal: false, vertical: true)
@@ -76,10 +76,11 @@ struct MenuBarView: View {
                 }
             }
             Spacer(minLength: 0)
+            VincentCompanion(size: 80, isListening: model.state.isActive, isMusicPlaying: model.music?.isPlaying == true)
         }
         .padding(.horizontal, OrejaTheme.Metrics.gutter)
-        .padding(.top, 13)
-        .padding(.bottom, 12)
+        .padding(.top, 18)
+        .padding(.bottom, 18)
     }
 
     private func noticeBlock(_ error: String) -> some View {
@@ -133,7 +134,7 @@ struct MenuBarView: View {
                model.music?.isPlaying == true || model.music?.isPaused == true {
                 Text(track.displayName)
                     .font(OrejaTheme.Typography.micro)
-                    .foregroundStyle(OrejaTheme.Palette.inkSoft.opacity(0.8))
+                    .foregroundStyle(OrejaTheme.Palette.inkSoft)
                     .lineLimit(1)
                     .truncationMode(.middle)
                     .padding(.leading, 19)
@@ -141,7 +142,7 @@ struct MenuBarView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, OrejaTheme.Metrics.gutter)
-        .padding(.bottom, 12)
+        .padding(.bottom, 18)
     }
 
     private var musicTitle: String {
@@ -172,7 +173,7 @@ struct MenuBarView: View {
                         Spacer(minLength: 0)
                     }
                     .padding(.horizontal, 10)
-                    .padding(.vertical, 7)
+                    .padding(.vertical, 10)
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
