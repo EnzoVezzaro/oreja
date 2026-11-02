@@ -659,6 +659,8 @@ code {
   pointer-events: none;
 }
 
+/* Decorative paint, and painted above Vincent: without this they would swallow clicks on his lower
+   half before the ouch could play. */
 .n-hills {
   z-index: 4;
   bottom: 0;
@@ -666,6 +668,7 @@ code {
   background-image: url("assets/night-hills.png");
   background-size: cover;
   background-position: bottom center;
+  pointer-events: none;
 }
 
 .n-front {
@@ -675,10 +678,11 @@ code {
   background-image: url("assets/night-front.png");
   background-size: cover;
   background-position: bottom center;
+  pointer-events: none;
 }
 
-/* Vincent is a five-frame sprite pinned to frame one. The site never animates him: the frames
-   belong to the app, where they mark a state the user just triggered. */
+/* Vincent is a five-frame sprite pinned to frame one. He never loops on the site: the only frame
+   change is the blink timer and the ouch on a click, the two reactions the app also has. */
 .n-vincent {
   display: block;
   width: 100%;
@@ -715,15 +719,33 @@ code {
   background-position: 25% 0;
 }
 
+/* The ouch, frame for frame the app's `VincentCompanion.snip()`: the ouch sprite stays up for the
+   whole 810ms while the figure steps -step, +step, -step/2, rest, 60ms of travel and 10ms of hold
+   each. `--ouch-step` is 4% of the sprite's rendered width, set by landing.js on click, so the
+   shake reads the same at 190px as at 330px — the app scales it by sprite size too. */
 .n-figure .n-vincent.is-ouch {
   background-position: 100% 0;
-  animation: n-ouch 280ms steps(2, end) 3;
+  animation: n-ouch 810ms linear both;
 }
 
 @keyframes n-ouch {
-  0%, 100% { transform: translate(0, 0); }
-  25% { transform: translate(-2px, 1px); }
-  75% { transform: translate(2px, -1px); }
+  0% { transform: translateX(0); }
+  7.4%,
+  8.6% { transform: translateX(calc(var(--ouch-step, 8px) * -1)); }
+  16%,
+  17.3% { transform: translateX(var(--ouch-step, 8px)); }
+  24.7%,
+  25.9% { transform: translateX(calc(var(--ouch-step, 8px) * -0.5)); }
+  35.8%,
+  100% { transform: translateX(0); }
+}
+
+/* Reduced motion keeps the frame (the bandage leaves his head) and drops the shake, exactly as the
+   app does; landing.js holds the frame for the app's 900ms in that case. */
+@media (prefers-reduced-motion: reduce) {
+  .n-figure .n-vincent.is-ouch {
+    animation: none;
+  }
 }
 
 .n-egg-note {
@@ -1371,8 +1393,8 @@ code {
 
 .n-panel {
   position: relative;
-  width: min(100%, 372px);
-  padding: 16px;
+  width: min(100%, 396px);
+  padding: 18px;
   border-radius: 26px;
   background: linear-gradient(180deg, #fffdf9 0%, var(--paper) 42%, #f7efe3 100%);
   color: var(--ink);
@@ -1387,15 +1409,32 @@ code {
 .n-panel-head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 12px;
-  padding-bottom: 14px;
 }
 
-.n-panel-title {
-  display: flex;
-  align-items: center;
-  gap: 10px;
+.n-panel-wordmark {
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  color: var(--ink);
+}
+
+/* SettingsView's own header, in order: mark and wordmark, then the page title, then the caption
+   that says when the app is allowed to touch playback. */
+.n-panel-page {
+  margin: 14px 0 0;
+  font-size: 25px;
+  font-weight: 600;
+  letter-spacing: -0.035em;
+  line-height: 1.1;
+  color: var(--ink);
+}
+
+.n-panel-caption {
+  margin: 4px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ink-soft);
 }
 
 .n-panel-vincent {
@@ -1411,59 +1450,95 @@ code {
   flex: none;
 }
 
-.n-panel-title strong {
-  display: block;
-  font-size: 14.5px;
-  letter-spacing: -0.02em;
-  line-height: 1.1;
-}
-
-.n-panel-title small {
-  display: block;
-  font-size: 9.5px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--ink-soft);
-  margin-top: 3px;
-}
-
-.n-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 9px;
-  border-radius: 999px;
-  background: #fff3e7;
-  border: 1px solid #f0dcc6;
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: #8a4a2c;
-}
-
-.n-chip .n-dot {
-  width: 5px;
-  height: 5px;
-  animation: none;
-  box-shadow: none;
-}
 
 .n-panel-block {
   padding: 13px 14px;
   border-radius: 16px;
   background: #fffdfa;
   border: 1px solid var(--paper-line);
-  margin-bottom: 10px;
+  margin-top: 14px;
+}
+
+/* `behaviorPreview` from SettingsView: the dot, the headline it derives from the selected mode,
+   and the two levels underneath. Sits above the controls, divided from them like the app does. */
+.n-panel-preview {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 0 0 12px;
+  border-bottom: 1px solid var(--paper-line);
+}
+
+/* StatusDot: a 7 px fill in the state tint and, when active, a 1 px ring at 2.1× and 35% opacity.
+   It does not pulse in the app, so it does not pulse here. */
+.n-panel-preview-dot {
+  width: 7px;
+  height: 7px;
+  margin-top: 4px;
+  border-radius: 50%;
+  background: #a7472a;
+  box-shadow: 0 0 0 3.5px rgba(167, 71, 42, 0.35);
+  flex: none;
+}
+
+.n-panel-preview-text {
+  display: grid;
+  gap: 2px;
+}
+
+.n-panel-preview-text strong {
+  font-size: 13.5px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+
+.n-panel-preview-text span {
+  font-size: 11.5px;
+  color: var(--ink-soft);
+}
+
+/* The macOS switch the app uses for `Automation enabled`, at panel scale. */
+.n-switch {
+  position: relative;
+  width: 30px;
+  height: 18px;
+  border-radius: 999px;
+  background: var(--coral);
+  flex: none;
+  align-self: center;
+}
+
+.n-switch::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #fffdfa;
+  box-shadow: 0 1px 2px rgba(74, 48, 24, 0.28);
+}
+
+/* A picker's value is a word, not a number: it keeps its own weight instead of the tabular
+   treatment the percentages get. */
+.n-panel-value {
+  padding: 3px 8px;
+  border-radius: 7px;
+  background: #f2e9dc;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
 }
 
 .n-panel-label {
-  font-family: var(--mono);
-  font-size: 8.5px;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0;
   color: var(--ink-soft);
-  margin-bottom: 9px;
+  margin-bottom: 10px;
 }
 
 .n-panel-row {
@@ -1471,139 +1546,22 @@ code {
   align-items: baseline;
   justify-content: space-between;
   gap: 12px;
-  font-size: 13.5px;
-  font-weight: 600;
+  padding-top: 11px;
+  font-size: 13px;
+  font-weight: 500;
   color: var(--ink);
 }
 
 .n-panel-row strong {
-  font-size: 15px;
+  font-size: 14px;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.02em;
-}
-
-.n-panel-live {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-family: var(--mono);
-  font-size: 10px;
-  letter-spacing: 0.04em;
-  color: #a7472a;
-}
-
-.n-panel-live::before {
-  content: "";
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: var(--coral);
-  animation: n-live 1.6s var(--ease-soft) infinite;
-}
-
-@keyframes n-live {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.35; transform: scale(0.8); }
-}
-
-/* The bars are what the app actually hears: a reply rises and falls. Each bar runs on its own
-   delay so the row reads as speech rather than as a loading spinner. */
-.n-panel-wave {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 3px;
-  height: 24px;
-  margin-top: 12px;
-}
-
-/* Thin rounded bars, not a bar chart: the rhythm of a sentence rather than a level meter. */
-.n-panel-wave i {
-  flex: none;
-  width: 2px;
-  border-radius: 999px;
-  background: #e0764f;
-  height: 100%;
-  transform-origin: 50% 50%;
-  animation: n-panel-bar 1.25s var(--ease-soft) infinite alternate;
-}
-
-.n-panel-wave i:nth-child(2) { height: 55%; animation-duration: 0.95s; animation-delay: -0.2s; }
-.n-panel-wave i:nth-child(3) { height: 88%; animation-duration: 1.4s; animation-delay: -0.55s; }
-.n-panel-wave i:nth-child(4) { height: 42%; animation-duration: 1.05s; animation-delay: -0.35s; }
-.n-panel-wave i:nth-child(5) { height: 70%; animation-duration: 1.55s; animation-delay: -0.7s; }
-.n-panel-wave i:nth-child(6) { height: 34%; animation-duration: 0.9s; animation-delay: -0.15s; }
-.n-panel-wave i:nth-child(7) { height: 62%; animation-duration: 1.3s; animation-delay: -0.45s; }
-.n-panel-wave i:nth-child(8) { height: 26%; animation-duration: 1.1s; animation-delay: -0.6s; }
-.n-panel-wave i:nth-child(9) { height: 44%; animation-duration: 1.2s; animation-delay: -0.05s; }
-.n-panel-wave i:nth-child(10) { height: 76%; animation-duration: 0.85s; animation-delay: -0.4s; }
-.n-panel-wave i:nth-child(11) { height: 38%; animation-duration: 1.45s; animation-delay: -0.75s; }
-.n-panel-wave i:nth-child(12) { height: 52%; animation-duration: 1.0s; animation-delay: -0.25s; }
-
-@keyframes n-panel-bar {
-  from { transform: scaleY(0.22); opacity: 0.55; }
-  to { transform: scaleY(1); opacity: 1; }
-}
-
-/* The level the card is built around: one number, read at a glance, with the reason underneath. */
-.n-panel-level {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  margin: 2px 0 0;
-}
-
-.n-panel-level strong {
-  font-size: 34px;
-  font-weight: 700;
-  letter-spacing: -0.045em;
-  line-height: 1;
-  font-variant-numeric: tabular-nums;
-  color: var(--ink);
-}
-
-.n-panel-level span {
-  font-size: 11.5px;
-  font-weight: 600;
-  color: var(--ink-soft);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .n-panel-wave i,
-  .n-panel-live::before {
-    animation: none;
-  }
-}
-
-.n-segmented {
-  display: flex;
-  gap: 4px;
-  padding: 4px;
-  margin-bottom: 10px;
-  border-radius: 13px;
-  background: #f0e6d6;
-  font-size: 11.5px;
-  font-weight: 700;
-}
-
-.n-segmented span {
-  flex: 1;
-  text-align: center;
-  padding: 7px 6px;
-  border-radius: 9px;
-  color: #7c6a55;
-}
-
-.n-segmented .is-on {
-  background: #fffdfa;
-  color: var(--ink);
-  box-shadow: 0 1px 2px rgba(74, 48, 24, 0.14);
 }
 
 .n-panel-slider {
   position: relative;
   height: 4px;
-  margin: 10px 0 14px;
+  margin: 10px 0 0;
   border-radius: 999px;
   background: #ece1d0;
 }
@@ -1635,11 +1593,9 @@ code {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 5px 2px;
-  font-family: var(--mono);
-  font-size: 9.5px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+  padding: 12px 5px 2px;
+  font-size: 11px;
+  letter-spacing: 0;
   color: var(--ink-soft);
 }
 

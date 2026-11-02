@@ -42,7 +42,7 @@
       </a>
       <nav class="n-nav" aria-label="Primary">
         <a href="#story">How it works</a>
-        <a href="#panel">The panel</a>
+        <a href="#panel">Settings</a>
         <a href="#privacy">Privacy</a>
         <a href="docs.html">Docs</a>
       </nav>
@@ -190,11 +190,11 @@
       <div class="n-wrap n-panel-grid">
         <div class="n-panel-copy" data-sc-in data-sc-stagger="70">
           <p class="n-eyebrow">The interface</p>
-          <h2 id="panel-title" class="n-h2">The panel is <em>the whole app.</em></h2>
+          <h2 id="panel-title" class="n-h2">Small enough to <em>read once.</em></h2>
           <p class="n-body-copy">
-            The menu bar holds one status and one switch. Settings holds the rest, in five short
-            answers: the app to follow, pause or lower volume, the two levels, and the quiet
-            interval before music comes back.
+            The menu bar holds the panel: one status, one switch, the music line. Everything you
+            decide lives in a single Settings window — the app to follow, what happens while
+            ChatGPT speaks, the level music drops to, and when it comes back.
           </p>
           <dl class="n-rows">
             <div><dt>Listen to</dt><dd>ChatGPT desktop app, or a browser marked experimental</dd></div>
@@ -206,48 +206,47 @@
 
         <div class="n-panel-art" data-sc-in>
           <div class="n-panel-glow" aria-hidden="true"></div>
-          <!-- Every label and value below is the app's own: the rows come from SettingsView.swift
-               (AI source, the pause/lower-volume picker, the two Music levels) with the wording the
-               panel itself uses. The numbers are one config — 12% while it speaks, back to 100% —
-               the app's own scale, not a marketing figure. Do not invent a row the app cannot
-               show. -->
+          <!-- Copy-paste of SettingsView.swift, not an impression of it. The header is its header
+               (BrandMark + wordmark + "Settings" + that caption), the preview is `behaviorPreview`
+               in the state where interruptionMode is .duck, and the rows are the exact labels the
+               view renders: Behavior, Automation enabled, While ChatGPT speaks → Lower volume,
+               Keep Music at, Return Music to, AI source → Listen to. 12% and 100% are one config
+               on the app's own 1–100 scale, not a default the app ships with.
+               If SettingsView's wording changes, this markup changes with it. -->
           <div class="n-panel" data-tilt="6" role="img"
-               aria-label="Oreja's panel: listening to ChatGPT, which is speaking, lowering Music to 12 percent and returning it to 100 percent">
+               aria-label="Oreja's Settings window: lowering Music to 12 percent while ChatGPT speaks and returning it to 100 percent afterwards, with the ChatGPT desktop app as the AI source">
             <div class="n-panel-head">
-              <span class="n-panel-title">
-                <span class="n-panel-vincent" aria-hidden="true"></span>
-                <span><strong>Oreja</strong><small>in your menu bar</small></span>
-              </span>
-              <span class="n-chip"><span class="n-dot" aria-hidden="true"></span> listening</span>
+              <span class="n-panel-vincent" aria-hidden="true"></span>
+              <strong class="n-panel-wordmark">oreja</strong>
             </div>
+            <p class="n-panel-page">Settings</p>
+            <p class="n-panel-caption">Oreja only touches playback while the selected AI source is speaking.</p>
 
             <div class="n-panel-block">
-              <p class="n-panel-label">Source</p>
-              <div class="n-panel-row"><span>ChatGPT</span><span class="n-panel-live">speaking</span></div>
-              <div class="n-panel-wave" aria-hidden="true">
-                <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+              <p class="n-panel-label">Behavior</p>
+              <div class="n-panel-preview">
+                <span class="n-panel-preview-dot" aria-hidden="true"></span>
+                <span class="n-panel-preview-text">
+                  <strong>Oreja makes room</strong>
+                  <span>Music 12% while AI speaks · 100% when quiet</span>
+                </span>
               </div>
-            </div>
-
-            <div class="n-panel-block">
-              <div class="n-panel-row"><span>While it speaks</span></div>
-              <div class="n-segmented" aria-hidden="true">
-                <span>Pause</span>
-                <span class="is-on">Lower volume</span>
-              </div>
-            </div>
-
-            <div class="n-panel-block">
-              <p class="n-panel-label">Music</p>
-              <div class="n-panel-level"><strong>12%</strong><span>while it speaks</span></div>
+              <div class="n-panel-row"><span>Automation enabled</span><span class="n-switch" aria-hidden="true"></span></div>
+              <div class="n-panel-row"><span>While ChatGPT speaks</span><span class="n-panel-value">Lower volume</span></div>
+              <div class="n-panel-row"><span>Keep Music at</span><strong>12%</strong></div>
               <div class="n-panel-slider" aria-hidden="true"><span style="--at:12%"></span></div>
-              <div class="n-panel-row"><span>Return to</span><strong>100%</strong></div>
+              <div class="n-panel-row"><span>Return Music to</span><strong>100%</strong></div>
               <div class="n-panel-slider" aria-hidden="true"><span style="--at:100%"></span></div>
             </div>
 
+            <div class="n-panel-block">
+              <p class="n-panel-label">AI source</p>
+              <div class="n-panel-row"><span>Listen to</span><span class="n-panel-value">ChatGPT desktop app</span></div>
+            </div>
+
             <div class="n-panel-foot">
-              <span>Automation on</span>
               <span>Version 0.1.0</span>
+              <span>GitHub · Changelog</span>
             </div>
           </div>
         </div>
@@ -377,7 +376,7 @@
         </div>
         <nav class="n-footer-links" aria-label="Footer">
           <a href="#story">How it works</a>
-          <a href="#panel">The panel</a>
+          <a href="#panel">Settings</a>
           <a href="#privacy">Privacy</a>
           <a href="docs.html">Documentation</a>
           <a href="https://opensource.org/license/gpl-3.0">License (GPL-3.0-only)</a>
