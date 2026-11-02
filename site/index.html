@@ -200,21 +200,27 @@
           <p class="n-eyebrow">The interface</p>
           <h2 id="panel-title" class="n-h2">The panel is <em>the whole app.</em></h2>
           <p class="n-body-copy">
-            Open it from the menu bar: choose the app to follow, pick pause or lower volume, set the
-            two levels and the quiet interval. Close it and Oreja keeps working.
+            The menu bar holds one status and one switch. Settings holds the rest, in five short
+            answers: the app to follow, pause or lower volume, the two levels, and the quiet
+            interval before music comes back.
           </p>
           <dl class="n-rows">
-            <div><dt>Source</dt><dd>ChatGPT, or a browser as an experimental source</dd></div>
-            <div><dt>Behavior</dt><dd>Pause Apple Music, or lower it to a level you choose</dd></div>
-            <div><dt>Return</dt><dd>The same volume and the same second of the track</dd></div>
-            <div><dt>Timing</dt><dd>Quiet interval and conversation hold, adjustable while it runs</dd></div>
+            <div><dt>Listen to</dt><dd>ChatGPT desktop app, or a browser marked experimental</dd></div>
+            <div><dt>While ChatGPT speaks</dt><dd>Pause music, or lower it instead</dd></div>
+            <div><dt>Keep Music at</dt><dd>Any level you pick, 12% in this shot, then back to 100% when the conversation is quiet</dd></div>
+            <div><dt>Quiet interval</dt><dd>800 ms before music resumes, adjustable up to 3 s</dd></div>
           </dl>
         </div>
 
         <div class="n-panel-art" data-sc-in>
           <div class="n-panel-glow" aria-hidden="true"></div>
+          <!-- Every label and value below is the app's own: the rows come from SettingsView.swift
+               (AI source, the pause/lower-volume picker, the two Music levels) with the wording the
+               panel itself uses. The numbers are one config — 12% while it speaks, back to 100% —
+               the app's own scale, not a marketing figure. Do not invent a row the app cannot
+               show. -->
           <div class="n-panel" data-tilt="6" role="img"
-               aria-label="The Oreja menu bar panel: ChatGPT speaking, Apple Music lowered to 12 percent, returning to 100 percent after six quiet seconds">
+               aria-label="Oreja's panel: listening to ChatGPT, which is speaking, lowering Music to 12 percent and returning it to 100 percent">
             <div class="n-panel-head">
               <span class="n-panel-title">
                 <span class="n-panel-vincent" aria-hidden="true"></span>
@@ -225,29 +231,31 @@
 
             <div class="n-panel-block">
               <p class="n-panel-label">Source</p>
-              <div class="n-panel-row">
-                <span>ChatGPT</span>
-                <span class="n-panel-live">speaking</span>
+              <div class="n-panel-row"><span>ChatGPT</span><span class="n-panel-live">speaking</span></div>
+              <div class="n-panel-wave" aria-hidden="true">
+                <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
               </div>
-              <div class="n-panel-wave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
-            </div>
-
-            <div class="n-segmented" aria-hidden="true">
-              <span>Pause</span>
-              <span class="is-on">Lower volume</span>
             </div>
 
             <div class="n-panel-block">
-              <p class="n-panel-label">While it speaks</p>
-              <div class="n-panel-row"><span>Music</span><strong>12%</strong></div>
+              <div class="n-panel-row"><span>While it speaks</span></div>
+              <div class="n-segmented" aria-hidden="true">
+                <span>Pause</span>
+                <span class="is-on">Lower volume</span>
+              </div>
+            </div>
+
+            <div class="n-panel-block">
+              <p class="n-panel-label">Music</p>
+              <div class="n-panel-level"><strong>12%</strong><span>while it speaks</span></div>
               <div class="n-panel-slider" aria-hidden="true"><span style="--at:12%"></span></div>
               <div class="n-panel-row"><span>Return to</span><strong>100%</strong></div>
               <div class="n-panel-slider" aria-hidden="true"><span style="--at:100%"></span></div>
             </div>
 
             <div class="n-panel-foot">
-              <span>Quiet for 6 s</span>
-              <span class="n-panel-toggle" aria-hidden="true"><i></i></span>
+              <span>Automation on</span>
+              <span>Version 0.1.0</span>
             </div>
           </div>
         </div>
