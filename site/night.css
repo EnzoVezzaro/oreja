@@ -351,6 +351,28 @@ code {
   --btn-fg: var(--cream);
 }
 
+/* The hero's second action lands on the painting's bright horizon, where a cream hairline and
+   15px text disappeared into the swirls. It gets its own dark glass, like the readout card, so the
+   pair reads as two buttons at any point of the sky behind them. */
+.n-actions .n-link {
+  padding: 13px 22px;
+  border: 1px solid rgba(246, 236, 217, 0.26);
+  border-radius: 999px;
+  background: rgba(6, 8, 26, 0.52);
+  -webkit-backdrop-filter: blur(10px) saturate(125%);
+  backdrop-filter: blur(10px) saturate(125%);
+  transition: border-color 180ms, background 220ms, gap 220ms var(--ease-out);
+}
+
+.n-actions .n-link:hover {
+  border-color: rgba(246, 236, 217, 0.6);
+  background: rgba(6, 8, 26, 0.66);
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .n-actions .n-link { background: rgba(6, 8, 26, 0.82); }
+}
+
 .n-btn-ghost:hover {
   border-color: var(--cream);
   background: rgba(246, 236, 217, 0.06);
@@ -1107,12 +1129,15 @@ code {
   z-index: 0;
 }
 
+/* The bars pass under the copy column, so this scrim has to be strong enough for text to sit on
+   it: at 0.55 the paragraph's last line and the gold beat caption were read through the waveform.
+   It clears by 58% so the wave is still the brightest thing on the right half. */
 .n-act-vignette {
   position: absolute;
   inset: 0;
   z-index: 1;
   background:
-    linear-gradient(90deg, rgba(5, 6, 18, 0.9) 0%, rgba(5, 6, 18, 0.55) 42%, transparent 78%),
+    linear-gradient(90deg, rgba(5, 6, 18, 0.97) 0%, rgba(5, 6, 18, 0.92) 30%, rgba(5, 6, 18, 0.62) 48%, transparent 76%),
     linear-gradient(180deg, rgba(5, 6, 18, 0.75) 0%, transparent 30%, rgba(5, 6, 18, 0.6) 100%);
 }
 
