@@ -5,16 +5,40 @@ step, no framework, no third-party requests. It renders from disk and offline.
 
 ```
 site/
-  index.html        landing page
+  index.html        landing page (the painted night)
   docs.html         documentation (setup, permissions, states, troubleshooting, privacy)
-  styles.css        the whole design system, shared by both pages
+  styles.css        design system for the documentation page
+  night.css         the landing page: palette, painted hero, act, dawn, phone layout
   scrollcraft.css   vendor scroll engine stylesheet (copied unedited, MIT)
   scrollcraft.js    vendor scroll engine (copied unedited, MIT)
-  landing.js        mounts the engine, then drives the pinned act and its rail
+  landing.js        mounts the engine, paints the waveform, star field and click joke
   assets/mark.svg   canonical brand mark
-  assets/oreja-vincent.png   Vincent's four-frame pixel sprite
-  assets/fonts/manrope-variable.ttf   the one self-hosted font (OFL)
+  assets/night-sky.png, night-hills.png, night-front.png   the painting, generated
+  assets/oreja-vincent.png   Vincent's five-frame pixel sprite
+  assets/vincent-desk.png, vincent-back.png   two further poses, generated
+  assets/fonts/     Manrope variable + Instrument Serif italic/regular (OFL)
 ```
+
+The sky, hills, foreground and the extra poses come from `scripts/night-scene.py` and
+`scripts/vincent-scenes.py`; do not hand-edit those PNGs.
+
+## The painted hero
+
+The first screen is a painted night: one image, four animated copies. A base layer breathes and
+drifts, three further copies are masked to a single current each (the two spirals and the low cloud
+river) and move against it on clocks of 41 s, 57 s and 68 s, and a broad moonlight band crosses the
+clouds every 38 s. All four animate transform and opacity only, so the compositor does the work;
+`prefers-reduced-motion: reduce` stops them at their first frame. Stars, embers and the occasional
+shooting star are drawn on a canvas above the paint.
+
+One trap, found by measurement and recorded here so it is not reintroduced: an animated child that
+stays inside `.n-sky` makes Chrome drop the masked group's backdrop, and the whole painting
+(normally ~0.36 mean luminance) renders as flat `#080a20`. The moonlight band therefore lives outside
+`.n-sky`, as a sibling in the hero, and it uses plain alpha rather than a blend mode.
+
+On phones (≤820 px) the hero becomes a two-column grid — copy across both columns, then the sprite
+and the readout side by side — so no viewport height or text length can stack one element on top of
+another. It previously did: at 390 px the readout overlapped the facts line and the sprite.
 
 Vincent is generated from `scripts/vincent-sprite.py`; do not hand-edit the PNG. The sprite is five
 40×40 frames wide (idle, idle blink, listening, listening blink, ouch) and the CSS addresses frames
@@ -92,8 +116,7 @@ after the `check` Deployment Check passes.
   `assets/mark.svg` changes, change both symbols and `apps/macos/Theme.swift` (`ListeningMark`).
 - No external fonts, analytics, images or scripts. Manrope is self-hosted from `assets/fonts/`, and
   the only raster asset is Vincent's generated sprite. His caption is real text, not an image.
-- Copy states only what `docs/test-evidence.md` supports. Keep the "Not yet" list honest when a test
-  is finally run, and move the item rather than deleting the section.
+- Copy states only what `docs/test-evidence.md` supports: what was executed, and what was not.
 - The deployed folder must be self-contained: every `href` resolves inside `site/` or is an explicit
   external URL. Repository Markdown is referred to by filename (`docs/privacy.md`), not linked,
   because it lives outside the deployed root and would 404 in production.

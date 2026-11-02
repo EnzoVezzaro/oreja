@@ -10,10 +10,14 @@ carries the product's namesake and does the explaining before a single paragraph
 
 ## First viewport
 
-A floating pill nav, a short centred headline in heavy Manrope, a black pill download action, and a
-large pixel character between two floating status cards: the AI speaking on the left, Apple Music
-lowered on the right. The first viewport should feel like a small, well-made instrument that is
-pleased to see you, not a SaaS hero.
+The landing page opens on a painted night: indigo star field with two painted spirals, a low hill
+line with a cypress, a cream headline in heavy Manrope with one italic line in wheat, and Vincent
+standing on the hill at the right with a small translucent readout beside him. The painting is
+alive — currents turn, moonlight crosses the clouds — while the character stays perfectly still.
+The documentation page keeps the warm-paper system below, so the two surfaces are night and paper
+rather than one theme stretched over both.
+
+The first viewport should feel like a painting that happens to be a product page, not a SaaS hero.
 
 ## Visual world
 
@@ -23,17 +27,19 @@ pleased to see you, not a SaaS hero.
   `--coral-ink` (#a7472a) is the only one allowed for small text and focus rings, at 5.5:1 on
   paper and 4.91:1 on the apricot wash. `--coral-ink` is the same value as
   `OrejaTheme.Palette.accent`, so the site and the app cannot drift apart.
-- Composition: generous centred field, one dense live control surface, a dark privacy band for
-  contrast, and a soft warm wash behind the character. Nothing is industrial.
+- Composition: a full-bleed painted sky, one column of copy on the left, the character standing on
+  the horizon at the right, and small mono labels for measurements. Nothing is industrial.
 - Type: Manrope for display and UI on the site; the system sans in the app. Monospace is reserved for
   timings, percentages and version labels.
 - Controls: pill buttons, black primary actions, rounded chips for the three conversation moments.
   Active states are unmistakable through position, colour and label.
-- Motion: on the website Vincent is one still frame. He does not blink, bob, float or parallax, on
-  scroll or otherwise; scroll moves light, readout cards and copy around him, never him. In the app
-  he holds the idle frame and switches to listening, or to the ouch frame on a click (the bandage
-  leaves his head) with a two-pixel shake. Interface transitions stay at 160–260 ms. Reduced motion
-  stops the transitions and keeps every state legible in text.
+- Motion: the painting moves, Vincent does not. On the site he is one still frame — no blink, bob,
+  float or parallax, on scroll or otherwise — and the life in the first screen comes from the paint:
+  three masked currents at 41 s, 57 s and 68 s, a moonlight band at 38 s, and a star field with
+  embers and a rare shooting star. In the app he holds the idle frame and switches to listening, or
+  to the ouch frame on a click (the bandage leaves his head) with a two-pixel shake. Interface
+  transitions stay at 160–260 ms. Reduced motion stops every loop and keeps each state legible in
+  text.
 - Scroll: the landing page runs on the scroll-craft engine (`site/scrollcraft.js`, unedited). A
   pinned act holds the conversation while three moments cross over, a rail pans the three behaviors
   sideways, and the rest of the page is ordinary flow with one reveal per section. The signature

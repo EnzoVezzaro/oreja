@@ -3,447 +3,390 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Oreja de Van Gogh: your AI talks, your music listens</title>
-  <meta name="description" content="A tiny Mac companion that pauses Apple Music or lowers it while ChatGPT speaks, then gives the music back when the conversation goes quiet. Local only: no account, no API key, no recording.">
-  <meta name="theme-color" content="#fbf7f0" media="(prefers-color-scheme: light)">
-  <meta name="theme-color" content="#16130f" media="(prefers-color-scheme: dark)">
+  <title>Oreja de Van Gogh: pause Apple Music while ChatGPT speaks</title>
+  <meta name="description" content="A menu bar app for macOS that pauses or lowers Apple Music while ChatGPT speaks, then returns it at the level and position you chose. Runs on your Mac and records nothing.">
+  <meta name="theme-color" content="#080a20">
+  <meta name="color-scheme" content="dark">
   <meta property="og:title" content="Oreja de Van Gogh">
-  <meta property="og:description" content="Your AI talks. Your music listens. A local menu bar app for ChatGPT and Apple Music.">
+  <meta property="og:description" content="Pauses or lowers Apple Music while ChatGPT speaks, then gives it back. A local menu bar app for macOS.">
   <meta property="og:type" content="website">
   <meta property="og:image" content="assets/oreja-vincent.png">
   <link rel="icon" href="assets/mark.svg" type="image/svg+xml">
-  <!-- scrollcraft.css is the engine's floor and loads first, so every token and rule the brand
-       cares about below can override it. Copy of the vendor engine, never edited here. -->
+  <!-- The engine's floor loads first; night.css owns everything the brand cares about. -->
   <link rel="stylesheet" href="scrollcraft.css">
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="night.css">
 </head>
-<body>
-  <a class="skip-link" href="#main">Skip to content</a>
+<body class="n-body">
+  <a class="n-skip" href="#main">Skip to content</a>
+  <div class="n-progress" aria-hidden="true"><span data-progress></span></div>
+  <div class="n-grain" aria-hidden="true"></div>
 
-  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
-    <symbol id="mark-tile" viewBox="0 0 64 64">
+  <svg width="0" height="0" class="n-sprite" aria-hidden="true" focusable="false">
+    <symbol id="n-mark" viewBox="0 0 64 64">
       <rect width="64" height="64" rx="19" fill="#fde7d5"/>
       <circle cx="24" cy="32" r="3.4" fill="#c95f3c"/>
       <path d="M30.43 24.34a10 10 0 0 1 0 15.32" fill="none" stroke="#c95f3c" stroke-width="3.4" stroke-linecap="round"/>
       <path d="M34.93 18.98a17 17 0 0 1 0 26.04" fill="none" stroke="#e77952" stroke-width="3.4" stroke-linecap="round"/>
     </symbol>
-    <symbol id="check" viewBox="0 0 16 16">
-      <path d="M3.2 8.4l3.1 3.1 6.5-6.6" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/>
-    </symbol>
   </svg>
 
-  <!-- Scroll-driven copy is hidden until the engine reveals it. With scripting off nothing would
-       ever appear, so the page states its own fallback instead of shipping a blank section. -->
   <noscript>
     <style>
       [data-sc-cue], [data-sc-in], [data-sc-stagger] > * { opacity: 1 !important; transform: none !important; }
-      .how-stage { position: static !important; height: auto !important; }
-      .how-panels { position: static !important; }
-      .how-panel { position: static !important; margin-bottom: 28px; }
-      .feature-stage { height: auto !important; overflow: visible !important; }
-      .feature-track { flex-wrap: wrap; }
+      .n-act-stage { position: static !important; height: auto !important; }
+      .n-beats { position: static !important; display: grid; gap: 40px; }
+      .n-beats article { position: static !important; max-width: 56ch; }
     </style>
   </noscript>
 
-  <header class="site-header">
-    <div class="container nav">
-      <a class="brand" href="index.html" aria-label="Oreja de Van Gogh, home">
-        <svg class="mark-tile mark-26" aria-hidden="true"><use href="#mark-tile"/></svg>
-        <span class="brand-lockup">
-          <span class="brand-name">oreja</span>
-          <span class="brand-suffix">DE VAN GOGH</span>
+  <header class="n-header">
+    <div class="n-wrap n-header-inner">
+      <a class="n-brand" href="index.html" aria-label="Oreja de Van Gogh, home">
+        <svg class="n-mark" aria-hidden="true"><use href="#n-mark"/></svg>
+        <span class="n-brand-text">
+          <span class="n-brand-name">oreja</span>
+          <span class="n-brand-sub">de van gogh</span>
         </span>
       </a>
-      <nav class="nav-links" aria-label="Primary">
-        <a href="#features">What it does</a>
+      <nav class="n-nav" aria-label="Primary">
+        <a href="#story">How it works</a>
+        <a href="#panel">The panel</a>
         <a href="#privacy">Privacy</a>
-        <a href="#verified">Verification</a>
         <a href="docs.html">Docs</a>
       </nav>
-      <a class="btn btn-primary btn-small" href="#get">Get Oreja</a>
+      <a class="n-btn n-btn-ghost n-btn-sm" href="#get">Download</a>
     </div>
   </header>
 
   <main id="main">
-    <section class="hero container" data-sc-act="flow">
-      <span class="pill">
-        <svg class="mark-tile mark-20" aria-hidden="true"><use href="#mark-tile"/></svg>
-        A little room for both
-      </span>
-      <h1>Your AI talks.<br><em>Your music listens.</em></h1>
-      <p class="hero-sub">
-        A tiny Mac app that gets Apple Music out of the way while ChatGPT replies, then brings it
-        back when the reply ends. Pause it completely, or leave it playing softly underneath.
-      </p>
-      <div class="hero-actions">
-        <a class="btn btn-primary btn-large" href="#get" data-sc-magnet="0.22">Get Oreja for Mac</a>
-        <a class="btn btn-ghost btn-large" href="#how">See it in action</a>
+    <!-- HERO. Planes, back to front: sky, stars, glow, Vincent, hills, foreground. The sky is a
+         painted field with two layers drifting against each other; Vincent is a still frame. -->
+    <section class="n-hero" id="top" data-sc-act="flow" aria-labelledby="hero-title">
+      <div class="n-sky" aria-hidden="true" data-sc-parallax="-0.9">
+        <span class="n-sky-base"></span>
+        <span class="n-sky-swirl n-sky-swirl-a"></span>
+        <span class="n-sky-swirl n-sky-swirl-b"></span>
+        <span class="n-sky-swirl n-sky-swirl-c"></span>
       </div>
-      <p class="hero-meta">Free · Open source · macOS 14.2+ · nothing leaves your Mac</p>
+      <span class="n-sky-light" aria-hidden="true"></span>
+      <canvas class="n-starfield" data-starfield aria-hidden="true"></canvas>
+      <div class="n-hills" aria-hidden="true" data-sc-parallax="0.35"></div>
+      <div class="n-front" aria-hidden="true" data-sc-parallax="0.9"></div>
 
-      <!-- The character is the one thing scroll never touches. Only the light and the two readout
-           cards carry a depth rate, and the rates are small enough to read as distance. -->
-      <div class="scene">
-        <div class="scene-glow" aria-hidden="true" data-sc-parallax="0.5"></div>
-        <div class="vincent" role="img"
-             aria-label="Vincent, Oreja's pixel companion: a straw hat, a rust beard, a cream bandage over one ear and a listening ear on the other side"></div>
-        <div class="float float-ai" data-sc-parallax="-0.35">
-          <span class="float-label"><span class="status-dot status-ok" aria-hidden="true"></span> ChatGPT</span>
-          <span class="float-value">speaking</span>
-          <span class="wave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
-        </div>
-        <div class="float float-music" data-sc-parallax="0.3">
-          <span class="float-label">Apple Music</span>
-          <span class="float-value">12% <small>of 100</small></span>
-          <span class="meter" aria-hidden="true"><span></span></span>
-        </div>
-        <div class="float float-return" data-sc-parallax="-0.22">
-          <span class="float-value">returns at 100%</span>
-        </div>
-      </div>
-      <p class="scene-caption">
-        Vincent only listens to the app you pick. When the voice has the floor, the music steps
-        back. When the room goes quiet again, it comes home.
-      </p>
-    </section>
+      <button class="n-figure" type="button" data-egg aria-label="Vincent. Click him if you must.">
+        <span class="n-figure-glow" aria-hidden="true"></span>
+        <span class="n-figure-ear" aria-hidden="true"></span>
+        <span class="n-vincent" data-vincent-hero aria-hidden="true"></span>
+      </button>
+      <p class="n-egg-note" data-egg-note aria-live="polite"></p>
 
-    <!-- Act 1, pin: the conversation holds still while the three moments cross over inside it.
-         The first cue greets, so the landing view already has its headline. -->
-    <section id="how" class="how" data-sc-act="pin" data-sc-span="3.2" aria-labelledby="how-title">
-      <div class="how-stage" data-sc-stage>
-        <div class="how-inner">
-          <div class="how-head">
-            <h2 id="how-title">Pick a moment in the conversation.</h2>
-            <p class="lead">
-              A spoken conversation alternates. Oreja follows the rhythm instead of guessing at it, so
-              the music does not come back in the middle of your answer.
-            </p>
-          </div>
-
-          <div class="how-frame">
-          <div class="how-body">
-            <div class="how-copy">
-              <div class="players" role="group" aria-label="Conversation moments">
-                <button class="player" type="button" aria-pressed="true" data-scene="speaking">AI is speaking</button>
-                <button class="player" type="button" aria-pressed="false" data-scene="answering">You answer</button>
-                <button class="player" type="button" aria-pressed="false" data-scene="quiet">It goes quiet</button>
-              </div>
-
-              <div class="how-panels">
-                <article class="how-panel" data-scene-panel="speaking" data-sc-cue="0 0.38 0 0.35">
-                  <h3>Music steps back.</h3>
-                  <p>
-                    ChatGPT starts replying, and Apple Music pauses on the same beat. Your track, queue
-                    and position stay exactly where they were.
-                  </p>
-                  <p class="stage-state">pause issued · 190 ms after onset</p>
-                </article>
-                <article class="how-panel" data-scene-panel="answering" data-sc-cue="0.30 0.70">
-                  <h3>It waits for your turn.</h3>
-                  <p>
-                    You start talking. Music stays paused for the conversation hold, so the reply does
-                    not jump back between the two of you.
-                  </p>
-                  <p class="stage-state">conversation hold · 12 s, adjustable</p>
-                </article>
-                <article class="how-panel" data-scene-panel="quiet" data-sc-cue="0.62 1">
-                  <h3>Music comes home.</h3>
-                  <p>
-                    Nobody has spoken for the whole quiet interval. Oreja hands playback back at the
-                    level you chose, exactly where you left it.
-                  </p>
-                  <p class="stage-state">resume issued · back at 100%</p>
-                </article>
-              </div>
-            </div>
-
-            <div class="how-art">
-              <div class="vincent vincent-stage" aria-hidden="true"></div>
-
-              <!-- The signature move: the conversation rail. It is the scroll, drawn. Two levels
-                   move as you travel the act, and both are real states of the app, not ambient
-                   decoration. -->
-              <div class="conv" data-conv-rail>
-                <div class="conv-row">
-                  <span class="conv-label"><span class="status-dot status-ok" aria-hidden="true"></span> AI audio</span>
-                  <span class="conv-level"><span class="conv-bar conv-bar-ai" data-level-ai></span></span>
-                  <strong data-row-ai>speaking</strong>
-                </div>
-                <div class="conv-row">
-                  <span class="conv-label">Apple Music</span>
-                  <span class="conv-level"><span class="conv-bar conv-bar-music" data-level-music></span></span>
-                  <strong data-row-music>paused</strong>
-                </div>
-                <div class="conv-track" aria-hidden="true">
-                  <span class="conv-tick" style="left:0%"></span>
-                  <span class="conv-tick" style="left:50%"></span>
-                  <span class="conv-tick" style="left:100%"></span>
-                  <span class="conv-head" data-conv-head></span>
-                </div>
-                <div class="conv-scale" aria-hidden="true">
-                  <span>reply</span><span>your turn</span><span>quiet</span>
-                </div>
-              </div>
-            </div>
-          </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Act 2, pan: breadth, not hierarchy. Heading opens the rail, the closing note ends it. -->
-    <section id="features" class="feature-act" data-sc-act="pan" data-sc-span="4.2" aria-labelledby="features-title">
-      <div class="feature-stage" data-sc-stage>
-        <div class="feature-track" data-sc-pan="0.04">
-          <article class="rail-lead">
-            <h2 id="features-title">A tiny companion with good manners.</h2>
-            <p class="lead">
-              It listens for the shape of a conversation, keeps your music in the room, and knows when
-              to hand it back.
-            </p>
-          </article>
-
-          <article class="card rail-card">
-            <div class="card-art" aria-hidden="true">
-              <div class="art-wave"><span></span><span></span><span></span><span></span><span></span></div>
-            </div>
-            <p class="card-label">Listen</p>
-            <h3>Give the voice the room.</h3>
-            <p>Oreja watches one chosen audio source and notices the moment it starts speaking.</p>
-          </article>
-          <article class="card rail-card">
-            <div class="card-art" aria-hidden="true">
-              <div class="art-duck"><strong>12%</strong><div class="meter"><span></span></div><small>music</small></div>
-            </div>
-            <p class="card-label">Choose</p>
-            <h3>Lower it, or pause it.</h3>
-            <p>Pick the behavior that feels right: keep Apple Music soft, or let it wait silently.</p>
-          </article>
-          <article class="card rail-card">
-            <div class="card-art" aria-hidden="true">
-              <div class="art-return"><span>100%</span><i>when quiet</i></div>
-            </div>
-            <p class="card-label">Return</p>
-            <h3>Come back to your setting.</h3>
-            <p>When the conversation is quiet, the music returns at the level you chose, in the same spot in the queue.</p>
-          </article>
-
-          <article class="rail-close">
-            <h3>One job, done locally.</h3>
-            <p>No account, no recording, no network code in the app. The menu bar panel is the whole interface.</p>
-            <a class="btn btn-ghost btn-small" href="#verified">Read the verification</a>
-          </article>
-        </div>
-      </div>
-    </section>
-
-    <div class="band-wrap container" id="privacy">
-      <section class="band">
-        <div class="band-grid" data-sc-in data-sc-stagger="70">
-          <div>
-            <p class="eyebrow">Privacy</p>
-            <h2>It reacts to how loud the app is, not to what it says.</h2>
-            <p class="lead">
-              No microphone is needed by default. No recording, transcript or server either. If you
-              opt into “Pause while I speak”, Oreja uses your microphone only to keep playback
-              interrupted.
-            </p>
-            <p class="lead" style="margin-top:18px">
-              <a class="btn btn-band btn-small" href="docs.html#privacy">Read the privacy note</a>
-            </p>
-          </div>
-          <ul class="checks">
-            <li>
-              <svg width="15" height="15" aria-hidden="true"><use href="#check"/></svg>
-              <span>Audio levels exist for milliseconds in memory and are never written to disk.</span>
-            </li>
-            <li>
-              <svg width="15" height="15" aria-hidden="true"><use href="#check"/></svg>
-              <span>No account, no API key, no analytics SDK, no crash reporting.</span>
-            </li>
-            <li>
-              <svg width="15" height="15" aria-hidden="true"><use href="#check"/></svg>
-              <span>Diagnostics keep Oreja's own state changes in memory, and forget them when it quits.</span>
-            </li>
-            <li>
-              <svg width="15" height="15" aria-hidden="true"><use href="#check"/></svg>
-              <span>Oreja never launches Music, resets a track or clears a queue. Volume changes happen only in lower-volume mode.</span>
-            </li>
-          </ul>
-        </div>
-      </section>
-    </div>
-
-    <section id="verified" class="section container">
-      <div class="section-head" data-sc-in data-sc-stagger="60">
-        <p class="eyebrow">Verification</p>
-        <h2>The honest version.</h2>
-        <p class="lead">
-          A small app that claims little is easier to trust. This is what has actually been executed,
-          and what has not.
+      <div class="n-wrap n-hero-inner">
+        <p class="n-kicker"><span class="n-dot" aria-hidden="true"></span> Menu bar app for macOS 14.2 and later</p>
+        <h1 id="hero-title" class="n-display">
+          <span>Your AI talks.</span>
+          <span>Your music</span>
+          <span class="n-underline">
+            <em>waits its turn.</em>
+            <svg viewBox="0 0 300 18" aria-hidden="true" focusable="false" preserveAspectRatio="none">
+              <path d="M3 13C52 4 104 4 152 9c44 4 95 6 145 1"/>
+            </svg>
+          </span>
+        </h1>
+        <p class="n-lede">
+          Oreja pauses Apple Music while ChatGPT speaks, or lowers it to a level you pick, then
+          puts it back where you left it. It follows the app's audio level, so it works with any
+          voice in any language and never listens to the words.
         </p>
-      </div>
-      <div class="evidence" data-sc-in data-sc-stagger="90">
-        <div class="evidence-card">
-          <h3>Executed</h3>
-          <ul>
-            <li><span class="status-dot status-ok" aria-hidden="true"></span><span><span data-sc-count="0 54">54</span> automated tests pass: coordinator, detector, settings, pause journal and AppleScript parsing.</span></li>
-            <li><span class="status-dot status-ok" aria-hidden="true"></span><span>The app bundle builds, signs, launches, and stays resident in the menu bar.</span></li>
-            <li><span class="status-dot status-ok" aria-hidden="true"></span><span>Core Audio process tap capture was verified with a local probe against a real audio-producing process.</span></li>
-            <li><span class="status-dot status-ok" aria-hidden="true"></span><span>Apple Music pause and resume were verified end to end with the integration harness and a controlled audio fixture.</span></li>
-          </ul>
+        <div class="n-actions">
+          <a class="n-btn n-btn-solid n-btn-lg" href="#get" data-sc-magnet="0.24" data-sc-rise="0">Download Oreja for Mac</a>
+          <a class="n-link" href="#story">See it happen <span aria-hidden="true">↓</span></a>
         </div>
-        <div class="evidence-card">
-          <h3>Not yet</h3>
-          <ul>
-            <li><span class="status-dot status-open" aria-hidden="true"></span><span>A live ChatGPT Voice session has not been run. The ChatGPT audio path is unverified against real replies.</span></li>
-            <li><span class="status-dot status-open" aria-hidden="true"></span><span>CPU and battery impact, Bluetooth and AirPods switching, and live end-to-end latency are unmeasured.</span></li>
-            <li><span class="status-dot status-open" aria-hidden="true"></span><span>The build is ad-hoc signed and not notarized.</span></li>
-            <li><span class="status-dot status-open" aria-hidden="true"></span><span>Browser sources are experimental and capture every tab in that browser.</span></li>
-          </ul>
+        <ul class="n-facts">
+          <li>Free, GPL-3.0</li>
+          <li>macOS 14.2+</li>
+          <li>No account</li>
+        </ul>
+      </div>
+
+      <div class="n-readout" data-readout aria-hidden="true">
+        <div class="n-readout-row">
+          <span class="n-readout-key"><span class="n-dot"></span> ChatGPT</span>
+          <span class="n-readout-val">speaking</span>
+          <span class="n-bars"><i></i><i></i><i></i><i></i><i></i><i></i></span>
+        </div>
+        <div class="n-readout-row">
+          <span class="n-readout-key">Apple Music</span>
+          <span class="n-readout-val">12<small>%</small></span>
+          <span class="n-readout-meter"><i></i></span>
         </div>
       </div>
-      <p class="evidence-foot">
-        Commands, raw output and dates live in <code>docs/test-evidence.md</code> in the repository.
+
+      <p class="n-scroll-cue" aria-hidden="true"><i></i> Scroll</p>
+
+      <p class="n-hero-caption">
+        Vincent gave away one ear. The other one does all the listening.
       </p>
     </section>
 
-    <section id="faq" class="section container">
-      <div class="section-head" data-sc-in>
-        <h2>The short answers.</h2>
-      </div>
-      <div class="faq" data-sc-in data-sc-stagger="45">
-        <details>
-          <summary>Does Oreja record or transcribe what ChatGPT says?</summary>
-          <p>
-            No. It reads the output level of the selected application's audio and keeps only a
-            boolean “active” state. No samples are stored, no speech is recognised, and no content
-            leaves the Mac. There is no networking code in the app.
-          </p>
-        </details>
-        <details>
-          <summary>Do I need an OpenAI account or API key?</summary>
-          <p>
-            No. Oreja does not talk to OpenAI at all. It observes the local audio output of the app
-            you choose, and controls Apple Music through macOS automation.
-          </p>
-        </details>
-        <details>
-          <summary>Why only Apple Music?</summary>
-          <p>
-            Apple Music is the only provider in this release. Other players would need their own
-            adapter, capability declarations and tests; guessing at provider state is not something
-            Oreja does. The music adapter is a port, so another provider is possible later.
-          </p>
-        </details>
-        <details>
-          <summary>Can I pause Music or lower its volume?</summary>
-          <p>
-            Yes. Choose pause mode to stop Music while the AI speaks and resume it afterward, or
-            choose lower-volume mode to keep Music playing quietly and restore its original volume
-            when the reply ends. The setting is yours.
-          </p>
-        </details>
-        <details>
-          <summary>Will a notification sound pause my music?</summary>
-          <p>
-            Possibly. Oreja reacts to output activity, not verified speech, so a sound played by the
-            same application counts. Browser sources are worse: they capture every tab in that
-            browser. Use the desktop app, or a dedicated browser window.
-          </p>
-        </details>
-        <details>
-          <summary>What if I pause or resume music myself?</summary>
-          <p>
-            Your choice wins. If you pause Music, Oreja will not resume it. If you resume Music while
-            ChatGPT is speaking, Oreja releases its claim and waits for the next activity before
-            acting again.
-          </p>
-        </details>
-        <details>
-          <summary>What happens if Oreja quits or crashes?</summary>
-          <p>
-            Quitting while Oreja owns a pause resumes the music first. After a crash, the pause
-            journal restores playback on the next launch only when the same track is still paused and
-            the pause is recent. If the track changed or Music quit, Oreja deliberately leaves it alone.
-          </p>
-        </details>
-        <details>
-          <summary>Is it notarized? Is it affiliated with OpenAI or Apple?</summary>
-          <p>
-            It is ad-hoc signed and not notarized, so another Mac may need a one-time Gatekeeper
-            approval. It is an independent project: not affiliated with, endorsed by, or supported by
-            OpenAI or Apple.
-          </p>
-        </details>
-      </div>
-    </section>
+    <!-- ACT: the handoff. A live waveform is scrubbed by the wheel: the AI band falls away and
+         the music band comes back. The canvas draws the two levels the app reports. -->
+    <section class="n-act" id="story" data-sc-act="pin" data-sc-span="3.4" aria-labelledby="story-title">
+      <div class="n-act-stage" data-sc-stage>
+        <canvas class="n-wave" data-wave aria-hidden="true"></canvas>
+        <div class="n-act-vignette" aria-hidden="true"></div>
+        <p class="n-wave-label n-wave-label-ai" aria-hidden="true">AI audio</p>
+        <p class="n-wave-label n-wave-label-music" aria-hidden="true">Apple Music</p>
 
-    <!-- The close resolves and holds: it is not a pinned act, so nothing fades it out. -->
-    <section id="get" class="section container close">
-      <div class="get-card" data-sc-in data-sc-stagger="60">
-        <div>
-            <h2>Bring Vincent home.</h2>
-          <p class="lead">
-            Download the latest 0.1.0 build, or make it yourself. The download is ad-hoc signed and
-            not notarized yet.
-          </p>
-          <div class="get-actions">
-            <a class="btn btn-primary" href="downloads/Oreja-0.1.0.dmg">Download for macOS</a>
-            <a class="btn btn-ghost" href="docs.html#building">Build from source</a>
+        <div class="n-wrap n-act-inner">
+          <div class="n-act-copy">
+            <p class="n-eyebrow">The handoff</p>
+            <h2 id="story-title" class="n-h2">How the music <em>gives way.</em></h2>
+
+            <div class="n-beats">
+              <article class="n-beat" data-sc-cue="0 0.38 0 0.34">
+                <h3>The reply starts.</h3>
+                <p>Oreja reads the app's output level and acts on the first sound. Apple Music stops in pause mode, or drops to the level you set in lower-volume mode.</p>
+                <p class="n-state">mode · pause, or lower volume</p>
+              </article>
+              <article class="n-beat" data-sc-cue="0.30 0.70">
+                <h3>You take your turn.</h3>
+                <p>Music stays down through the conversation hold, so the next reply does not restart it in the middle of your sentence.</p>
+                <p class="n-state">conversation hold · 12 seconds, adjustable</p>
+              </article>
+              <article class="n-beat" data-sc-cue="0.62 1">
+                <h3>The room goes quiet.</h3>
+                <p>After the quiet interval, playback returns at the level you chose and the same second of the same track it left.</p>
+                <p class="n-state">resume · 100%, same position</p>
+              </article>
+            </div>
           </div>
-          <p class="note">
-            macOS may ask you to approve the app in System Settings › Privacy &amp; Security because
-            this build does not carry a Developer ID or notarization. Oreja does not disable Gatekeeper.
-          </p>
-          <pre><code>./scripts/build.sh
-open build/Oreja.app</code></pre>
-          <ul class="requirements" style="margin-top:22px">
-            <li><span aria-hidden="true">·</span><span><strong>macOS 14.2 or newer.</strong> Core Audio process taps require it.</span></li>
-            <li><span aria-hidden="true">·</span><span><strong>ChatGPT desktop</strong>, or ChatGPT in Safari/Chrome as an experimental source.</span></li>
-            <li><span aria-hidden="true">·</span><span><strong>The Music app</strong>, already playing something. Oreja never opens it for you.</span></li>
-            <li><span aria-hidden="true">·</span><span><strong>Command Line Tools</strong> if you build from source. No third-party dependencies.</span></li>
-          </ul>
+
+          <div class="n-act-side" aria-hidden="true">
+            <figure class="n-desk">
+              <span class="n-desk-glow"></span>
+              <img src="assets/vincent-desk.png" width="448" height="352"
+                   alt="" loading="lazy" decoding="async">
+            </figure>
+            <div class="n-levels">
+              <div class="n-level">
+                <p class="n-level-label">AI audio</p>
+                <div class="n-level-track"><span data-level-ai></span></div>
+                <p class="n-level-value" data-value-ai>speaking</p>
+              </div>
+              <div class="n-level n-level-music">
+                <p class="n-level-label">Apple Music</p>
+                <div class="n-level-track"><span data-level-music></span></div>
+                <p class="n-level-value" data-value-music>paused</p>
+              </div>
+            </div>
+          </div>
         </div>
-        <div class="get-art">
-          <div class="vincent vincent-still" role="img"
-               aria-label="Vincent waiting beside the download, bandaged ear and all"></div>
+
+        <div class="n-timeline" aria-hidden="true">
+          <span class="n-timeline-line"><i data-playhead></i></span>
+          <div class="n-timeline-labels">
+            <span data-moment="speaking">reply</span>
+            <span data-moment="answering">your turn</span>
+            <span data-moment="quiet">quiet</span>
+          </div>
+        </div>
+        <p class="n-act-hint">Keep scrolling</p>
+      </div>
+    </section>
+
+    <section class="n-section n-panel-section" id="panel" aria-labelledby="panel-title">
+      <div class="n-wrap n-panel-grid">
+        <div class="n-panel-copy" data-sc-in data-sc-stagger="70">
+          <p class="n-eyebrow">The interface</p>
+          <h2 id="panel-title" class="n-h2">The panel is <em>the whole app.</em></h2>
+          <p class="n-body-copy">
+            Open it from the menu bar: choose the app to follow, pick pause or lower volume, set the
+            two levels and the quiet interval. Close it and Oreja keeps working.
+          </p>
+          <dl class="n-rows">
+            <div><dt>Source</dt><dd>ChatGPT, or a browser as an experimental source</dd></div>
+            <div><dt>Behavior</dt><dd>Pause Apple Music, or lower it to a level you choose</dd></div>
+            <div><dt>Return</dt><dd>The same volume and the same second of the track</dd></div>
+            <div><dt>Timing</dt><dd>Quiet interval and conversation hold, adjustable while it runs</dd></div>
+          </dl>
+        </div>
+
+        <div class="n-panel-art" data-sc-in>
+          <div class="n-panel-glow" aria-hidden="true"></div>
+          <div class="n-panel" data-tilt="6" role="img"
+               aria-label="The Oreja menu bar panel: ChatGPT speaking, Apple Music lowered to 12 percent, returning to 100 percent after six quiet seconds">
+            <div class="n-panel-head">
+              <span class="n-panel-title">
+                <span class="n-panel-vincent" aria-hidden="true"></span>
+                <span><strong>Oreja</strong><small>in your menu bar</small></span>
+              </span>
+              <span class="n-chip"><span class="n-dot" aria-hidden="true"></span> listening</span>
+            </div>
+
+            <div class="n-panel-block">
+              <p class="n-panel-label">Source</p>
+              <div class="n-panel-row">
+                <span>ChatGPT</span>
+                <span class="n-panel-live">speaking</span>
+              </div>
+              <div class="n-panel-wave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+            </div>
+
+            <div class="n-segmented" aria-hidden="true">
+              <span>Pause</span>
+              <span class="is-on">Lower volume</span>
+            </div>
+
+            <div class="n-panel-block">
+              <p class="n-panel-label">While it speaks</p>
+              <div class="n-panel-row"><span>Music</span><strong>12%</strong></div>
+              <div class="n-panel-slider" aria-hidden="true"><span style="--at:12%"></span></div>
+              <div class="n-panel-row"><span>Return to</span><strong>100%</strong></div>
+              <div class="n-panel-slider" aria-hidden="true"><span style="--at:100%"></span></div>
+            </div>
+
+            <div class="n-panel-foot">
+              <span>Quiet for 6 s</span>
+              <span class="n-panel-toggle" aria-hidden="true"><i></i></span>
+            </div>
+          </div>
         </div>
       </div>
     </section>
 
- </main>
+    <section class="n-privacy" id="privacy" aria-labelledby="privacy-title">
+      <div class="n-wrap">
+        <div class="n-privacy-head" data-sc-in data-sc-stagger="80">
+          <p class="n-eyebrow">Privacy</p>
+          <h2 id="privacy-title" class="n-h2 n-h2-wide">
+            It measures <em>how loud</em> the app is.
+          </h2>
+          <p class="n-body-copy">
+            That is the whole input: one level from macOS's process tap, held in memory for a moment
+            and thrown away. Oreja keeps a single answer, speaking or quiet, and nothing else.
+          </p>
+        </div>
+        <ul class="n-privacy-grid" data-sc-in data-sc-stagger="90">
+          <li>
+            <span class="n-num">01</span>
+            <h3>A level, then nothing</h3>
+            <p>Samples exist in memory for milliseconds. None are written to disk and none leave your Mac.</p>
+          </li>
+          <li>
+            <span class="n-num">02</span>
+            <h3>An app that runs offline</h3>
+            <p>There is no account to create and no analytics or crash reporting in the bundle. The app contains no network code.</p>
+          </li>
+          <li>
+            <span class="n-num">03</span>
+            <h3>Your hand wins</h3>
+            <p>Pause Music yourself and Oreja leaves it alone. Resume during a reply and Oreja lets go of its claim.</p>
+          </li>
+          <li>
+            <span class="n-num">04</span>
+            <h3>Your library stays yours</h3>
+            <p>Oreja starts no playback and changes no queue. Volume moves only in lower-volume mode.</p>
+          </li>
+        </ul>
+      </div>
+    </section>
 
-  <footer class="site-footer">
-    <div class="container">
-      <div class="footer-top">
+    <section class="n-section n-faq" id="faq" aria-labelledby="faq-title">
+      <div class="n-wrap n-faq-grid">
+        <div class="n-faq-head" data-sc-in>
+          <p class="n-eyebrow">Questions</p>
+          <h2 id="faq-title" class="n-h2">The short<br><em>answers.</em></h2>
+        </div>
+        <div class="n-faq-list" data-sc-in data-sc-stagger="40">
+          <details>
+            <summary>Does Oreja record or transcribe what ChatGPT says?</summary>
+            <p>No. It reads the output level of the selected application's audio and keeps only an active or quiet state. No samples are stored, no speech is recognised, and the app contains no networking code.</p>
+          </details>
+          <details>
+            <summary>Do I need an OpenAI account or API key?</summary>
+            <p>No. Oreja does not talk to OpenAI. It observes the local audio output of the app you choose and controls Apple Music through macOS automation.</p>
+          </details>
+          <details>
+            <summary>Why only Apple Music?</summary>
+            <p>Apple Music is the one player Oreja controls today. More players are coming.</p>
+          </details>
+          <details>
+            <summary>Pause, or just lower it?</summary>
+            <p>Both. Pause mode stops Music while the AI speaks and resumes it afterward. Lower-volume mode keeps Music playing quietly and restores the level you set when the reply ends.</p>
+          </details>
+          <details>
+            <summary>Will a notification sound pause my music?</summary>
+            <p>Not a normal one. Oreja listens for the shape of speech — the loudness rising and falling with every syllable — so a short blip, a steady alert tone or a chime that fades once is ignored, and Diagnostics tells you when that happened. A melody-style ringtone can still pass, and browser sources capture every tab in that browser, so a dedicated window or the desktop app gives the cleanest signal.</p>
+          </details>
+          <details>
+            <summary>What if I pause or resume music myself?</summary>
+            <p>Your choice wins. If you pause Music, Oreja will not resume it. If you resume Music while ChatGPT is speaking, Oreja releases its claim and waits for the next activity before acting again.</p>
+          </details>
+          <details>
+            <summary>What happens if Oreja quits or crashes?</summary>
+            <p>Quitting while Oreja owns a pause resumes the music first. After a crash, the pause journal restores playback on the next launch only when the same track is still paused and the pause is recent. If the track changed or Music quit, Oreja leaves it alone.</p>
+          </details>
+          <details>
+            <summary>Is it notarized, and who makes it?</summary>
+            <p>It is ad-hoc signed and not notarized, so another Mac may ask for a one-time Gatekeeper approval. It is an independent project, not affiliated with, endorsed by or supported by OpenAI or Apple.</p>
+          </details>
+        </div>
+      </div>
+    </section>
+
+    <!-- DAWN: the night ends, the music comes back. Scroll drives the sunrise. -->
+    <section class="n-dawn" id="get" data-dawn aria-labelledby="get-title">
+      <div class="n-dawn-sky" aria-hidden="true"></div>
+      <div class="n-sun" aria-hidden="true"></div>
+      <div class="n-dawn-hills" aria-hidden="true"></div>
+      <div class="n-dawn-figure" aria-hidden="true">
+        <img src="assets/vincent-back.png" width="208" height="304" alt="" loading="lazy" decoding="async">
+      </div>
+
+      <div class="n-wrap n-dawn-inner">
+        <p class="n-eyebrow n-eyebrow-dark">Morning</p>
+        <h2 id="get-title" class="n-h2 n-dawn-title">Bring him home.</h2>
+        <p class="n-lede n-lede-dark">
+          Download the 0.1.0 build for macOS 14.2 or later. It is ad-hoc signed and not notarized, so
+          macOS asks for approval once. The source builds with one script and no dependencies.
+        </p>
+        <div class="n-actions">
+          <a class="n-btn n-btn-dark n-btn-lg" href="downloads/Oreja-0.1.0.dmg">Download Oreja 0.1.0</a>
+          <a class="n-link n-link-dark" href="docs.html#building">Build from source <span aria-hidden="true">→</span></a>
+        </div>
+        <ul class="n-facts n-facts-dark">
+          <li>macOS 14.2+</li>
+          <li>Apple Music</li>
+        </ul>
+      </div>
+    </section>
+  </main>
+
+  <footer class="n-footer">
+    <div class="n-wrap">
+      <div class="n-footer-top">
         <div>
-          <div class="footer-brand">
-            <svg class="mark-tile mark-26" aria-hidden="true"><use href="#mark-tile"/></svg>
-            <span class="brand-lockup">
-              <span class="brand-name">oreja</span>
-              <span class="brand-suffix">DE VAN GOGH</span>
+          <a class="n-brand" href="index.html">
+            <svg class="n-mark" aria-hidden="true"><use href="#n-mark"/></svg>
+            <span class="n-brand-text">
+              <span class="n-brand-name">oreja</span>
+              <span class="n-brand-sub">de van gogh</span>
             </span>
-          </div>
-          <p class="footer-note">
-            A local menu bar companion for ChatGPT and Apple Music. One job, no account, no recording.
-          </p>
+          </a>
+          <p class="n-footer-note">A menu bar app for ChatGPT and Apple Music. Runs on your Mac and keeps no record of what it hears.</p>
         </div>
-        <nav class="footer-links" aria-label="Footer">
-          <a href="#how">See it in action</a>
+        <nav class="n-footer-links" aria-label="Footer">
+          <a href="#story">How it works</a>
+          <a href="#panel">The panel</a>
+          <a href="#privacy">Privacy</a>
           <a href="docs.html">Documentation</a>
-          <a href="#verified">Verification</a>
-          <a href="docs.html#privacy">Privacy</a>
-          <a href="#get">Get Oreja</a>
           <a href="https://opensource.org/license/gpl-3.0">License (GPL-3.0-only)</a>
         </nav>
       </div>
-      <p class="footer-fine">
-        Independent project. Not affiliated with OpenAI or Apple. Built with AI-assisted development
-        and human review.
-      </p>
+      <p class="n-footer-fine">Independent project. Not affiliated with OpenAI or Apple. Built with AI-assisted development and human review.</p>
     </div>
   </footer>
+
   <script src="scrollcraft.js" defer></script>
   <script src="landing.js" defer></script>
 </body>
