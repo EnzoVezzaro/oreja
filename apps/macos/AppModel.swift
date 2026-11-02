@@ -538,6 +538,10 @@ final class AppModel: ObservableObject {
         ) { [weak self] _ in
             MainActor.assumeIsolated {
                 self?.coordinator.systemWillSleep()
+                // AVAudioEngine can stop delivering input while the Mac sleeps. Clear the
+                // existing monitor so wake-up creates a fresh microphone tap instead of treating
+                // the stale instance as healthy.
+                self?.stopUserSpeechMonitoring(reason: "system sleep")
                 self?.stopObservation()
             }
         }
@@ -552,6 +556,7 @@ final class AppModel: ObservableObject {
                 self.coordinator.systemDidWake()
                 if self.settings.automationEnabled {
                     self.startMonitoringIfNeeded()
+                    self.startUserSpeechMonitoring()
                     self.startObservation()
                 }
                 self.refreshMusic()
