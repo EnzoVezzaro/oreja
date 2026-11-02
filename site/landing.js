@@ -2,7 +2,6 @@
 // page keeps working with scripting off: the first scene is already in the markup.
 const stage = document.querySelector("[data-mode]");
 const buttons = Array.from(document.querySelectorAll("[data-scene]"));
-const art = document.querySelector("[data-scene-art]");
 
 const scenes = {
   speaking: {
@@ -12,7 +11,6 @@ const scenes = {
     state: "pause issued · 190 ms after onset",
     ai: "speaking",
     music: "paused",
-    listening: true,
   },
   answering: {
     title: "It waits for your turn.",
@@ -21,7 +19,6 @@ const scenes = {
     state: "conversation hold · 12 s, adjustable",
     ai: "listening",
     music: "still paused",
-    listening: true,
   },
   quiet: {
     title: "Music comes home.",
@@ -30,7 +27,6 @@ const scenes = {
     state: "resume issued · back at 100%",
     ai: "quiet",
     music: "playing",
-    listening: false,
   },
 };
 
@@ -59,7 +55,6 @@ function show(name) {
   if (state) state.textContent = scene.state;
   if (ai) ai.textContent = scene.ai;
   if (music) music.textContent = scene.music;
-  if (art) art.classList.toggle("is-listening", scene.listening);
 
   for (const button of buttons) {
     button.setAttribute("aria-pressed", String(button.dataset.scene === name));

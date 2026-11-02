@@ -455,7 +455,9 @@ code {
 /* Vincent is a five-frame pixel sprite: idle, idle blink, listening, listening blink, ouch.
    The sheet is 5 frames wide, so background-position percentages address a frame by
    frame / 4 * 100%. Sizes stay multiples of the 40px grid, which keeps every pixel square.
-   He blinks and nothing else: he does not bob, float, drift or parallax, on scroll or otherwise. */
+   The site holds him on the first frame and never moves it: no frame animation, no blink, no
+   bob, float, drift or parallax, on scroll or otherwise. Frames belong to the app, where they
+   mark a state the user just triggered. */
 .vincent {
   position: relative;
   width: 320px;
@@ -467,12 +469,6 @@ code {
   image-rendering: pixelated;
   -webkit-user-select: none;
   user-select: none;
-  animation: vincent-idle 5.6s steps(1) infinite;
-}
-
-.vincent.is-listening,
-.stage-art.is-listening .vincent {
-  animation: vincent-listen 2.4s steps(1) infinite;
 }
 
 .vincent-stage {
@@ -483,36 +479,6 @@ code {
 .vincent-still {
   width: 200px;
   height: 200px;
-}
-
-@keyframes vincent-idle {
-  0%,
-  82% {
-    background-position: 0% 0;
-  }
-  84%,
-  92% {
-    background-position: 25% 0;
-  }
-  94%,
-  100% {
-    background-position: 0% 0;
-  }
-}
-
-@keyframes vincent-listen {
-  0%,
-  74% {
-    background-position: 50% 0;
-  }
-  76%,
-  88% {
-    background-position: 75% 0;
-  }
-  90%,
-  100% {
-    background-position: 50% 0;
-  }
 }
 
 .float {
@@ -1583,10 +1549,6 @@ td code {
     scroll-behavior: auto;
   }
 
-  .vincent,
-  .vincent.is-listening,
-  .stage-art.is-listening .vincent,
-  .vincent-still,
   .wave i {
     animation: none;
   }
