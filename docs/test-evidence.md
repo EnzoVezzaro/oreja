@@ -32,6 +32,11 @@ assertions**; `python3 scripts/check-site.py` → site consistent; `git diff --c
 | Click easter egg renders | `screencapture -l <panel window id>` 160 ms after a click at the mascot | captures show the fifth frame (bandage off, eyes shut, mouth open) |
 | Production serves every referenced file | `curl -I https://oreja-tau.vercel.app/{landing.js,assets/oreja-vincent.png,assets/fonts/manrope-variable.ttf,downloads/Oreja-0.1.0.dmg}` | 200 for all four; sprite and DMG byte-identical to the repository files |
 | Website character does not bob | two screenshots 900 ms apart, `getComputedStyle(.vincent).transform` | `none`; frames identical |
+| Website character never scrolls | `getComputedStyle` on the pinned act's sprite at p = 0.14 / 0.50 / 0.90 | `animation-name: none`, `transform: none`, `background-position: 0% 0px` and the same viewport top (272.84 px) at all three |
+| Pinned conversation act holds and advances | screenshots at p = 0.14 / 0.50 / 0.90, 1440×900 and 390×844 | stage stays sticky, one panel at full strength each time, chip and AI/Music readouts follow the scroll (`--sc-p` 0.1400 / 0.5002 / 0.9001) |
+| Behaviors rail actually travels | `rail.scrollWidth - innerWidth` | 568 px of overflow at 1440 wide; 0 horizontal page overflow at 390 wide |
+| Page reads with reduced motion | Chrome `Emulation.setEmulatedMedia` prefers-reduced-motion: reduce | pinned act and rail still resolve their states; no transition, no magnet |
+| Site structure after the rewrite | `python3 scripts/check-site.py` | 2 pages, 11 ids each, every internal link and anchor resolves |
 | Downloaded DMG carries the current binary | mount, `shasum` against `build/Oreja.app`, `plutil CFBundleVersion` | identical binary, `CFBundleVersion` 2, `oreja-vincent.png` present |
 
 Still not executed: a real ChatGPT Voice session, real Apple Music control on a clean account, and

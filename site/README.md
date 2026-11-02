@@ -8,7 +8,9 @@ site/
   index.html        landing page
   docs.html         documentation (setup, permissions, states, troubleshooting, privacy)
   styles.css        the whole design system, shared by both pages
-  landing.js        the three conversation moments in the interactive demo
+  scrollcraft.css   vendor scroll engine stylesheet (copied unedited, MIT)
+  scrollcraft.js    vendor scroll engine (copied unedited, MIT)
+  landing.js        mounts the engine, then drives the pinned act and its rail
   assets/mark.svg   canonical brand mark
   assets/oreja-vincent.png   Vincent's four-frame pixel sprite
   assets/fonts/manrope-variable.ttf   the one self-hosted font (OFL)
@@ -20,8 +22,16 @@ by `background-position` percentages over a 500% background; the site uses the f
 fifth is the click joke in the app. The macOS app ships the same file, so a change here must be
 regenerated and rebuilt, not edited in two places.
 
-Vincent blinks in place. He does not bob, float or parallax on scroll; `scripts/vincent-sprite.py
---preview 2` writes `build/vincent-preview.png` at the 80 px size the sprite has to read at.
+The site pins Vincent to the first frame. He does not blink, bob, float or parallax, on scroll or
+otherwise: the frame animation was removed because it read as the character scrolling. Frames stay
+in the app, where they mark a state the user just triggered. `scripts/vincent-sprite.py --preview 2`
+writes `build/vincent-preview.png` at the 80 px size the sprite has to read at.
+
+The landing page is scroll-driven through the [scroll-craft](https://github.com/nateherkai/scroll-craft)
+engine: a pinned conversation act, a lateral behaviors rail, and flow reveals. `docs/scroll-craft.md`
+records the brief, the chosen grammar and the signature move. The two `scrollcraft.*` files are the
+vendor engine and are never edited here; theme through the `--sc-*` tokens at the end of
+`styles.css`.
 
 ## Preview
 

@@ -12,6 +12,9 @@
   <meta property="og:type" content="website">
   <meta property="og:image" content="assets/oreja-vincent.png">
   <link rel="icon" href="assets/mark.svg" type="image/svg+xml">
+  <!-- scrollcraft.css is the engine's floor and loads first, so every token and rule the brand
+       cares about below can override it. Copy of the vendor engine, never edited here. -->
+  <link rel="stylesheet" href="scrollcraft.css">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -28,6 +31,19 @@
       <path d="M3.2 8.4l3.1 3.1 6.5-6.6" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/>
     </symbol>
   </svg>
+
+  <!-- Scroll-driven copy is hidden until the engine reveals it. With scripting off nothing would
+       ever appear, so the page states its own fallback instead of shipping a blank section. -->
+  <noscript>
+    <style>
+      [data-sc-cue], [data-sc-in], [data-sc-stagger] > * { opacity: 1 !important; transform: none !important; }
+      .how-stage { position: static !important; height: auto !important; }
+      .how-panels { position: static !important; }
+      .how-panel { position: static !important; margin-bottom: 28px; }
+      .feature-stage { height: auto !important; overflow: visible !important; }
+      .feature-track { flex-wrap: wrap; }
+    </style>
+  </noscript>
 
   <header class="site-header">
     <div class="container nav">
@@ -49,7 +65,7 @@
   </header>
 
   <main id="main">
-    <section class="hero container">
+    <section class="hero container" data-sc-act="flow">
       <span class="pill">
         <svg class="mark-tile mark-20" aria-hidden="true"><use href="#mark-tile"/></svg>
         A little room for both
@@ -60,26 +76,28 @@
         back when the reply ends. Pause it completely, or leave it playing softly underneath.
       </p>
       <div class="hero-actions">
-        <a class="btn btn-primary btn-large" href="#get">Get Oreja for Mac</a>
+        <a class="btn btn-primary btn-large" href="#get" data-sc-magnet="0.22">Get Oreja for Mac</a>
         <a class="btn btn-ghost btn-large" href="#how">See it in action</a>
       </div>
       <p class="hero-meta">Free · Open source · macOS 14.2+ · nothing leaves your Mac</p>
 
+      <!-- The character is the one thing scroll never touches. Only the light and the two readout
+           cards carry a depth rate, and the rates are small enough to read as distance. -->
       <div class="scene">
-        <div class="scene-glow" aria-hidden="true"></div>
+        <div class="scene-glow" aria-hidden="true" data-sc-parallax="0.5"></div>
         <div class="vincent" role="img"
              aria-label="Vincent, Oreja's pixel companion: a straw hat, a rust beard, a cream bandage over one ear and a listening ear on the other side"></div>
-        <div class="float float-ai">
+        <div class="float float-ai" data-sc-parallax="-0.35">
           <span class="float-label"><span class="status-dot status-ok" aria-hidden="true"></span> ChatGPT</span>
           <span class="float-value">speaking</span>
           <span class="wave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
         </div>
-        <div class="float float-music">
+        <div class="float float-music" data-sc-parallax="0.3">
           <span class="float-label">Apple Music</span>
           <span class="float-value">12% <small>of 100</small></span>
           <span class="meter" aria-hidden="true"><span></span></span>
         </div>
-        <div class="float float-return">
+        <div class="float float-return" data-sc-parallax="-0.22">
           <span class="float-value">returns at 100%</span>
         </div>
       </div>
@@ -89,80 +107,139 @@
       </p>
     </section>
 
-    <section id="how" class="section container">
-      <div class="section-head">
-        <h2>Pick a moment in the conversation.</h2>
-        <p class="lead">
-          A spoken conversation alternates. Oreja follows the rhythm instead of guessing at it, so
-          the music does not come back in the middle of your answer.
-        </p>
-      </div>
+    <!-- Act 1, pin: the conversation holds still while the three moments cross over inside it.
+         The first cue greets, so the landing view already has its headline. -->
+    <section id="how" class="how" data-sc-act="pin" data-sc-span="3.2" aria-labelledby="how-title">
+      <div class="how-stage" data-sc-stage>
+        <div class="how-inner">
+          <div class="how-head">
+            <h2 id="how-title">Pick a moment in the conversation.</h2>
+            <p class="lead">
+              A spoken conversation alternates. Oreja follows the rhythm instead of guessing at it, so
+              the music does not come back in the middle of your answer.
+            </p>
+          </div>
 
-      <div class="players" role="group" aria-label="Conversation moments">
-        <button class="player" type="button" aria-pressed="true" data-scene="speaking">AI is speaking</button>
-        <button class="player" type="button" aria-pressed="false" data-scene="answering">You answer</button>
-        <button class="player" type="button" aria-pressed="false" data-scene="quiet">It goes quiet</button>
-      </div>
+          <div class="how-frame">
+          <div class="how-body">
+            <div class="how-copy">
+              <div class="players" role="group" aria-label="Conversation moments">
+                <button class="player" type="button" aria-pressed="true" data-scene="speaking">AI is speaking</button>
+                <button class="player" type="button" aria-pressed="false" data-scene="answering">You answer</button>
+                <button class="player" type="button" aria-pressed="false" data-scene="quiet">It goes quiet</button>
+              </div>
 
-      <div class="stage" data-mode="speaking">
-        <div class="stage-copy" aria-live="polite">
-          <h3 data-scene-title>Music steps back.</h3>
-          <p data-scene-detail>
-            ChatGPT starts replying, and Apple Music pauses on the same beat. Your track, queue and
-            position stay exactly where they were.
-          </p>
-          <p class="stage-state" data-scene-state>pause issued · 190 ms after onset</p>
-        </div>
-        <div class="stage-art">
-          <div class="vincent vincent-stage" aria-hidden="true"></div>
-          <div class="stage-board">
-            <div class="stage-row"><span><span class="dot"></span> AI audio</span><strong data-row-ai>speaking</strong></div>
-            <div class="stage-row"><span>Apple Music</span><strong data-row-music>paused</strong></div>
-            <div class="stage-row"><span>Yours to undo</span><strong>anytime</strong></div>
+              <div class="how-panels">
+                <article class="how-panel" data-scene-panel="speaking" data-sc-cue="0 0.38 0 0.35">
+                  <h3>Music steps back.</h3>
+                  <p>
+                    ChatGPT starts replying, and Apple Music pauses on the same beat. Your track, queue
+                    and position stay exactly where they were.
+                  </p>
+                  <p class="stage-state">pause issued · 190 ms after onset</p>
+                </article>
+                <article class="how-panel" data-scene-panel="answering" data-sc-cue="0.30 0.70">
+                  <h3>It waits for your turn.</h3>
+                  <p>
+                    You start talking. Music stays paused for the conversation hold, so the reply does
+                    not jump back between the two of you.
+                  </p>
+                  <p class="stage-state">conversation hold · 12 s, adjustable</p>
+                </article>
+                <article class="how-panel" data-scene-panel="quiet" data-sc-cue="0.62 1">
+                  <h3>Music comes home.</h3>
+                  <p>
+                    Nobody has spoken for the whole quiet interval. Oreja hands playback back at the
+                    level you chose, exactly where you left it.
+                  </p>
+                  <p class="stage-state">resume issued · back at 100%</p>
+                </article>
+              </div>
+            </div>
+
+            <div class="how-art">
+              <div class="vincent vincent-stage" aria-hidden="true"></div>
+
+              <!-- The signature move: the conversation rail. It is the scroll, drawn. Two levels
+                   move as you travel the act, and both are real states of the app, not ambient
+                   decoration. -->
+              <div class="conv" data-conv-rail>
+                <div class="conv-row">
+                  <span class="conv-label"><span class="status-dot status-ok" aria-hidden="true"></span> AI audio</span>
+                  <span class="conv-level"><span class="conv-bar conv-bar-ai" data-level-ai></span></span>
+                  <strong data-row-ai>speaking</strong>
+                </div>
+                <div class="conv-row">
+                  <span class="conv-label">Apple Music</span>
+                  <span class="conv-level"><span class="conv-bar conv-bar-music" data-level-music></span></span>
+                  <strong data-row-music>paused</strong>
+                </div>
+                <div class="conv-track" aria-hidden="true">
+                  <span class="conv-tick" style="left:0%"></span>
+                  <span class="conv-tick" style="left:50%"></span>
+                  <span class="conv-tick" style="left:100%"></span>
+                  <span class="conv-head" data-conv-head></span>
+                </div>
+                <div class="conv-scale" aria-hidden="true">
+                  <span>reply</span><span>your turn</span><span>quiet</span>
+                </div>
+              </div>
+            </div>
+          </div>
           </div>
         </div>
       </div>
     </section>
 
-    <section id="features" class="section container">
-      <div class="section-head">
-        <h2>A tiny companion with good manners.</h2>
-        <p class="lead">
-          It listens for the shape of a conversation, keeps your music in the room, and knows when to
-          hand it back.
-        </p>
-      </div>
-      <div class="cards">
-        <article class="card">
-          <div class="card-art" aria-hidden="true">
-            <div class="art-wave"><span></span><span></span><span></span><span></span><span></span></div>
-          </div>
-          <p class="card-label">Listen</p>
-          <h3>Give the voice the room.</h3>
-          <p>Oreja watches one chosen audio source and notices the moment it starts speaking.</p>
-        </article>
-        <article class="card">
-          <div class="card-art" aria-hidden="true">
-            <div class="art-duck"><strong>12%</strong><div class="meter"><span></span></div><small>music</small></div>
-          </div>
-          <p class="card-label">Choose</p>
-          <h3>Lower it, or pause it.</h3>
-          <p>Pick the behavior that feels right: keep Apple Music soft, or let it wait silently.</p>
-        </article>
-        <article class="card">
-          <div class="card-art" aria-hidden="true">
-            <div class="art-return"><span>100%</span><i>when quiet</i></div>
-          </div>
-          <p class="card-label">Return</p>
-          <h3>Come back to your setting.</h3>
-          <p>When the conversation is quiet, the music returns at the level you chose, in the same spot in the queue.</p>
-        </article>
+    <!-- Act 2, pan: breadth, not hierarchy. Heading opens the rail, the closing note ends it. -->
+    <section id="features" class="feature-act" data-sc-act="pan" data-sc-span="4.2" aria-labelledby="features-title">
+      <div class="feature-stage" data-sc-stage>
+        <div class="feature-track" data-sc-pan="0.04">
+          <article class="rail-lead">
+            <h2 id="features-title">A tiny companion with good manners.</h2>
+            <p class="lead">
+              It listens for the shape of a conversation, keeps your music in the room, and knows when
+              to hand it back.
+            </p>
+          </article>
+
+          <article class="card rail-card">
+            <div class="card-art" aria-hidden="true">
+              <div class="art-wave"><span></span><span></span><span></span><span></span><span></span></div>
+            </div>
+            <p class="card-label">Listen</p>
+            <h3>Give the voice the room.</h3>
+            <p>Oreja watches one chosen audio source and notices the moment it starts speaking.</p>
+          </article>
+          <article class="card rail-card">
+            <div class="card-art" aria-hidden="true">
+              <div class="art-duck"><strong>12%</strong><div class="meter"><span></span></div><small>music</small></div>
+            </div>
+            <p class="card-label">Choose</p>
+            <h3>Lower it, or pause it.</h3>
+            <p>Pick the behavior that feels right: keep Apple Music soft, or let it wait silently.</p>
+          </article>
+          <article class="card rail-card">
+            <div class="card-art" aria-hidden="true">
+              <div class="art-return"><span>100%</span><i>when quiet</i></div>
+            </div>
+            <p class="card-label">Return</p>
+            <h3>Come back to your setting.</h3>
+            <p>When the conversation is quiet, the music returns at the level you chose, in the same spot in the queue.</p>
+          </article>
+
+          <article class="rail-close">
+            <h3>One job, done locally.</h3>
+            <p>No account, no recording, no network code in the app. The menu bar panel is the whole interface.</p>
+            <a class="btn btn-ghost btn-small" href="#verified">Read the verification</a>
+          </article>
+        </div>
       </div>
     </section>
 
     <div class="band-wrap container" id="privacy">
       <section class="band">
-        <div class="band-grid">
+        <div class="band-grid" data-sc-in data-sc-stagger="70">
           <div>
             <p class="eyebrow">Privacy</p>
             <h2>It reacts to how loud the app is, not to what it says.</h2>
@@ -198,7 +275,7 @@
     </div>
 
     <section id="verified" class="section container">
-      <div class="section-head">
+      <div class="section-head" data-sc-in data-sc-stagger="60">
         <p class="eyebrow">Verification</p>
         <h2>The honest version.</h2>
         <p class="lead">
@@ -206,11 +283,11 @@
           and what has not.
         </p>
       </div>
-      <div class="evidence">
+      <div class="evidence" data-sc-in data-sc-stagger="90">
         <div class="evidence-card">
           <h3>Executed</h3>
           <ul>
-            <li><span class="status-dot status-ok" aria-hidden="true"></span><span>54 automated tests pass: coordinator, detector, settings, pause journal and AppleScript parsing.</span></li>
+            <li><span class="status-dot status-ok" aria-hidden="true"></span><span><span data-sc-count="0 54">54</span> automated tests pass: coordinator, detector, settings, pause journal and AppleScript parsing.</span></li>
             <li><span class="status-dot status-ok" aria-hidden="true"></span><span>The app bundle builds, signs, launches, and stays resident in the menu bar.</span></li>
             <li><span class="status-dot status-ok" aria-hidden="true"></span><span>Core Audio process tap capture was verified with a local probe against a real audio-producing process.</span></li>
             <li><span class="status-dot status-ok" aria-hidden="true"></span><span>Apple Music pause and resume were verified end to end with the integration harness and a controlled audio fixture.</span></li>
@@ -232,10 +309,10 @@
     </section>
 
     <section id="faq" class="section container">
-      <div class="section-head">
+      <div class="section-head" data-sc-in>
         <h2>The short answers.</h2>
       </div>
-      <div class="faq">
+      <div class="faq" data-sc-in data-sc-stagger="45">
         <details>
           <summary>Does Oreja record or transcribe what ChatGPT says?</summary>
           <p>
@@ -301,8 +378,10 @@
         </details>
       </div>
     </section>
-    <section id="get" class="section container">
-      <div class="get-card">
+
+    <!-- The close resolves and holds: it is not a pinned act, so nothing fades it out. -->
+    <section id="get" class="section container close">
+      <div class="get-card" data-sc-in data-sc-stagger="60">
         <div>
             <h2>Bring Vincent home.</h2>
           <p class="lead">
@@ -365,6 +444,7 @@ open build/Oreja.app</code></pre>
       </p>
     </div>
   </footer>
+  <script src="scrollcraft.js" defer></script>
   <script src="landing.js" defer></script>
 </body>
 </html>

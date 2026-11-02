@@ -29,10 +29,16 @@ pleased to see you, not a SaaS hero.
   timings, percentages and version labels.
 - Controls: pill buttons, black primary actions, rounded chips for the three conversation moments.
   Active states are unmistakable through position, colour and label.
-- Motion: Vincent blinks slowly and stays put — no float, no bob, no parallax on scroll. When the
-  AI is active he switches to the listening frames with sound marks and a lit ear; a click plays the
-  ouch frame (the bandage leaves his head) with a two-pixel shake. Interface transitions stay at
-  160–260 ms. Reduced motion freezes Vincent and keeps every state legible in text.
+- Motion: on the website Vincent is one still frame. He does not blink, bob, float or parallax, on
+  scroll or otherwise; scroll moves light, readout cards and copy around him, never him. In the app
+  he holds the idle frame and switches to listening, or to the ouch frame on a click (the bandage
+  leaves his head) with a two-pixel shake. Interface transitions stay at 160–260 ms. Reduced motion
+  stops the transitions and keeps every state legible in text.
+- Scroll: the landing page runs on the scroll-craft engine (`site/scrollcraft.js`, unedited). A
+  pinned act holds the conversation while three moments cross over, a rail pans the three behaviors
+  sideways, and the rest of the page is ordinary flow with one reveal per section. The signature
+  move is the conversation rail: scroll drives the AI and Apple Music levels the app would actually
+  report. `docs/scroll-craft.md` has the brief and the score.
 - Native app: the same paper/card/ink/coral system, Vincent at 80 pt in the panel and in Settings,
   rounded cards at 18 pt.
 
