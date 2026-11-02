@@ -37,6 +37,9 @@ assertions**; `python3 scripts/check-site.py` → site consistent; `git diff --c
 | Behaviors rail actually travels | `rail.scrollWidth - innerWidth` | 568 px of overflow at 1440 wide; 0 horizontal page overflow at 390 wide |
 | Page reads with reduced motion | Chrome `Emulation.setEmulatedMedia` prefers-reduced-motion: reduce | pinned act and rail still resolve their states; no transition, no magnet |
 | Site structure after the rewrite | `python3 scripts/check-site.py` | 2 pages, 11 ids each, every internal link and anchor resolves |
+| Four-width layout audit | Chrome via CDP at 375×812, 768×1024, 1024×768, 1440×900 | 0 horizontal page overflow, 0 clipped text nodes, pinned stage content fits its viewport at every width |
+| Rail travels on desktop, swipes on phones | `scrollWidth` of the track and the stage, measured per width | 1127/915/459/568 px of overflow at 375/768/1024/1440; below 900px the act is `height: auto` with the stage `static` and `transform: none` |
+| Design tokens match the stylesheet | computed styles read from the live page at 1440×900 | recorded in `docs/design-tokens.md` (`--ink` `#24211d`, 78px display, 30px frame radius, 22px pill-free card radius) |
 | Downloaded DMG carries the current binary | mount, `shasum` against `build/Oreja.app`, `plutil CFBundleVersion` | identical binary, `CFBundleVersion` 2, `oreja-vincent.png` present |
 
 Still not executed: a real ChatGPT Voice session, real Apple Music control on a clean account, and

@@ -1885,6 +1885,38 @@ top: 0 the stage centres its content under the header and the heading is clipped
   .rail-card {
     width: min(76vw, 320px);
   }
+
+  /* On a phone the pan act is a swipe strip, not a scroll act. Once the cards are 76vw wide the
+     heading leaves the screen after one flick, and the act's four viewports of scroll would be
+     dead space, so it stops pinning and becomes an ordinary section with a native horizontal
+     scroller: every card reachable, the heading always at the start. */
+  #features {
+    height: auto !important;
+  }
+
+  .feature-stage {
+    position: static !important;
+    height: auto !important;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-snap-type: x mandatory;
+    /* Without this the first snap consumes the track's own padding and the heading lands flush
+       against the screen edge. */
+    scroll-padding-inline: var(--gutter);
+    scrollbar-width: thin;
+    scrollbar-color: var(--line-strong) transparent;
+    -webkit-overflow-scrolling: touch;
+    padding-block: clamp(18px, 5vw, 32px);
+  }
+
+  .feature-track {
+    transform: none !important;
+    flex-wrap: nowrap;
+  }
+
+  .feature-track > * {
+    scroll-snap-align: start;
+  }
 }
 
 @media (max-height: 720px) {

@@ -86,6 +86,14 @@ scroll positions on a 1440×900 and a 390×844 viewport, the character's compute
 background position at three scroll positions, the rail's measured overflow, horizontal overflow on
 mobile, and `prefers-reduced-motion: reduce`.
 
+A four-width audit (375, 768, 1024, 1440) found one defect that the desktop shots hid: on a phone the
+rail's heading left the screen after one flick, so the section read as orphaned cards. Below 900px
+the pan act therefore stops pinning (`height: auto` on the act, `position: static` on the stage) and
+the track becomes a native horizontal scroller with snap points and `scroll-padding-inline`. The
+heading always stays at the start, every card is reachable, and the act can no longer spend four
+viewports of scroll on a stage that does not move. Measured after the fix: 375 wide, stage
+`scrollWidth` 1502 against 375 client, page overflow 0.
+
 What they do not cover: a real iPhone, Safari, and the scroll-craft screenshot harness
 (`shoot.mjs`), which was not run here because it needs `playwright-core` installed in the build
 folder. The page was inspected in Chrome through ego-browser instead.
