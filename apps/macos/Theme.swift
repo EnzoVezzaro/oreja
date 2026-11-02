@@ -65,38 +65,49 @@ private extension NSColor {
 
 // MARK: - Shared small views
 
-/// The shared ear geometry, in the same 64-point coordinates as the website mark.
-struct ListeningMark: View {
-    var color: Color = OrejaTheme.Palette.accent
-
-    var body: some View {
-        GeometryReader { proxy in
-            let scale = min(proxy.size.width, proxy.size.height) / 64
-            Path { path in
-                path.move(to: CGPoint(x: 22, y: 29))
-                path.addCurve(to: CGPoint(x: 45, y: 29), control1: CGPoint(x: 22, y: 12), control2: CGPoint(x: 45, y: 12))
-                path.addCurve(to: CGPoint(x: 34, y: 46), control1: CGPoint(x: 45, y: 38), control2: CGPoint(x: 34, y: 38))
-                path.addCurve(to: CGPoint(x: 23, y: 45), control1: CGPoint(x: 34, y: 53), control2: CGPoint(x: 23, y: 53))
-                path.move(to: CGPoint(x: 29, y: 29))
-                path.addCurve(to: CGPoint(x: 38, y: 29), control1: CGPoint(x: 29, y: 21), control2: CGPoint(x: 38, y: 21))
-                path.addCurve(to: CGPoint(x: 30, y: 39), control1: CGPoint(x: 38, y: 34), control2: CGPoint(x: 30, y: 33))
-            }
-            .applying(CGAffineTransform(scaleX: scale, y: scale))
-            .stroke(color, style: StrokeStyle(lineWidth: 4 * scale, lineCap: .round, lineJoin: .round))
-        }
-        .accessibilityHidden(true)
-    }
-}
-
+/// The brand mark is the character: Vincent's head, cropped from the idle frame of the same sprite
+/// sheet the companion uses, on the paper tile. The site draws the identical crop from the same
+/// PNG (`site/assets/mark.png`), so the menu bar, the window and the landing page cannot drift.
+///
+/// The crop is 268 × 308 points at (26, 8) inside a 320-point frame, framed at 76% of the tile,
+/// which leaves the hat brim and the collar inside the tile's rounded corners rather than resting
+/// on them.
 struct BrandMark: View {
     var size: CGFloat = 28
     var cornerRadius: CGFloat?
 
+    private static let sheet: NSImage? = {
+        guard let url = Bundle.main.url(forResource: "oreja-vincent", withExtension: "png") else { return nil }
+        return NSImage(contentsOf: url)
+    }()
+
+    private static let framePoints: CGFloat = 320
+    private static let cropOrigin = CGPoint(x: 26, y: 8)
+    private static let cropSize = CGSize(width: 268, height: 308)
+    /// How much of the tile the head fills. Shared with the website's `assets/mark.png`.
+    private static let headShare: CGFloat = 0.76
+
     var body: some View {
-        RoundedRectangle(cornerRadius: cornerRadius ?? size * 0.25, style: .continuous)
+        let radius = cornerRadius ?? size * 0.26
+        RoundedRectangle(cornerRadius: radius, style: .continuous)
             .fill(OrejaTheme.Palette.accentWash)
-            .overlay { ListeningMark().padding(size * 0.02) }
+            .overlay(alignment: .topLeading) {
+                if let sheet = Self.sheet {
+                    let head = size * Self.headShare
+                    let frame = head * (Self.framePoints / Self.cropSize.width)
+                    Image(nsImage: sheet)
+                        .resizable()
+                        .interpolation(.none)
+                        .frame(width: frame * 5, height: frame, alignment: .topLeading)
+                        .offset(
+                            x: (size - head) / 2 - frame * (Self.cropOrigin.x / Self.framePoints),
+                            y: (size - head * (Self.cropSize.height / Self.cropSize.width)) / 2
+                                - frame * (Self.cropOrigin.y / Self.framePoints)
+                        )
+                }
+            }
             .frame(width: size, height: size)
+            .clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
             .accessibilityHidden(true)
     }
 }

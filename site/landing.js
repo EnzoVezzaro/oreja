@@ -27,6 +27,24 @@ const momentLabels = Array.from(document.querySelectorAll("[data-moment]"));
 const waveCtx = waveCanvas ? waveCanvas.getContext("2d") : null;
 let waveWidth = 0;
 let waveHeight = 0;
+// Every bar's silhouette, computed once per resize. Recomputing a hash and a sine for ~180 bars
+// twice per band on every scroll frame was the single most expensive thing this page did while
+// scrolling; the shape of each bar never changes, only how tall it is allowed to be.
+let waveShapes = null;
+
+function buildWaveShapes() {
+  if (!waveWidth) return;
+  const step = waveWidth < 720 ? 5 : 7;
+  const count = Math.max(0, Math.ceil((waveWidth - 52) / step));
+  waveShapes = [1.7, 4.3].map((seed) => {
+    const shape = new Float32Array(count);
+    for (let i = 0; i < count; i += 1) {
+      const grain = hash(i, seed);
+      shape[i] = (0.32 + 0.68 * grain) * (0.72 + 0.28 * Math.sin(i * 0.21 + seed * 2.4));
+    }
+    return shape;
+  });
+}
 
 function sizeWave() {
   if (!waveCanvas) return;
@@ -37,6 +55,8 @@ function sizeWave() {
   waveCanvas.width = Math.round(waveWidth * dpr);
   waveCanvas.height = Math.round(waveHeight * dpr);
   waveCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  buildWaveShapes();
+  lastWaveP = -1;
 }
 
 // The engine owns the measurement, including the pin travel. Reading its number back beats
@@ -61,9 +81,14 @@ function levelAt(p) {
   return { ai: Math.max(0.015, 0.2 - (p - 0.62) * 0.5), music: clamp01((p - 0.6) / 0.26) };
 }
 
-function drawWave() {
-  if (!waveCtx || !waveWidth) return;
-  const p = actProgress();
+let lastWaveP = -1;
+
+function drawWave(p) {
+  if (!waveCtx || !waveWidth || !waveShapes) return;
+  // A sub-pixel change is not visible on a 2 px bar, so it is not worth a repaint either.
+  if (Math.abs(p - lastWaveP) < 0.0015) return;
+  lastWaveP = p;
+
   const levels = levelAt(p);
   const w = waveWidth;
   const h = waveHeight;
@@ -76,28 +101,22 @@ function drawWave() {
   const musicY = h * 0.81;
   const amplitude = Math.min(h * 0.1, 96);
 
-  function band(center, env, seed, color, halo) {
+  // One pass per bar, two rectangles: the faint halo behind and the bar itself.
+  function band(center, env, shape, color, halo) {
     if (env <= 0.031) return;
-    waveCtx.fillStyle = halo;
-    for (let x = scratch, i = 0; x < w - scratch; x += step, i += 1) {
-      const grain = hash(i, seed);
-      const shape = 0.32 + 0.68 * grain;
-      const wave = 0.72 + 0.28 * Math.sin(i * 0.21 + seed * 2.4);
-      const size = Math.max(1, env * amplitude * shape * wave);
+    const haloColor = halo;
+    const barColor = color;
+    for (let i = 0, x = scratch; x < w - scratch; i += 1, x += step) {
+      const size = Math.max(1, env * amplitude * shape[i]);
+      waveCtx.fillStyle = haloColor;
       waveCtx.fillRect(x - 1, center - size - 1, barWidth + 2, size * 2 + 2);
-    }
-    waveCtx.fillStyle = color;
-    for (let x = scratch, i = 0; x < w - scratch; x += step, i += 1) {
-      const grain = hash(i, seed);
-      const shape = 0.32 + 0.68 * grain;
-      const wave = 0.72 + 0.28 * Math.sin(i * 0.21 + seed * 2.4);
-      const size = Math.max(1, env * amplitude * shape * wave);
+      waveCtx.fillStyle = barColor;
       waveCtx.fillRect(x, center - size, barWidth, size * 2);
     }
   }
 
-  band(aiY, levels.ai, 1.7, "rgba(243, 205, 128, 0.92)", "rgba(239, 195, 106, 0.1)");
-  band(musicY, levels.music, 4.3, "rgba(244, 152, 114, 0.9)", "rgba(240, 138, 95, 0.1)");
+  band(aiY, levels.ai, waveShapes[0], "rgba(243, 205, 128, 0.92)", "rgba(239, 195, 106, 0.1)");
+  band(musicY, levels.music, waveShapes[1], "rgba(244, 152, 114, 0.9)", "rgba(240, 138, 95, 0.1)");
 
   // Centre lines, then the playhead.
   waveCtx.strokeStyle = "rgba(246, 236, 217, 0.12)";
@@ -121,35 +140,70 @@ function drawWave() {
   waveCtx.stroke();
 }
 
-function paintAct() {
+function paintAct(p) {
   if (!storyAct) return;
-  const p = actProgress();
-  const levels = levelAt(p);
+  const value = typeof p === "number" ? p : actProgress();
+  const levels = levelAt(value);
 
-  if (aiBar) aiBar.style.width = (clamp01(levels.ai) * 100).toFixed(1) + "%";
-  if (musicBar) musicBar.style.width = (clamp01(levels.music) * 100).toFixed(1) + "%";
-  if (aiValue) aiValue.textContent = p < 0.36 ? "speaking" : p < 0.64 ? "listening" : "quiet";
-  if (musicValue) {
-    musicValue.textContent = p < 0.6 ? "paused" : levels.music > 0.94 ? "100%" : "returning";
-  }
-  if (playhead) playhead.style.left = (p * 100).toFixed(2) + "%";
+  // The bars move by a rounding error most frames. Writing an identical string still invalidates
+  // style, so the write is skipped unless the rendered value actually changes.
+  if (aiBar) setWidth(aiBar, clamp01(levels.ai) * 100);
+  if (musicBar) setWidth(musicBar, clamp01(levels.music) * 100);
+  const aiText = value < 0.36 ? "speaking" : value < 0.64 ? "listening" : "quiet";
+  if (aiValue && aiValue.textContent !== aiText) aiValue.textContent = aiText;
+  const musicText = value < 0.6 ? "paused" : levels.music > 0.94 ? "100%" : "returning";
+  if (musicValue && musicValue.textContent !== musicText) musicValue.textContent = musicText;
+  if (playhead) setPercent(playhead, value * 100);
 
-  const live = p < 0.36 ? "speaking" : p < 0.64 ? "answering" : "quiet";
+  const live = value < 0.36 ? "speaking" : value < 0.64 ? "answering" : "quiet";
   for (const label of momentLabels) {
     label.classList.toggle("is-live", label.dataset.moment === live);
   }
 
-  drawWave();
+  drawWave(value);
+}
+
+// Cached writers: the DOM is only touched when the rendered number changes, which keeps a slow
+// scroll from recalculating style for elements that did not move.
+const widthCache = new WeakMap();
+const percentCache = new WeakMap();
+
+function setWidth(el, percent) {
+  const next = percent.toFixed(1) + "%";
+  if (widthCache.get(el) === next) return;
+  widthCache.set(el, next);
+  el.style.width = next;
+}
+
+function setPercent(el, percent) {
+  const next = percent.toFixed(2) + "%";
+  if (percentCache.get(el) === next) return;
+  percentCache.set(el, next);
+  el.style.left = next;
 }
 
 /* -------------------------------------------------------------------- dawn -- */
 
+/* The sunrise is a custom property on the section, so every write invalidates style for its whole
+   subtree. Two decimal places are all the paint can show, so the rest of the writes are dropped. */
+let lastDawn = -1;
+let dawnTop = 0;
+let dawnTravel = 1;
+
+function measureDawn() {
+  if (!dawnSection) return;
+  dawnTop = dawnSection.getBoundingClientRect().top + window.scrollY;
+  dawnTravel = Math.max(1, window.innerHeight * 0.85);
+  lastDawn = -1;
+}
+
 function paintDawn() {
   if (!dawnSection) return;
-  const rect = dawnSection.getBoundingClientRect();
-  const travel = Math.max(1, window.innerHeight * 0.85);
-  const value = clamp01((window.innerHeight - rect.top) / travel);
-  dawnSection.style.setProperty("--dawn", value.toFixed(3));
+  const value = clamp01((window.innerHeight + window.scrollY - dawnTop) / dawnTravel);
+  const rounded = Math.round(value * 100) / 100;
+  if (rounded === lastDawn) return;
+  lastDawn = rounded;
+  dawnSection.style.setProperty("--dawn", rounded.toFixed(2));
 }
 
 /* ------------------------------------------------------------------ scroll -- */
@@ -166,7 +220,7 @@ function onScroll() {
       const max = document.documentElement.scrollHeight - window.innerHeight;
       progress.style.width = (max > 0 ? (y / max) * 100 : 0).toFixed(2) + "%";
     }
-    paintAct();
+    paintAct(actProgress());
     paintDawn();
   });
 }
@@ -174,14 +228,23 @@ function onScroll() {
 window.addEventListener("scroll", onScroll, { passive: true });
 window.addEventListener("resize", () => {
   sizeWave();
+  measureDawn();
   paintAct();
   paintDawn();
 });
 
 sizeWave();
+measureDawn();
 paintAct();
 paintDawn();
 onScroll();
+
+// Sections above the sunrise can change height after the first paint (fonts, the engine's pin
+// travel), so its offset is re-measured when the layout settles rather than on every frame.
+window.addEventListener("load", () => { measureDawn(); paintDawn(); }, { once: true });
+if ("ResizeObserver" in window) {
+  new ResizeObserver(() => { measureDawn(); paintDawn(); }).observe(document.body);
+}
 
 /* ---------------------------------------------------------------- starfield -- */
 
@@ -309,6 +372,17 @@ if (starCanvas && starCtx) {
   }
   if (reduceMotion) drawStars(0);
   else requestAnimationFrame(tickStars);
+}
+
+// The hero's painted layers turn for as long as the page is open, and each one is a full-viewport
+// raster rotating under a mask. Offscreen they still cost the compositor every frame, so they are
+// parked once the hero has left the viewport and resumed when it comes back.
+const heroSection = document.querySelector(".n-hero");
+if (heroSection && "IntersectionObserver" in window) {
+  new IntersectionObserver(
+    (entries) => heroSection.classList.toggle("is-parked", !entries[0].isIntersecting),
+    { rootMargin: "160px" }
+  ).observe(heroSection);
 }
 
 /* -------------------------------------------------------- the ear, and the egg -- */

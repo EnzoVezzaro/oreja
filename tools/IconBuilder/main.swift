@@ -1,12 +1,19 @@
 import AppKit
 import Foundation
 
-/// Generates the warm-white Oreja icon with the shared coral ear outline.
-/// Run by scripts/build.sh.
+/// Generates the Oreja icon: the character on the warm-white tile, cropped from the same sprite
+/// sheet the app and the website use. Run by scripts/build.sh.
 @main
 struct IconBuilder {
+    /// The five-frame sheet, relative to the repository root that build.sh runs from.
+    static let spritePath = "site/assets/oreja-vincent.png"
+
     static func main() {
         let outputDirectory = CommandLine.arguments.count > 1 ? CommandLine.arguments[1] : "build"
+        guard let sprite = NSImage(contentsOfFile: spritePath) else {
+            FileHandle.standardError.write(Data("Missing sprite sheet at \(spritePath)\n".utf8))
+            exit(1)
+        }
         let iconset = URL(fileURLWithPath: outputDirectory).appendingPathComponent("AppIcon.iconset")
         let fileManager = FileManager.default
 
@@ -22,7 +29,7 @@ struct IconBuilder {
         ]
 
         for variant in variants {
-            let image = render(pixels: variant.pixels)
+            let image = render(pixels: variant.pixels, sprite: sprite)
             guard
                 let tiff = image.tiffRepresentation,
                 let representation = NSBitmapImageRep(data: tiff),
@@ -52,7 +59,7 @@ struct IconBuilder {
         print(icns.path)
     }
 
-    static func render(pixels: Int) -> NSImage {
+    static func render(pixels: Int, sprite: NSImage) -> NSImage {
         let size = CGFloat(pixels)
         let image = NSImage(size: NSSize(width: size, height: size))
         image.lockFocus()
@@ -71,27 +78,34 @@ struct IconBuilder {
             transform: nil
         )
 
+        // Same peach tile as `BrandMark` and the site's `mark.png` (accentWash), so the Dock icon,
+        // the menu bar panel and the landing page header are one object at three sizes.
         context.addPath(squircle)
-        context.setFillColor(NSColor(srgbRed: 251 / 255, green: 247 / 255, blue: 240 / 255, alpha: 1).cgColor)
+        context.setFillColor(NSColor(srgbRed: 253 / 255, green: 231 / 255, blue: 213 / 255, alpha: 1).cgColor)
         context.fillPath()
 
-        // Flip the drawing coordinates to match SwiftUI and the SVG's top-left origin.
-        context.saveGState()
-        context.translateBy(x: body.minX, y: body.maxY)
-        context.scaleBy(x: side / 64, y: -side / 64)
-        context.setStrokeColor(NSColor(srgbRed: 201 / 255, green: 95 / 255, blue: 60 / 255, alpha: 1).cgColor)
-        context.setLineWidth(4)
-        context.setLineCap(.round)
-        context.setLineJoin(.round)
-        context.move(to: CGPoint(x: 22, y: 29))
-        context.addCurve(to: CGPoint(x: 45, y: 29), control1: CGPoint(x: 22, y: 12), control2: CGPoint(x: 45, y: 12))
-        context.addCurve(to: CGPoint(x: 34, y: 46), control1: CGPoint(x: 45, y: 38), control2: CGPoint(x: 34, y: 38))
-        context.addCurve(to: CGPoint(x: 23, y: 45), control1: CGPoint(x: 34, y: 53), control2: CGPoint(x: 23, y: 53))
-        context.move(to: CGPoint(x: 29, y: 29))
-        context.addCurve(to: CGPoint(x: 38, y: 29), control1: CGPoint(x: 29, y: 21), control2: CGPoint(x: 38, y: 21))
-        context.addCurve(to: CGPoint(x: 30, y: 39), control1: CGPoint(x: 38, y: 34), control2: CGPoint(x: 30, y: 33))
-        context.strokePath()
-        context.restoreGState()
+        // The character: frame 0 of the sheet, cropped exactly as BrandMark crops it
+        // (26, 8, 268 × 308 of a 320-point frame) and drawn with no interpolation, so his pixels
+        // stay square at every icon size.
+        if let sheet = sprite.cgImage(forProposedRect: nil, context: nil, hints: nil) {
+            let density = CGFloat(sheet.height) / 320
+            let crop = CGRect(x: 26 * density, y: 8 * density, width: 268 * density, height: 308 * density).integral
+            if let head = sheet.cropping(to: crop) {
+                let headShare: CGFloat = 0.76
+                let headWidth = body.width * headShare
+                let headHeight = headWidth * (crop.height / crop.width)
+                let origin = CGPoint(
+                    x: body.minX + (body.width - headWidth) / 2,
+                    y: body.minY + (body.height - headHeight) / 2
+                )
+                context.saveGState()
+                context.addPath(squircle)
+                context.clip()
+                context.interpolationQuality = .none
+                context.draw(head, in: CGRect(x: origin.x, y: origin.y, width: headWidth, height: headHeight))
+                context.restoreGState()
+            }
+        }
 
         return image
     }

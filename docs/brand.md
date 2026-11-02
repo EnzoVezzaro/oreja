@@ -10,8 +10,8 @@ Everything here is implemented in three places and they must stay in step:
 | --- | --- |
 | `apps/macos/Theme.swift` | Palette, metrics, type scale, mark, quiet rows |
 | `site/styles.css` | The same tokens as CSS custom properties |
-| `tools/IconBuilder/main.swift` | The app icon, drawn from the mark geometry |
-| `site/assets/mark.svg` | The canonical mark |
+| `tools/IconBuilder/main.swift` | The app icon, cropped from the same sprite sheet |
+| `site/assets/mark.png` | The canonical mark: Vincent's head on the paper tile |
 | `scripts/vincent-sprite.py` | Vincent's four-frame pixel sprite, shared by the site and the app |
 
 ## Name
@@ -51,20 +51,35 @@ Rules that outrank tone:
 3. Never call activity detection "speech recognition". The app measures output level.
 4. Local, no account, no API key, no recording: say it once per page, plainly, and move on.
 
-## Mark
+## Logo
 
-The listening mark is a filled dot with two waves opening to the right. It works because it is made
-of four primitives and survives a 16pt menu bar.
+The logo is Vincent's head: straw hat, cream bandage, rust beard, on an apricot-wash tile with a 26%
+continuous radius. Not a monogram, not a wave, not a spiral — the character carries the name, and he
+is the only drawing in the product, so he is also the thing people recognise in a Dock and a menu bar
+panel.
 
-- Inner wave: coral deep. Outer wave: coral. Dot: coral deep.
-- On apricot wash for the tile, on paper, and on ink for a single-colour lockup (use cream for all
-  three shapes, then).
-- Clear space: half the mark's width on every side.
-- Minimum size: 16pt for the icon; 20pt for the mark on its own.
-- Never rotate it, gradient the strokes, outline the dot, add a third wave, or place it on a photo.
+- Tile: `accent-wash` (`#FDE7D5`). Crop: frame 0 of `oreja-vincent.png` at (26, 8, 268 × 308) of its
+  320-point frame, filling 76% of the tile.
+- Sizes: 38 px in the site header, 32 px in the menu bar panel, 36 px in settings, 24 px on
+  onboarding, 16–1024 px in the icon. Integer multiples of the 40 px grid where it is larger than
+  40 px, so pixels stay square.
+- Clear space: half the mark's width on every side. On dark surfaces the tile is its own ground; the
+  mark never inverts and is never placed directly on a photo.
+- Minimum size: 16 px. At that size the hat outline and the beard are the whole read, which is why
+  the crop is tighter than the full sprite.
+- Never rotate it, recolor the tile, crop below the collar, or add a second character beside it. The
+  sprite is redrawn in `scripts/vincent-sprite.py` only; a mask or a redraw in another style would
+  drift the three surfaces apart.
 
-`site/assets/mark.svg` is canonical. The app draws the same geometry in `ListeningMark`, and the
-icon generator draws it in Core Graphics. If the mark changes, all three change together.
+`site/assets/mark.png` (320 px) and `mark-128.png` (favicon) are rendered from `BrandMark` itself, so
+the header, the panel and the icon are the same crop of the same sheet rather than three drawings
+that resemble each other. `tools/IconBuilder` reproduces that crop on the Big Sur icon grid. Recrop
+once, recrop everywhere — and regenerate the two PNGs when the sprite changes:
+
+```bash
+python3 scripts/vincent-sprite.py     # sprite
+# then re-render BrandMark to site/assets/mark.png and mark-128.png, and ./scripts/build.sh for the icon
+```
 
 ## Vincent
 

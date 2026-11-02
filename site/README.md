@@ -12,7 +12,8 @@ site/
   scrollcraft.css   vendor scroll engine stylesheet (copied unedited, MIT)
   scrollcraft.js    vendor scroll engine (copied unedited, MIT)
   landing.js        mounts the engine, paints the waveform, star field and click joke
-  assets/mark.svg   canonical brand mark
+  assets/mark.png   the brand mark: Vincent's head, rendered from the app's BrandMark
+  assets/mark-128.png  the same mark at favicon size
   assets/night-sky.png, night-hills.png, night-front.png   the painting, generated
   assets/oreja-vincent.png   Vincent's five-frame pixel sprite
   assets/vincent-desk.png, vincent-back.png   two further poses, generated
@@ -112,8 +113,9 @@ after the `check` Deployment Check passes.
 ## Rules
 
 - Tokens in `styles.css` mirror `apps/macos/Theme.swift` and `docs/brand.md`. Change them together.
-- The mark geometry is duplicated as an inline `<symbol id="mark-tile">` in both pages. If
-  `assets/mark.svg` changes, change both symbols and `apps/macos/Theme.swift` (`ListeningMark`).
+- The mark is one raster: `assets/mark.png` and `assets/mark-128.png`, rendered from `BrandMark` in
+  `apps/macos/Theme.swift` and referenced by `<img class="n-mark">` / `.mark-tile` in both pages. If
+  the sprite changes, re-render both PNGs and rebuild the icon; never draw a second mark.
 - No external fonts, analytics, images or scripts. Manrope is self-hosted from `assets/fonts/`, and
   the only raster asset is Vincent's generated sprite. His caption is real text, not an image.
 - Copy states only what `docs/test-evidence.md` supports: what was executed, and what was not.
