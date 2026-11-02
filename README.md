@@ -12,6 +12,13 @@ goes quiet, Music resumes or its original volume returns exactly where it left o
   derived from the selected app's output, in memory, and discarded immediately.
 - It is an independent project. It is not affiliated with or endorsed by OpenAI or Apple.
 
+## Download
+
+[Oreja 0.2.0](https://github.com/EnzoVezzaro/oreja/releases/latest) is a disk image for macOS 14.2
+or newer, also served from [the landing page](https://oreja-tau.vercel.app/). It is ad-hoc signed
+and not notarized, so the first launch on another Mac needs one Gatekeeper approval (System
+Settings › Privacy & Security › Open Anyway). What changed: [CHANGELOG.md](CHANGELOG.md).
+
 Status: **macOS MVP built and working on the development machine** (macOS 26.6.2, Apple M2). The
 Core Audio capture path and real Apple Music pause/resume have been exercised end to end against a
 controlled audio fixture. A live **ChatGPT Voice session has not** been run; see
@@ -65,7 +72,7 @@ Onboarding runs once per install; to see it again, quit Oreja and delete its def
 To run the automated suite:
 
 ```bash
-./scripts/test.sh             # 44 tests, 0 failures
+./scripts/test.sh             # 54 tests, 0 failures
 ./scripts/test.sh resume      # filter by test name
 ```
 
@@ -75,7 +82,7 @@ users; `swift build` and `swift test` need a full Xcode toolchain and are not us
 
 ### Build artifact
 
-`build/Oreja.app` — ~2.8 MB, ad-hoc signed (no hardened runtime, because ad-hoc signatures have no
+`build/Oreja.app` — ~2.9 MB, ad-hoc signed (no hardened runtime, because ad-hoc signatures have no
 team identity for library validation) with these entitlements:
 `com.apple.security.device.audio-input`, `com.apple.security.automation.apple-events`. It is **not
 notarized**; see [docs/distribution.md](docs/distribution.md).

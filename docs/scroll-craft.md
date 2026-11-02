@@ -14,7 +14,7 @@ by the product and `docs/brand.md`, not invented here.
   when the conversation goes quiet. Local only.
 - **What the visitor must believe by the end.** Oreja reacts to the shape of a conversation, not to
   the words in it, and it does that without recording anything.
-- **The one action.** Download the 0.1.0 build.
+- **The one action.** Download the 0.2.0 build.
 - **Assets.** No photography and no footage. The brand is genuinely illustrated: one generated pixel
   character, `site/assets/oreja-vincent.png`. Generating a photographic world here would contradict
   the brand, so the page is built from the illustration, the palette and real product states.

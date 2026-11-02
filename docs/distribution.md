@@ -7,7 +7,7 @@
 open build/Oreja.app
 ```
 
-`build/Oreja.app` (~2.8 MB) is assembled by `scripts/build.sh`:
+`build/Oreja.app` (~2.9 MB) is assembled by `scripts/build.sh`:
 
 - `Contents/MacOS/Oreja` — the SwiftUI menu bar app.
 - `Contents/Frameworks/libOrejaCore.dylib`, `libOrejaAudio.dylib`, `libOrejaMedia.dylib` — signed
@@ -86,7 +86,7 @@ security controls to pass review.
 ## Versioning
 
 `CFBundleShortVersionString` and `CFBundleVersion` live in `packaging/Info.plist` (currently
-`0.1.0` / `1`). Bump both for every distributed build. There is no auto-updater.
+`0.2.0` / `3`). Bump both for every distributed build. There is no auto-updater.
 
 ## Release checklist
 
