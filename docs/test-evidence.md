@@ -23,6 +23,20 @@ Current UI release verification (2026-11-01): `./scripts/test.sh` → **54 passe
 assertions**; `python3 scripts/check-site.py` → site consistent; `git diff --check` → clean;
 `./scripts/build.sh` → app valid on disk and satisfies its designated requirement.
 
+### Mascot and deploy verification (2026-11-01, executed)
+
+| Check | Command | Result |
+| --- | --- | --- |
+| Sprite in the bundle matches the site asset | `shasum -a 256 site/assets/oreja-vincent.png build/Oreja.app/Contents/Resources/oreja-vincent.png` | identical (`e5689934…`, `0140ab3d…` after the ear change) |
+| App launches and loads its frameworks | `open build/Oreja.app`, `vmmap -summary $(pgrep -x Oreja)`, `lsof -p` | footprint 19–30 MB, 3 `Contents/Frameworks` dylibs |
+| Click easter egg renders | `screencapture -l <panel window id>` 160 ms after a click at the mascot | captures show the fifth frame (bandage off, eyes shut, mouth open) |
+| Production serves every referenced file | `curl -I https://oreja-tau.vercel.app/{landing.js,assets/oreja-vincent.png,assets/fonts/manrope-variable.ttf,downloads/Oreja-0.1.0.dmg}` | 200 for all four; sprite and DMG byte-identical to the repository files |
+| Website character does not bob | two screenshots 900 ms apart, `getComputedStyle(.vincent).transform` | `none`; frames identical |
+| Downloaded DMG carries the current binary | mount, `shasum` against `build/Oreja.app`, `plutil CFBundleVersion` | identical binary, `CFBundleVersion` 2, `oreja-vincent.png` present |
+
+Still not executed: a real ChatGPT Voice session, real Apple Music control on a clean account, and
+notarization. Nothing above claims them.
+
 Coverage (names as printed by the suite):
 
 | Area | Cases |
