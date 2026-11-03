@@ -18,7 +18,7 @@ else is listed under *not executed*, with the reason.
 ```
 $ ./scripts/test.sh
 ...
-51 passed, 0 failed, 261 assertions
+69 passed, 0 failed, 334 assertions
 ```
 
 Coverage (all green):
@@ -35,6 +35,18 @@ Coverage (all green):
   turn; per-reply mode still resumes as soon as one reply ends; no commands without a valid source.
 - Activity detection: dBFS conversion and clamping, activation duration, sub-threshold blips, silence
   duration, hysteresis, short gaps, reset, `LevelSampler` averaging.
+- Hooks: only hooks bound to an event fire; a disabled hook and a draft never run; the cooldown stops a
+  rapid exchange from flooding shortcuts and clears once it elapses; a failing action is reported once
+  and not retried; a URL action needs a scheme to be runnable; hooks survive a settings round trip and
+  settings written without them still load; every event is grouped and titled for the picker.
+- Sensitivity: High/Normal/Low map onto real thresholds, the default stays at the calibrated -45 dBFS
+  for app output, hysteresis is a fixed 10 dB at every level, and the microphone always starts above
+  app output.
+- Speech-shape filter: a brief blip is suppressed rather than announced; a steady alert tone is suppressed
+  after the confirmation window; a chime that only decays is suppressed; speech-shaped audio is
+  announced within a few frames; speech following an alert in the same window is still announced and
+  ends normally; pass-through forwards everything when the option is off; reset clears an open
+  window.
 - Apple Music: script output parsing (playing/paused/stopped/unavailable), scripts never call `stop`
   or `activate`, volume clamping, track identity checks, error mapping.
 - Settings: round-trip, decode tolerance, clamping, UserDefaults separation of settings and journal.

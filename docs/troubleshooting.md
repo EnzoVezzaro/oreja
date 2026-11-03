@@ -63,6 +63,14 @@ restores the per-reply resume delay.
 - If activity appears but no pause is issued, Music was already paused, a command is pending, or a
   manual override was detected. Diagnostics says which.
 
+## No activity detected
+
+- Raise **Detection → The AI's voice** to *High*: a quiet reply or small laptop speakers can sit
+  below the normal threshold.
+- If you are answering and music comes back over your voice, raise **Detection → Your voice** the
+  same way while “Pause while I speak” is on.
+- Then check the tap itself with the probe, below.
+
 ## No activity detected with the probe
 
 ```bash
@@ -85,11 +93,26 @@ Find the target process and confirm `output=yes`. Then:
 
 The probe prints levels only. It never stores audio.
 
+## A notification sound paused my music
+
+With **Ignore notification sounds** on (the default), short blips, steady alerts and single-decay
+chimes are classified as non-speech and never interrupt playback. Check Diagnostics: a suppressed
+sound appears as `Ignored a sound from the AI source: …` with the reason.
+
+- **Nothing appears at all** for a notification: the gate is working; the chime never became
+  activity.
+- **A chime still pauses music**: it was modulated enough to look like speech (a ringtone melody, a
+  beat-driven alarm), or the option is off. Turn the option on in Settings.
+- **A reply is missed** on a source whose speech is unusual (heavy processing, a synthetic
+  announcement voice): turn the option off to react to any output activity.
+
 ## Music keeps toggling
 
 - Increase **resume delay** (Settings). Speech pauses shorter than the delay keep music paused.
-- If the AI source is a browser, other tabs and notification sounds can trigger activity. Switch to
-  the desktop app or use a dedicated browser window/profile.
+- Lower **Detection → The AI's voice** to *Low* so only clearly loud speech counts, and leave
+  **Ignore notification sounds** on.
+- If the AI source is a browser, other tabs can trigger activity. Switch to the desktop app or use a
+  dedicated browser window/profile; the speech-shape filter already drops notification-style sounds.
 - Increase the activity onset debounce only in code/policy if you are building from source; it is
   not exposed in the UI.
 

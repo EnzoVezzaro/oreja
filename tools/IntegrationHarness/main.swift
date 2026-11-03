@@ -123,9 +123,14 @@ struct IntegrationHarness {
             }
         }
 
+        // The fixture is a steady sine tone, which the app's speech-shape filter classifies as an alert
+        // rather than speech. Measuring the tap-to-command path therefore needs the raw gate, or
+        // this harness would report zero activity. The gate's own cost is the confirmation window
+        // (see docs/test-evidence.md).
         let monitor = ProcessAudioMonitor(
             targetObjectIDs: [target.objectID],
-            displayName: "afplay fixture"
+            displayName: "afplay fixture",
+            speechFilterConfiguration: .passthrough
         )
 
         coordinator.setAutomationEnabled(true)
@@ -168,6 +173,8 @@ struct IntegrationHarness {
                 activityEndedAt = now
                 print(String(format: "event: activity ended at %.1f dBFS (t+%.3fs)", levelDB, now - launchedAt))
                 coordinator.audioActivityEnded()
+            case .activitySuppressed(let reason, let levelDB):
+                print(String(format: "event: suppressed (%@) at %.1f dBFS", reason.explanation, levelDB))
             case .monitorFailed(let failure):
                 monitorError = failure.message
                 print("monitor failed: \(failure.message)")

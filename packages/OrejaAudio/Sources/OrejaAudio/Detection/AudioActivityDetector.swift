@@ -1,4 +1,5 @@
 import Foundation
+import OrejaCore
 
 /// Lightweight activity analysis over dBFS levels.
 ///
@@ -94,6 +95,44 @@ public struct AudioActivityDetector: Sendable, Equatable {
         loudSince = nil
         quietSince = nil
         lastLevelDB = configuration.silenceFloorDB
+    }
+}
+
+extension AudioActivityDetector.Configuration {
+    /// Maps the user-facing sensitivity onto thresholds for the selected app's output.
+    ///
+    /// Deactivation stays 10 dB below activation: that gap is the hysteresis that keeps a sentence
+    /// from ending between words, so it must not scale with sensitivity.
+    public static func forAI(_ sensitivity: DetectionSensitivity) -> AudioActivityDetector.Configuration {
+        let activation: Double
+        switch sensitivity {
+        case .high: activation = -55
+        case .normal: activation = -45
+        case .low: activation = -35
+        }
+        return AudioActivityDetector.Configuration(
+            activationThresholdDB: activation,
+            deactivationThresholdDB: activation - 10,
+            minimumActivityDuration: 0.06,
+            minimumSilenceDuration: 0.25
+        )
+    }
+
+    /// The microphone hears room noise, keyboard clicks and fans, so it starts higher than the
+    /// output detector and needs a slightly longer onset to count.
+    public static func forMicrophone(_ sensitivity: DetectionSensitivity) -> AudioActivityDetector.Configuration {
+        let activation: Double
+        switch sensitivity {
+        case .high: activation = -35
+        case .normal: activation = -25
+        case .low: activation = -18
+        }
+        return AudioActivityDetector.Configuration(
+            activationThresholdDB: activation,
+            deactivationThresholdDB: activation - 10,
+            minimumActivityDuration: 0.12,
+            minimumSilenceDuration: 0.35
+        )
     }
 }
 

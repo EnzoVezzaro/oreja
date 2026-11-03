@@ -46,7 +46,10 @@ public protocol AIAudioMonitoring: AnyObject, Sendable {
 }
 
 public protocol AIAudioMonitorFactory: AnyObject, Sendable {
-    func makeMonitor(for descriptor: AIAudioSourceDescriptor) -> any AIAudioMonitoring
+    /// `options` carries the user's detection intent (sensitivity and whether notification-shaped
+    /// bursts are ignored). A platform monitor that cannot honour an option still reports the same
+    /// events, so callers never branch on capabilities here.
+    func makeMonitor(for descriptor: AIAudioSourceDescriptor, options: AudioMonitorOptions) -> any AIAudioMonitoring
 }
 
 public enum AudioActivityEvent: Sendable, Equatable {
@@ -58,6 +61,24 @@ public enum AudioActivityEvent: Sendable, Equatable {
     case monitorFailed(AudioMonitoringFailure)
     case activityStarted(levelDB: Double)
     case activityEnded(levelDB: Double)
+    /// The source produced sound that was deliberately not treated as AI activity. Nothing is
+    /// paused for it; the event exists so the app can say so in diagnostics and in the UI.
+    case activitySuppressed(reason: AudioSuppressionReason, levelDB: Double)
+}
+
+/// Why a burst of audio from a monitored app was not treated as speech.
+public enum AudioSuppressionReason: String, Sendable, Equatable, Codable {
+    /// The burst ended before it showed speech-like modulation: a click, a blip, a sent-sound.
+    case brief
+    /// The burst was continuous and unmodulated: a chime, an alert tone, a ringing loop.
+    case steady
+
+    public var explanation: String {
+        switch self {
+        case .brief: "too short to be speech"
+        case .steady: "a steady alert tone, not speech"
+        }
+    }
 }
 
 public struct AudioMonitoringFailure: Error, Sendable, Equatable, LocalizedError {
@@ -119,6 +140,7 @@ public protocol DiagnosticsSink: AnyObject {
 
 public struct DiagnosticEvent: Sendable, Equatable, Identifiable {
     public enum Level: String, Sendable, Codable {
+        case debug
         case info
         case success
         case warning
@@ -133,6 +155,7 @@ public struct DiagnosticEvent: Sendable, Equatable, Identifiable {
         case permissions
         case recovery
         case settings
+        case hooks
     }
 
     public var id: UUID

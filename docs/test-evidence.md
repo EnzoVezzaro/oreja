@@ -23,6 +23,15 @@ Current UI release verification (2026-11-01): `./scripts/test.sh` → **54 passe
 assertions**; `python3 scripts/check-site.py` → site consistent; `git diff --check` → clean;
 `./scripts/build.sh` → app valid on disk and satisfies its designated requirement.
 
+Current working-tree verification (2026-11-02): `./scripts/test.sh` → **69 passed, 0 failed, 334
+assertions**. This run includes the new hook, sensitivity, and speech-shape unit cases. It does not
+verify execution of a real macOS Shortcut, native Settings interaction, or audio detection against
+a live process; those remain separate checks. The hook process runner now has a 30-second timeout,
+discards child output to avoid undrained-pipe stalls, and terminates a child that does not stop
+within two additional seconds. `./scripts/build.sh` also completed successfully and codesign
+reported the app valid on disk and satisfying its designated requirement. The app was not launched
+for an interactive UI check in this verification pass.
+
 ### Mascot and deploy verification (2026-11-01, executed)
 
 | Check | Command | Result |
@@ -431,11 +440,44 @@ The exact supervised procedure that would close this gap is in
 | Detector silence window | 250 ms | default policy |
 | Resume delay | 300–3000 ms, default 800 ms | user setting |
 | AppleScript command (one round trip, in-script confirm) | 187–201 ms | measured, `Latency fix` |
+| Speech-shape filter confirmation | 450 ms worst case, +50–135 ms measured on speech | measured, below |
 
 Pause begins roughly 110 ms plus about 190 ms of command work after sustained audio onset, which is
 why detected onset → paused measured 187–201 ms and the 250 ms target is met. The figure that
 includes the fixture player starting up stays 550–630 ms and should not be quoted as Oreja's
 latency; against an already-running ChatGPT only detection plus the command apply.
+
+## Speech-shape filter against real audio (2026-11-01)
+
+Executed with the real Core Audio process tap, a steady 440 Hz tone and an offline `say` clip played
+by `afplay`, each tapped by PID. `--speech-gate` runs the app's own gate; without it the probe uses
+the raw level path.
+
+```
+$ afplay /tmp/oreja-tone.wav & ./build/bin/oreja-probe --pid $! --seconds 4 --speech-gate
+• monitoring pid 59869 (1 audio process)
+· suppressed (a steady alert tone, not speech) at -15.0 dBFS
+
+$ afplay /tmp/oreja-speech.aiff & ./build/bin/oreja-probe --pid $! --seconds 5 --speech-gate
+• monitoring pid 61376 (1 audio process)
+· suppressed (too short to be speech) at -65.8 dBFS
+▶ activity started at -17.7 dBFS
+■ activity ended at -93.6 dBFS
+▶ activity started at -17.0 dBFS
+```
+
+- A constant tone — the shape of an alert, a chime tail or a notification loop — never starts
+  activity. It is reported once as suppressed.
+- A spoken sentence starts activity at full speech level and ends when the sentence ends; the
+  -65.8 dBFS blip before the first word was a sub-onset blip that the gate also rejected.
+- Added latency, four alternating runs on the same clip, measured from the monitor's start line to
+  the first activity start: raw 0.559 s / 0.583 s, gate 0.694 s / 0.633 s, i.e. **+50–135 ms**. The
+  450 ms confirmation window is the worst case, and it did not apply here because speech is
+  modulated from the first syllable.
+
+Limit of this evidence: a `say` clip played by `afplay` is not a live ChatGPT Voice session, so the
+shape of a real reply (jitter, background noise in the tap, notification sounds the desktop app
+plays) is still unmeasured.
 
 ## Manual acceptance procedure
 

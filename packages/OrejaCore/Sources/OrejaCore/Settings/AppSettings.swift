@@ -16,6 +16,13 @@ public struct AppSettings: Codable, Sendable, Equatable {
     /// Pause the music while the user is speaking too, not only while the AI speaks. Needs the
     /// microphone; off by default because it is a second, separate permission.
     public var pauseWhileISpeak: Bool
+    /// Only react to speech-shaped bursts. Notification and alert sounds from the same app are
+    /// short, steady or a single decay, so they no longer interrupt music. On by default.
+    public var ignoreNotificationSounds: Bool
+    /// How loud the AI's output must be before it counts as speech.
+    public var aiSensitivity: DetectionSensitivity
+    /// How loud your own voice must be, for “Pause while I speak” only.
+    public var microphoneSensitivity: DetectionSensitivity
     public var interruptionMode: MusicInterruptionMode
     public var duckVolumePercent: Int {
         didSet { duckVolumePercent = min(max(duckVolumePercent, 1), 100) }
@@ -23,6 +30,9 @@ public struct AppSettings: Codable, Sendable, Equatable {
     public var restoreVolumePercent: Int {
         didSet { restoreVolumePercent = min(max(restoreVolumePercent, 1), 100) }
     }
+    /// User-authored automations: when one of Oreja's own events happens, run the chosen action.
+    /// Empty by default; hooks never require an account and never touch the network on their own.
+    public var hooks: [Hook]
     /// Keep the music paused for the whole conversation instead of returning it between replies.
     /// A spoken conversation is mostly silence: the assistant is thinking, then the user answers.
     public var holdThroughConversation: Bool
@@ -46,9 +56,13 @@ public struct AppSettings: Codable, Sendable, Equatable {
         onboardingCompleted: Bool = false,
         verboseDiagnostics: Bool = false,
         pauseWhileISpeak: Bool = false,
+        ignoreNotificationSounds: Bool = true,
+        aiSensitivity: DetectionSensitivity = .normal,
+        microphoneSensitivity: DetectionSensitivity = .normal,
         interruptionMode: MusicInterruptionMode = .duck,
         duckVolumePercent: Int = 5,
         restoreVolumePercent: Int = 100,
+        hooks: [Hook] = [],
         holdThroughConversation: Bool = true,
         conversationHold: TimeInterval = 0
     ) {
@@ -60,9 +74,13 @@ public struct AppSettings: Codable, Sendable, Equatable {
         self.onboardingCompleted = onboardingCompleted
         self.verboseDiagnostics = verboseDiagnostics
         self.pauseWhileISpeak = pauseWhileISpeak
+        self.ignoreNotificationSounds = ignoreNotificationSounds
+        self.aiSensitivity = aiSensitivity
+        self.microphoneSensitivity = microphoneSensitivity
         self.interruptionMode = interruptionMode
         self.duckVolumePercent = min(max(duckVolumePercent, 1), 100)
         self.restoreVolumePercent = min(max(restoreVolumePercent, 1), 100)
+        self.hooks = hooks
         self.holdThroughConversation = holdThroughConversation
         self.conversationHold = Self.clampConversationHold(conversationHold)
     }
@@ -73,6 +91,11 @@ public struct AppSettings: Codable, Sendable, Equatable {
 
     public static func clampConversationHold(_ value: TimeInterval) -> TimeInterval {
         min(max(value, conversationHoldRange.lowerBound), conversationHoldRange.upperBound)
+    }
+
+    /// What the audio monitor is asked to do, derived here so the factory never reads settings.
+    public var audioMonitorOptions: AudioMonitorOptions {
+        AudioMonitorOptions(sensitivity: aiSensitivity, ignoresNotificationSounds: ignoreNotificationSounds)
     }
 
     public var policy: PlaybackPolicy {
@@ -86,7 +109,7 @@ public struct AppSettings: Codable, Sendable, Equatable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case aiSource, musicProvider, automationEnabled, resumeDelay, launchAtLogin, onboardingCompleted, verboseDiagnostics, pauseWhileISpeak, interruptionMode, duckVolumePercent, restoreVolumePercent, holdThroughConversation, conversationHold
+        case aiSource, musicProvider, automationEnabled, resumeDelay, launchAtLogin, onboardingCompleted, verboseDiagnostics, pauseWhileISpeak, ignoreNotificationSounds, aiSensitivity, microphoneSensitivity, interruptionMode, duckVolumePercent, restoreVolumePercent, hooks, holdThroughConversation, conversationHold
     }
 
     public init(from decoder: any Decoder) throws {
@@ -99,9 +122,13 @@ public struct AppSettings: Codable, Sendable, Equatable {
         self.onboardingCompleted = try container.decodeIfPresent(Bool.self, forKey: .onboardingCompleted) ?? false
         self.verboseDiagnostics = try container.decodeIfPresent(Bool.self, forKey: .verboseDiagnostics) ?? false
         self.pauseWhileISpeak = try container.decodeIfPresent(Bool.self, forKey: .pauseWhileISpeak) ?? false
+        self.ignoreNotificationSounds = try container.decodeIfPresent(Bool.self, forKey: .ignoreNotificationSounds) ?? true
+        self.aiSensitivity = try container.decodeIfPresent(DetectionSensitivity.self, forKey: .aiSensitivity) ?? .normal
+        self.microphoneSensitivity = try container.decodeIfPresent(DetectionSensitivity.self, forKey: .microphoneSensitivity) ?? .normal
         self.interruptionMode = try container.decodeIfPresent(MusicInterruptionMode.self, forKey: .interruptionMode) ?? .duck
         self.duckVolumePercent = min(max(try container.decodeIfPresent(Int.self, forKey: .duckVolumePercent) ?? 5, 1), 100)
         self.restoreVolumePercent = min(max(try container.decodeIfPresent(Int.self, forKey: .restoreVolumePercent) ?? 100, 1), 100)
+        self.hooks = try container.decodeIfPresent([Hook].self, forKey: .hooks) ?? []
         self.holdThroughConversation = try container.decodeIfPresent(Bool.self, forKey: .holdThroughConversation) ?? true
         self.conversationHold = Self.clampConversationHold(
             try container.decodeIfPresent(TimeInterval.self, forKey: .conversationHold) ?? 0

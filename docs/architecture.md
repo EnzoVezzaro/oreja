@@ -120,6 +120,10 @@ The enum is intentionally coarse: one state is displayed everywhere. Finer flags
 | Setting | Default | Range |
 | --- | --- | --- |
 | Activity onset debounce | 60 ms | policy |
+| Speech-shape filter confirmation (speech shape) | 450 ms max | implementation |
+| AI activation threshold | High −55, Normal −45, Low −35 dBFS | user setting |
+| Microphone activation threshold | High −35, Normal −25, Low −18 dBFS | user setting |
+| Hysteresis (deactivation) | activation − 10 dBFS | fixed |
 | AI silence window (detector end) | 250 ms | policy |
 | Resume delay (coordinator quiet interval) | 800 ms | 300–3000 ms |
 | Conversation hold (silence that ends a conversation) | 12 s | 2–60 s, or off |
@@ -129,6 +133,65 @@ The enum is intentionally coarse: one state is displayed everywhere. Finer flags
 
 The 250 ms detector window protects against syllable gaps; the resume delay is the user-facing
 "wait before the music comes back" control.
+
+### Hooks
+
+Automation is a set of user-authored rules over Oreja's own events, not over audio. `OrejaEvent`
+(`OrejaCore/Hooks`) names twelve things Oreja can report — speech started/ended, a sound ignored,
+music paused/resumed, volume lowered/restored, listening started/failed, permission missing,
+sleep/wake — and a `Hook` binds one of them to one `HookAction`: run a Shortcut, or open a URL.
+
+`HookDispatcher` is `@MainActor` and depends only on a `HookExecuting` port, so it is tested with a
+recording executor and no AppKit: it filters by event and enabled state, reserves a hook so it
+cannot overlap itself, enforces a per-hook cooldown, caps an event at eight hooks, and reports both
+success and failure to the diagnostic log. A hook with no shortcut name or no URL scheme is a draft
+and never runs. `MacHookExecutor` runs `shortcuts run` off the main actor and opens URLs with
+`NSWorkspace`.
+
+No shell, no scripting runtime and no network client live inside the app: a Shortcut can do all of
+those, and keeping them outside means the process that holds audio-capture permission never
+executes arbitrary code on its own. Events carry only a one-line description of Oreja's action, so
+hooks cannot receive conversation content. See [hooks.md](hooks.md).
+
+### Detection settings
+
+Detection is not a display preference: `AppSettings.aiSensitivity`, `microphoneSensitivity` and
+`ignoreNotificationSounds` are folded into an `AudioMonitorOptions` value, which the monitor factory
+turns into `AudioActivityDetector.Configuration.forAI(_:)` and
+`SpeechShapeFilter.Configuration(isEnabled:)`. Changing any of them restarts monitoring (and the
+microphone tap), so the next detected sound already uses the new thresholds.
+
+The three levels move the activation threshold only; deactivation stays exactly 10 dB below it,
+because that gap is the hysteresis that keeps a sentence from ending between words. The microphone
+starts 10–20 dB higher than app output at every level, since it hears the room as well as the person.
+
+### Speech-shape filter
+
+Between the level detector and the coordinator sits `SpeechShapeFilter` (`OrejaAudio/Detection`), the
+answer to "will a notification sound pause my music?". macOS exposes no signal that identifies a
+sound as a notification, so the gate uses the one difference that is always present in the audio
+itself: **shape**. A spoken reply is modulated at syllable rate, so its dBFS envelope reverses
+direction several times a second. An alert is a brief blip, a flat tone, or a single attack
+followed by a decay.
+
+The gate opens a window, then requires the envelope to reverse direction at least twice by at least
+1.5 dB inside 450 ms before it reports activity. Until then, nothing reaches the coordinator: no
+pause, no ownership, no resume. Three outcomes exist:
+
+- speech-shaped within a few frames → `activityStarted` (the common case, and the fastest one);
+- the burst ends before it could be speech → `activitySuppressed(.brief)`;
+- the burst continues for the whole confirmation window without modulation →
+  `activitySuppressed(.steady)`.
+
+A suppressed window stays open, so a chime followed immediately by the reply still produces a
+start. Suppressions are diagnostic events only: the app logs them so a user can see a notification
+being ignored rather than guessing. `AppSettings.ignoreNotificationSounds` (on by default) turns
+the gate into a pass-through, and the developer probe and integration harness always run it as a
+pass-through so their level measurements stay comparable with earlier builds. The microphone path
+is deliberately not gated: it exists to hear the person in the room.
+
+This is a filter for a known failure mode, not a classifier: a long, loudly modulated non-speech
+sound still passes, which the docs state instead of promising speech recognition.
 
 A spoken conversation is mostly silence: the assistant stops talking, works on the answer, then you
 answer, and only then does it speak again. Resuming after 800 ms would therefore drop music into the
@@ -148,8 +211,9 @@ pause; the microphone merely keeps it alive.
 The IOProc block runs on Core Audio's real-time thread. It accumulates sum-of-squares in
 `LevelSampler` using `os_unfair_lock_trylock`: if the analysis task holds the lock, the audio frame
 is dropped rather than waited on. It does not allocate, block, log, touch the filesystem, or call
-Swift concurrency. A detached utility task drains the accumulator every 50 ms, computes RMS/dBFS,
-and feeds the detector. Audio samples are never retained beyond the callback and never persisted.
+Swift concurrency. A detached utility task drains the accumulator every 30 ms, computes RMS/dBFS,
+and feeds the speech-shape filter. Audio samples are never retained beyond the callback and never
+persisted; the gate keeps only a 600 ms window of dBFS values.
 
 The tap is private and unmuted (`CATapMuteBehavior` raw value 0), so the target app keeps its
 normal output. Only the selected application's processes are tapped; Music is never part of the

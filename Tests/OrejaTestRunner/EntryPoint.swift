@@ -15,6 +15,7 @@ struct TestMain {
         await runCoordinatorSuite(harness)
         runDetectionSuite(harness)
         await runMediaAndSettingsSuite(harness)
+        await runHookSuite(harness)
 
         print("\n\(harness.summary)")
         if !harness.failures.isEmpty {

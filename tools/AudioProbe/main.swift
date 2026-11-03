@@ -18,6 +18,7 @@ struct AudioProbe {
         var threshold: Double = -45
         var listOnly = false
         var targetPID: pid_t?
+        var speechGate = false
 
         var arguments = Array(CommandLine.arguments.dropFirst())
         while let argument = arguments.first {
@@ -45,8 +46,12 @@ struct AudioProbe {
                 }
             case "--list":
                 listOnly = true
+            case "--speech-gate":
+                // Runs the app's speech-shape filter instead of the raw level path, so notification-shaped
+                // sounds can be checked against real system audio.
+                speechGate = true
             case "--help", "-h":
-                print("usage: oreja-probe [--bundle <prefix> | --pid <pid>] [--seconds <n>] [--threshold <dBFS>] [--list]")
+                print("usage: oreja-probe [--bundle <prefix> | --pid <pid>] [--seconds <n>] [--threshold <dBFS>] [--speech-gate] [--list]")
                 return
             default:
                 print("Unknown argument: \(argument)")
@@ -76,6 +81,7 @@ struct AudioProbe {
         }
         var configuration = AudioActivityDetector.Configuration()
         configuration.activationThresholdDB = threshold
+        let speechFilter: SpeechShapeFilter.Configuration = speechGate ? SpeechShapeFilter.Configuration() : .passthrough
         let monitor: ProcessAudioMonitor
 
         if let targetPID {
@@ -89,7 +95,8 @@ struct AudioProbe {
                 monitor = ProcessAudioMonitor(
                     targetObjectIDs: [process.objectID],
                     displayName: "pid \(process.pid)",
-                    detectorConfiguration: configuration
+                    detectorConfiguration: configuration,
+                    speechFilterConfiguration: speechFilter
                 )
             } catch {
                 print("Process discovery failed: \(error.localizedDescription)")
@@ -116,7 +123,11 @@ struct AudioProbe {
                 bundleIdentifierPrefixes: [bundlePrefix],
                 isExperimental: true
             )
-            monitor = ProcessAudioMonitor(descriptor: descriptor, detectorConfiguration: configuration)
+            monitor = ProcessAudioMonitor(
+                descriptor: descriptor,
+                detectorConfiguration: configuration,
+                speechFilterConfiguration: speechFilter
+            )
         }
 
         do {
@@ -147,6 +158,8 @@ struct AudioProbe {
                 print("▶ activity started at \(String(format: "%.1f", levelDB)) dBFS")
             case .activityEnded(let levelDB):
                 print("■ activity ended at \(String(format: "%.1f", levelDB)) dBFS")
+            case .activitySuppressed(let reason, let levelDB):
+                print("· suppressed (\(reason.explanation)) at \(String(format: "%.1f", levelDB)) dBFS")
             case .monitorFailed(let failure):
                 print("✕ monitor failed: \(failure.message)")
             case .monitorStopped(let reason):

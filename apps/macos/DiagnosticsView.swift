@@ -157,6 +157,7 @@ struct DiagnosticsView: View {
         case .warning: OrejaTheme.Palette.wheat
         case .success: OrejaTheme.Palette.positive
         case .info: OrejaTheme.Palette.ink
+        case .debug: OrejaTheme.Palette.inkSoft
         }
     }
 }

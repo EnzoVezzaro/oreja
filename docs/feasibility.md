@@ -19,7 +19,7 @@ Legend:
 | Discover audio-producing processes and their bundle IDs | Supported | same TCC on first tap | `AudioProcessCatalog` enumerated 32 real Core Audio process objects on the test Mac. |
 | Keep target app's audio audible while tapping | Supported | — | Tap is unmuted and private; the aggregate device is only for analysis. |
 | Control Music play/pause without changing track or queue | Supported + permission | Automation TCC, `NSAppleEventsUsageDescription` | `NSAppleScript` against `com.apple.Music`; scripts guard on `application "Music" is running` and never call next/previous/stop or change volume. Unit-tested generation/parsing; **live command path not executed** because the Automation consent dialog could not be approved non-interactively. |
-| Detect whether ChatGPT is speaking | Experimental | OpenAI has no public desktop speech-event API | Oreja detects **audio output activity** from the selected process. That is not a speech classifier. Notifications/sound effects can trigger it. |
+| Detect whether ChatGPT is speaking | Experimental | OpenAI has no public desktop speech-event API | Oreja detects **audio output activity** from the selected process. That is not a speech classifier. Notification and alert sounds are filtered by shape before they can move music. |
 | Run without an OpenAI API key or account | Supported | — | No network code exists in the app. |
 | Keep all processing local | Supported | — | Only dBFS levels are computed; buffers are never written or sent anywhere. |
 | Start at login | Supported | User approval in System Settings | `SMAppService.mainApp`; toggle in Settings/onboarding. |

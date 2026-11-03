@@ -42,6 +42,9 @@ final class AppModel: ObservableObject {
     private let monitorFactory: any AIAudioMonitorFactory
     private let settingsStore: any SettingsStoring
     private let pauseJournal: any PauseJournal
+    private let hookExecutor: any HookExecuting = MacHookExecutor()
+    /// Fires the user's hooks. Set at the end of `init`, once `settings` is readable.
+    private var hookDispatcher: HookDispatcher?
 
     // MARK: Private state
 
@@ -54,6 +57,9 @@ final class AppModel: ObservableObject {
     private var retryTask: Task<Void, Never>?
     private var hasRunStalePauseRecovery = false
     private var windows = WindowRegistry()
+    /// Last ownership seen, so hooks fire on the transition and not on every state refresh.
+    private var lastOwnership: PauseOwnership?
+    private var lastVolumeOwnership: VolumeOwnership?
 
     init(
         settingsStore: (any SettingsStoring)? = nil,
@@ -92,7 +98,40 @@ final class AppModel: ObservableObject {
             self?.objectWillChange.send()
         }
 
+        hookDispatcher = HookDispatcher(
+            hooks: { [weak self] in self?.settings.hooks ?? [] },
+            executor: hookExecutor,
+            diagnostics: diagnostics
+        )
+
         observeSystemEvents()
+    }
+
+    // MARK: Hooks
+
+    /// Publishes one of Oreja's own events to the user's hooks. Nothing about the conversation is
+    /// included: the detail is a description of what Oreja itself just did.
+    private func fire(_ event: OrejaEvent, detail: String) {
+        hookDispatcher?.emit(HookContext(event: event, detail: detail))
+    }
+
+    func addHook() {
+        settings.hooks.append(Hook(name: "New hook"))
+    }
+
+    func updateHook(_ hook: Hook) {
+        guard let index = settings.hooks.firstIndex(where: { $0.id == hook.id }) else { return }
+        guard settings.hooks[index] != hook else { return }
+        settings.hooks[index] = hook
+    }
+
+    func removeHook(id: UUID) {
+        settings.hooks.removeAll { $0.id == id }
+    }
+
+    /// Proves a hook works now, including one whose event has not happened yet.
+    func testHook(_ hook: Hook) {
+        hookDispatcher?.runManually(hook)
     }
 
     // MARK: Lifecycle
@@ -189,6 +228,16 @@ final class AppModel: ObservableObject {
             }
         }
 
+        if settings.audioMonitorOptions != previous.audioMonitorOptions {
+            stopMonitoring(reason: "detection setting changed")
+            if settings.automationEnabled { startMonitoringIfNeeded() }
+        }
+
+        if settings.microphoneSensitivity != previous.microphoneSensitivity {
+            stopUserSpeechMonitoring(reason: "microphone sensitivity changed")
+            startUserSpeechMonitoring()
+        }
+
         if settings.pauseWhileISpeak != previous.pauseWhileISpeak {
             if settings.pauseWhileISpeak, settings.automationEnabled {
                 startUserSpeechMonitoring()
@@ -208,9 +257,18 @@ final class AppModel: ObservableObject {
         retryTask = nil
 
         let descriptor = AIAudioSourceDescriptor(selection: settings.aiSource)
-        let newMonitor = monitorFactory.makeMonitor(for: descriptor)
+        let newMonitor = monitorFactory.makeMonitor(
+            for: descriptor,
+            options: settings.audioMonitorOptions
+        )
         monitor = newMonitor
-        record(.info, .monitoring, "Starting audio monitor for \(descriptor.displayName).")
+        record(
+            .info,
+            .monitoring,
+            settings.ignoreNotificationSounds
+                ? "Starting audio monitor for \(descriptor.displayName); ignoring notification sounds."
+                : "Starting audio monitor for \(descriptor.displayName)."
+        )
 
         let monitorID = ObjectIdentifier(newMonitor as AnyObject)
         eventTask = Task { [weak self] in
@@ -262,6 +320,7 @@ final class AppModel: ObservableObject {
             hasAudioPermission = true
             sourceDescription = description
             coordinator.monitoringBecameAvailable(description: description)
+            fire(.monitoringStarted, detail: "Listening to \(description)")
         case .targetsChanged(let description):
             // The app opened a new audio process (for example the renderer that appears when a
             // voice conversation starts). The tap was rebuilt; music must not resume because of it.
@@ -275,6 +334,10 @@ final class AppModel: ObservableObject {
             isMonitoring = false
             if failure.kind == .permissionDenied { hasAudioPermission = false }
             coordinator.monitoringFailed(failure)
+            fire(.monitoringFailed, detail: failure.message)
+            if failure.kind == .permissionDenied {
+                fire(.permissionRequired, detail: failure.message)
+            }
             // The monitored app quit or dropped all of its audio processes. Without this the tap
             // would stay dead until the user toggled automation by hand.
             if failure.kind != .permissionDenied {
@@ -283,11 +346,22 @@ final class AppModel: ObservableObject {
         case .activityStarted(let levelDB):
             if activity.set(true, for: .ai) {
                 coordinator.audioActivityStarted(levelDB: levelDB)
+                fire(.speechStarted, detail: "The AI source started speaking")
             }
         case .activityEnded:
             if activity.set(false, for: .ai) {
                 coordinator.audioActivityEnded()
+                fire(.speechEnded, detail: "The AI source went quiet")
             }
+        case .activitySuppressed(let reason, let levelDB):
+            fire(.soundIgnored, detail: "Ignored a sound that was \(reason.explanation)")
+            // Not activity: nothing to pause for. The log line is what makes the option
+            // verifiable, so a user can see a chime being ignored instead of guessed at.
+            record(
+                .info,
+                .monitoring,
+                String(format: "Ignored a sound from the AI source: %@ (%.0f dBFS).", reason.explanation, levelDB)
+            )
         }
         publishCoordinatorState()
     }
@@ -301,7 +375,7 @@ final class AppModel: ObservableObject {
         guard #available(macOS 14.2, *) else { return }
         guard speechMonitor == nil else { return }
 
-        let monitor = MicrophoneActivityMonitor()
+        let monitor = MicrophoneActivityMonitor(sensitivity: settings.microphoneSensitivity)
         speechMonitor = monitor
         record(.info, .monitoring, "Listening for your voice as well.")
 
@@ -368,6 +442,10 @@ final class AppModel: ObservableObject {
             if activity.set(false, for: .user) {
                 coordinator.audioActivityEnded()
             }
+        case .activitySuppressed:
+            // The microphone path is not gated: it exists to hear the person in the room, and a
+            // hesitation in their own sentence should not be second-guessed.
+            break
         }
         publishCoordinatorState()
     }
@@ -524,6 +602,27 @@ final class AppModel: ObservableObject {
     private func publishCoordinatorState() {
         state = coordinator.state
         lastError = coordinator.lastError
+
+        // Hooks fire on ownership transitions: the moment Oreja takes responsibility for playback
+        // and the moment it gives it back. Comparing ownership rather than state keeps this
+        // correct in both pause and lower-volume modes.
+        let ownership = coordinator.ownership
+        let volumeOwnership = coordinator.volumeOwnership
+        if (lastOwnership == nil) != (ownership == nil) {
+            fire(
+                ownership == nil ? .musicResumed : .musicPaused,
+                detail: ownership == nil ? "Music resumed" : "Music paused by Oreja"
+            )
+        }
+        if (lastVolumeOwnership == nil) != (volumeOwnership == nil) {
+            fire(
+                volumeOwnership == nil ? .volumeRestored : .volumeLowered,
+                detail: volumeOwnership == nil ? "Music volume restored" : "Music volume lowered by Oreja"
+            )
+        }
+        lastOwnership = ownership
+        lastVolumeOwnership = volumeOwnership
+
         objectWillChange.send()
     }
 
@@ -538,6 +637,7 @@ final class AppModel: ObservableObject {
         ) { [weak self] _ in
             MainActor.assumeIsolated {
                 self?.coordinator.systemWillSleep()
+                self?.fire(.sleep, detail: "The Mac is going to sleep")
                 // AVAudioEngine can stop delivering input while the Mac sleeps. Clear the
                 // existing monitor so wake-up creates a fresh microphone tap instead of treating
                 // the stale instance as healthy.
@@ -552,6 +652,7 @@ final class AppModel: ObservableObject {
         ) { [weak self] _ in
             MainActor.assumeIsolated {
                 guard let self else { return }
+                self.fire(.wake, detail: "The Mac woke up")
                 self.coordinator.updatePolicy(self.settings.policy)
                 self.coordinator.systemDidWake()
                 if self.settings.automationEnabled {
@@ -698,7 +799,10 @@ final class AppModel: ObservableObject {
         guard monitor != nil else {
             // No live monitor: prove the tap can be created, then tear it down again.
             let descriptor = AIAudioSourceDescriptor(selection: settings.aiSource)
-            let probe = monitorFactory.makeMonitor(for: descriptor)
+            let probe = monitorFactory.makeMonitor(
+                for: descriptor,
+                options: settings.audioMonitorOptions
+            )
             do {
                 try await probe.start()
             } catch let failure as AudioMonitoringFailure {

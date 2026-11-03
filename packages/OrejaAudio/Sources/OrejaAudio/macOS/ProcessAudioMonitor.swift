@@ -12,6 +12,7 @@ public final class ProcessAudioMonitor: AIAudioMonitoring, @unchecked Sendable {
 
     private let continuation: AsyncStream<AudioActivityEvent>.Continuation
     private let detectorConfiguration: AudioActivityDetector.Configuration
+    private let speechFilterConfiguration: SpeechShapeFilter.Configuration
     private let explicitTargets: [AudioObjectID]?
     private let sampler = LevelSampler()
 
@@ -44,10 +45,12 @@ public final class ProcessAudioMonitor: AIAudioMonitoring, @unchecked Sendable {
 
     public init(
         descriptor: AIAudioSourceDescriptor,
-        detectorConfiguration: AudioActivityDetector.Configuration = .init()
+        detectorConfiguration: AudioActivityDetector.Configuration = .init(),
+        speechFilterConfiguration: SpeechShapeFilter.Configuration = .init()
     ) {
         self.descriptor = descriptor
         self.detectorConfiguration = detectorConfiguration
+        self.speechFilterConfiguration = speechFilterConfiguration
         self.explicitTargets = nil
         var localContinuation: AsyncStream<AudioActivityEvent>.Continuation!
         self.events = AsyncStream(bufferingPolicy: .bufferingNewest(64)) { continuation in
@@ -61,7 +64,8 @@ public final class ProcessAudioMonitor: AIAudioMonitoring, @unchecked Sendable {
     public init(
         targetObjectIDs: [AudioObjectID],
         displayName: String,
-        detectorConfiguration: AudioActivityDetector.Configuration = .init()
+        detectorConfiguration: AudioActivityDetector.Configuration = .init(),
+        speechFilterConfiguration: SpeechShapeFilter.Configuration = .init()
     ) {
         self.descriptor = AIAudioSourceDescriptor(
             displayName: displayName,
@@ -69,6 +73,7 @@ public final class ProcessAudioMonitor: AIAudioMonitoring, @unchecked Sendable {
             isExperimental: true
         )
         self.detectorConfiguration = detectorConfiguration
+        self.speechFilterConfiguration = speechFilterConfiguration
         self.explicitTargets = targetObjectIDs
         var localContinuation: AsyncStream<AudioActivityEvent>.Continuation!
         self.events = AsyncStream(bufferingPolicy: .bufferingNewest(64)) { continuation in
@@ -363,7 +368,10 @@ public final class ProcessAudioMonitor: AIAudioMonitoring, @unchecked Sendable {
         analysisTask?.cancel()
         analysisTask = Task.detached(priority: .utility) { [weak self] in
             guard let self else { return }
-            var detector = AudioActivityDetector(configuration: self.detectorConfiguration)
+            var gate = SpeechShapeFilter(
+                configuration: self.speechFilterConfiguration,
+                detectorConfiguration: self.detectorConfiguration
+            )
             var lastDataTime = ProcessInfo.processInfo.systemUptime
             var nextRetarget = ProcessInfo.processInfo.systemUptime + Self.retargetInterval
 
@@ -391,22 +399,26 @@ public final class ProcessAudioMonitor: AIAudioMonitoring, @unchecked Sendable {
 
                 if let summary = self.sampler.drain() {
                     lastDataTime = now
-                    if let transition = detector.ingest(levelDB: summary.levelDB, at: now) {
-                        switch transition {
-                        case .started:
-                            self.continuation.yield(.activityStarted(levelDB: summary.levelDB))
-                        case .ended:
-                            self.continuation.yield(.activityEnded(levelDB: summary.levelDB))
-                        }
-                    }
-                } else if detector.isActive, now - lastDataTime > Self.dataWatchdog {
+                    self.publish(gate.ingest(levelDB: summary.levelDB, at: now))
+                } else if gate.isActive, now - lastDataTime > Self.dataWatchdog {
                     // The tap stopped delivering audio (device change / process exit). Treat it
                     // as silence so music is not left paused forever.
-                    if let transition = detector.ingest(levelDB: -100, at: now), transition == .ended {
-                        self.continuation.yield(.activityEnded(levelDB: -100))
-                    }
+                    self.publish(gate.ingest(levelDB: -100, at: now))
                 }
             }
+        }
+    }
+
+    private func publish(_ output: SpeechShapeFilter.Output) {
+        switch output {
+        case .none:
+            return
+        case .started(let levelDB):
+            continuation.yield(.activityStarted(levelDB: levelDB))
+        case .ended(let levelDB):
+            continuation.yield(.activityEnded(levelDB: levelDB))
+        case .suppressed(let reason, let levelDB):
+            continuation.yield(.activitySuppressed(reason: reason, levelDB: levelDB))
         }
     }
 
@@ -487,9 +499,18 @@ public final class ProcessAudioMonitor: AIAudioMonitoring, @unchecked Sendable {
 public final class ProcessAudioMonitorFactory: AIAudioMonitorFactory {
     public init() {}
 
-    public func makeMonitor(for descriptor: AIAudioSourceDescriptor) -> any AIAudioMonitoring {
+    public func makeMonitor(
+        for descriptor: AIAudioSourceDescriptor,
+        options: AudioMonitorOptions
+    ) -> any AIAudioMonitoring {
         if #available(macOS 14.2, *) {
-            return ProcessAudioMonitor(descriptor: descriptor)
+            return ProcessAudioMonitor(
+                descriptor: descriptor,
+                detectorConfiguration: .forAI(options.sensitivity),
+                speechFilterConfiguration: SpeechShapeFilter.Configuration(
+                    isEnabled: options.ignoresNotificationSounds
+                )
+            )
         } else {
             return FailingAudioMonitor(
                 failure: AudioMonitoringFailure(.sourceUnavailable, "Oreja requires macOS 14.2 or newer.")

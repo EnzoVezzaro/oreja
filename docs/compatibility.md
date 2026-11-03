@@ -62,11 +62,13 @@ real ChatGPT/Music conversation).
 | Sleep/wake | Suspended state; on wake, state is reconciled from real playback |
 | Audio capture permission revoked | Monitoring stops, error shown, no automation |
 | Two quick ChatGPT responses | Hysteresis plus debounce; no pause/resume oscillation |
-| ChatGPT notification sound | Treated as activity (documented limitation) |
+| ChatGPT notification sound | Ignored: the speech-shape filter rejects brief, steady and single-decay bursts (on by default) |
+| Chime followed immediately by a reply | The reply still pauses; a suppressed window stays open |
+| Ringtone or beat-driven alert from the source | Treated as activity: modulated like speech. Turn off “Ignore notification sounds”, or use a dedicated source |
 
 ## Known limitations
 
-- Detection is output activity, not verified speech.
+- Detection is speech-*shaped* output activity, not speech recognition: a long modulated non-speech sound still counts.
 - Browser monitoring is whole-browser.
 - Ad-hoc signing means TCC grants may reset when the app is rebuilt.
 - No notarization: another Mac needs Gatekeeper approval.

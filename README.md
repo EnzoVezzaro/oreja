@@ -35,7 +35,9 @@ Apple Music playback state ◄── Apple Events ◄── pause / resume comma
 Oreja taps the **output** of the selected application's Core Audio processes (macOS 14.2+),
 unmuted, so ChatGPT keeps playing normally while Oreja listens to a copy. The tap is private,
 targeted at that application's processes (including its helpers), and torn down when monitoring
-stops. Music is controlled with Apple Events against the Music app, which Oreja never launches on
+stops. A speech-shape filter then decides whether a burst is worth interrupting music for: it wants the
+syllable-shaped loudness changes of speech, so short blips, steady alert tones and single decay
+chimes are ignored instead of pausing your music. Music is controlled with Apple Events against the Music app, which Oreja never launches on
 its own.
 
 The decision to pause or resume lives in one deterministic state machine
@@ -72,7 +74,7 @@ Onboarding runs once per install; to see it again, quit Oreja and delete its def
 To run the automated suite:
 
 ```bash
-./scripts/test.sh             # 54 tests, 0 failures
+./scripts/test.sh             # 69 tests, 0 failures
 ./scripts/test.sh resume      # filter by test name
 ```
 
@@ -82,7 +84,7 @@ users; `swift build` and `swift test` need a full Xcode toolchain and are not us
 
 ### Build artifact
 
-`build/Oreja.app` — ~2.9 MB, ad-hoc signed (no hardened runtime, because ad-hoc signatures have no
+`build/Oreja.app` — ~2.8 MB, ad-hoc signed (no hardened runtime, because ad-hoc signatures have no
 team identity for library validation) with these entitlements:
 `com.apple.security.device.audio-input`, `com.apple.security.automation.apple-events`. It is **not
 notarized**; see [docs/distribution.md](docs/distribution.md).
@@ -113,9 +115,22 @@ Details and reset commands: [docs/permissions.md](docs/permissions.md).
 - **Pause while I speak** (off by default, needs the microphone) keeps the music paused while you
   answer. When enabled, the microphone can also start a pause when the person speaks first;
   headphones are recommended so music does not feed back into the microphone.
+- **Detection** (Settings) is where the thresholds live: **The AI's voice** (High / Normal / Low)
+  sets how loud the selected app has to be before music moves, **Your voice** does the same for the
+  microphone when “Pause while I speak” is on, and **Ignore notification sounds** drops chime-shaped
+  bursts. High catches quiet speakers and laptop audio; Low is for a hissing or humming source.
+- **Hooks** (Settings → Hooks) run your own automation when Oreja does something: start, pause,
+  resume, a sound being ignored, a permission missing, sleep or wake. Each hook runs a Shortcut or
+  opens a URL, with the event as input text. Drafts never fire, each hook has a cooldown, and a
+  failing action is reported in Diagnostics instead of being retried. Details:
+  [docs/hooks.md](docs/hooks.md).
 - **Manual control always wins.** If you pause Music yourself, Oreja will not resume it. If you
   resume Music while ChatGPT is speaking, Oreja releases its claim and will pause again the next
   time ChatGPT speaks.
+- **Ignore notification sounds** (on by default) means Oreja reacts to speech-shaped audio instead
+  of any sound. A chime, a sent-sound or an alert tone lasts a moment, stays flat, or fades once;
+  a spoken reply rises and falls with every syllable. Turning it off restores the older behavior of
+  reacting to any output activity, which is useful for a source whose speech is unusual.
 - **Resume delay across sentence gaps** is handled by hysteresis: short gaps inside a response keep
   music paused.
 - **Quitting** while Oreja owns a pause resumes the music before exit. If Oreja crashes, the pause
@@ -129,7 +144,7 @@ attention.
 
 Executed on this machine (macOS 26.6.2, Apple M2, Swift 6.3.3):
 
-- ✅ **54/54 automated tests pass** (283 assertions): pause, resume, stale-state recovery, sentence gaps, conversation hold, volume ducking, user-first speech pause, manual pause and resume, process exit, Music exit, permission revoked, device change, rapid responses, sleep/wake, ownership reconciliation, quit restoration, delayed commands, command-failure limits, detector thresholds/hysteresis, AppleScript parsing, one-round-trip command scripts, settings, journal recovery, and reactive playback settings.
+- ✅ **69/69 automated tests pass** (334 assertions): pause, resume, stale-state recovery, sentence gaps, conversation hold, volume ducking, user-first speech pause, manual pause and resume, process exit, Music exit, permission revoked, device change, rapid responses, sleep/wake, ownership reconciliation, quit restoration, delayed commands, command-failure limits, detector thresholds/hysteresis, speech-shape filter classification of brief, steady, decaying and speech-shaped bursts, sensitivity-to-threshold mapping for the AI and the microphone, hook routing by event, disabled and draft hooks, cooldown, failure reporting and settings round-trip, AppleScript parsing, one-round-trip command scripts, settings, journal recovery, and reactive playback settings.
 - ✅ **App bundle builds, signs, and launches**: the menu bar app stays resident, maps only its own
   `Contents/Frameworks` dylibs, and idles at 0.0–0.1% CPU with a ~37–54 MB physical footprint.
   A packaging bug that made the app abort in dyld at launch was found and fixed; see
@@ -144,6 +159,11 @@ Executed on this machine (macOS 26.6.2, Apple M2, Swift 6.3.3):
   new state, with compiled scripts cached. Detected onset → music actually paused measures
   **187–201 ms** (was 570–687 ms), and resume 1654–1721 ms end to end including the deliberate
   250 ms detector window and 800 ms quiet interval.
+- ✅ **The speech-shape filter works on real audio**, through the real process tap: a steady 440 Hz tone was
+  suppressed as `a steady alert tone, not speech`, while an offline `say` sentence produced
+  `activity started` / `activity ended`. Added latency over the raw level path measured
+  **+50–135 ms**; the 450 ms confirmation window is the worst case and did not apply because
+  speech is modulated from its first syllable. Evidence: [docs/test-evidence.md](docs/test-evidence.md#speech-shape filter-against-real-audio-2026-11-01).
 - ✅ **Process discovery works** against real Core Audio process objects, including the installed
   ChatGPT application (`/Applications/ChatGPT.app`, bundle `com.openai.codex`) and its helpers.
 - ❌ **Not executed: a real ChatGPT Voice session.** Starting one requires a signed-in human
@@ -160,7 +180,7 @@ Capability matrix and remaining unknowns: [docs/feasibility.md](docs/feasibility
 
 ```
 apps/macos/                     SwiftUI menu bar app, onboarding, settings, diagnostics
-packages/OrejaCore/             Domain, ports, playback coordinator, settings (no platform APIs)
+packages/OrejaCore/             Domain, ports, playback coordinator, hooks, settings (no platform APIs)
 packages/OrejaAudio/            Core Audio process discovery, taps, level analysis, detector
 packages/OrejaMedia/            Apple Music Apple Events adapter, mock provider
 Tests/OrejaTestRunner/          Executable test suite (no XCTest runtime required)
@@ -183,9 +203,9 @@ There is no analytics SDK and no server. Full text: [docs/privacy.md](docs/priva
 ## Limitations
 
 - macOS 14.2+ only. iOS is researched, not implemented: [docs/ios-strategy.md](docs/ios-strategy.md).
-- The detector identifies *output activity*, not verified speech. ChatGPT notification sounds or
-  other audio from the same process can pause music. This is documented behavior, not a promise of
-  semantic speech detection.
+- The speech-shape filter classifies audio by shape, not meaning. It reliably ignores short blips, steady
+  tones and single-decay chimes, but a long, loudly modulated non-speech sound (a ringtone melody,
+  a beat-driven alarm) still counts. It is not speech recognition and makes no semantic claims.
 - Browser-based ChatGPT is experimental and captures every tab in that browser.
 - The app is ad-hoc signed and unnotarized, so another Mac will require a Gatekeeper bypass.
 - The name has not been cleared for trademark use; do not publish under it without a search.
@@ -234,5 +254,6 @@ position.
 - [Brand guidelines](docs/brand.md)
 - [Apple Music connection guide](docs/apple-music.md)
 - [ChatGPT sources on macOS](docs/chatgpt-sources.md)
+- [Hooks and events](docs/hooks.md)
 - [Test results log](docs/test-results.md) and [consolidated evidence](docs/test-evidence.md)
 - [Landing and docs pages](site/README.md)

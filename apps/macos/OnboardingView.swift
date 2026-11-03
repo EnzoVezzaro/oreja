@@ -174,7 +174,7 @@ struct OnboardingView: View {
 
             VStack(alignment: .leading, spacing: 6) {
                 Eyebrow(text: "Experimental: browser sessions")
-                Text("A browser tap captures every tab in that browser, so notifications or other tabs can look like AI audio. Use it only if you keep ChatGPT in a dedicated window.")
+                Text("A browser tap captures every tab in that browser, so other tabs can look like AI audio. Use it only if you keep ChatGPT in a dedicated window.")
                     .font(OrejaTheme.Typography.micro)
                     .lineSpacing(2)
                     .foregroundStyle(OrejaTheme.Palette.inkSoft)

@@ -24,19 +24,14 @@ public final class MicrophoneActivityMonitor: @unchecked Sendable {
 
     /// Slightly stricter than the output detector: room noise, keyboard clicks and fans should not
     /// hold the music paused, and the user's own voice is close to the microphone.
-    static let configuration = AudioActivityDetector.Configuration(
-        // Bluetooth microphone noise can spike into the high -30s dBFS even in a quiet room.
-        // Keep the user-speech threshold above that floor; headphones keep Music out of the input
-        // path, while ordinary speech remains substantially louder at the microphone.
-        activationThresholdDB: -25,
-        deactivationThresholdDB: -35,
-        minimumActivityDuration: 0.12,
-        minimumSilenceDuration: 0.35
-    )
+    private let configuration: AudioActivityDetector.Configuration
 
     private static let analysisIntervalNanos: UInt64 = 50_000_000
 
-    public init() {
+    public init(sensitivity: DetectionSensitivity = .normal) {
+        // Bluetooth microphone noise can spike into the high -30s dBFS even in a quiet room, which
+        // is why the normal threshold sits above that floor.
+        self.configuration = .forMicrophone(sensitivity)
         var localContinuation: AsyncStream<AudioActivityEvent>.Continuation!
         self.events = AsyncStream(bufferingPolicy: .bufferingNewest(32)) { continuation in
             localContinuation = continuation
@@ -123,7 +118,7 @@ public final class MicrophoneActivityMonitor: @unchecked Sendable {
         analysisTask?.cancel()
         analysisTask = Task.detached(priority: .utility) { [weak self] in
             guard let self else { return }
-            var detector = AudioActivityDetector(configuration: Self.configuration)
+            var detector = AudioActivityDetector(configuration: self.configuration)
             while !Task.isCancelled {
                 do {
                     try await Task.sleep(nanoseconds: Self.analysisIntervalNanos)
