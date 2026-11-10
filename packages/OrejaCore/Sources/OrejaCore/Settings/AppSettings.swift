@@ -1,7 +1,13 @@
 import Foundation
 
 public struct AppSettings: Codable, Sendable, Equatable {
-    public var aiSource: AISourceSelection
+    /// Applications whose audio counts as the AI speaking. Empty means nothing is listened to.
+    public var aiSources: [AISourceSelection] {
+        didSet {
+            let normalized = AISourceCatalog.normalized(aiSources)
+            if normalized != aiSources { aiSources = normalized }
+        }
+    }
     public var musicProvider: MediaProviderID
     public var automationEnabled: Bool
     public var resumeDelay: TimeInterval {
@@ -48,7 +54,7 @@ public struct AppSettings: Codable, Sendable, Equatable {
     public static let conversationHoldRange: ClosedRange<TimeInterval> = 0...60
 
     public init(
-        aiSource: AISourceSelection = .chatGPTDesktop,
+        aiSources: [AISourceSelection] = [.chatGPTDesktop],
         musicProvider: MediaProviderID = .appleMusic,
         automationEnabled: Bool = true,
         resumeDelay: TimeInterval = 0.8,
@@ -66,7 +72,7 @@ public struct AppSettings: Codable, Sendable, Equatable {
         holdThroughConversation: Bool = true,
         conversationHold: TimeInterval = 0
     ) {
-        self.aiSource = aiSource
+        self.aiSources = AISourceCatalog.normalized(aiSources)
         self.musicProvider = musicProvider
         self.automationEnabled = automationEnabled
         self.resumeDelay = Self.clampResumeDelay(resumeDelay)
@@ -109,12 +115,23 @@ public struct AppSettings: Codable, Sendable, Equatable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case aiSource, musicProvider, automationEnabled, resumeDelay, launchAtLogin, onboardingCompleted, verboseDiagnostics, pauseWhileISpeak, ignoreNotificationSounds, aiSensitivity, microphoneSensitivity, interruptionMode, duckVolumePercent, restoreVolumePercent, hooks, holdThroughConversation, conversationHold
+        case aiSources, musicProvider, automationEnabled, resumeDelay, launchAtLogin, onboardingCompleted, verboseDiagnostics, pauseWhileISpeak, ignoreNotificationSounds, aiSensitivity, microphoneSensitivity, interruptionMode, duckVolumePercent, restoreVolumePercent, hooks, holdThroughConversation, conversationHold
+    }
+
+    private enum LegacyKeys: String, CodingKey {
+        case aiSource
     }
 
     public init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        self.aiSource = try container.decodeIfPresent(AISourceSelection.self, forKey: .aiSource) ?? .chatGPTDesktop
+        if let list = try container.decodeIfPresent([AISourceSelection].self, forKey: .aiSources) {
+            self.aiSources = AISourceCatalog.normalized(list)
+        } else {
+            // Settings written before multi-select stored one source under `aiSource`.
+            let legacy = try decoder.container(keyedBy: LegacyKeys.self)
+                .decodeIfPresent(AISourceSelection.self, forKey: .aiSource) ?? .chatGPTDesktop
+            self.aiSources = AISourceCatalog.normalized([legacy])
+        }
         self.musicProvider = try container.decodeIfPresent(MediaProviderID.self, forKey: .musicProvider) ?? .appleMusic
         self.automationEnabled = try container.decodeIfPresent(Bool.self, forKey: .automationEnabled) ?? true
         self.resumeDelay = Self.clampResumeDelay(try container.decodeIfPresent(TimeInterval.self, forKey: .resumeDelay) ?? 0.8)

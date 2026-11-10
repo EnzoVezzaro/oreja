@@ -1,7 +1,9 @@
-# ChatGPT sources on macOS
+# Audio sources on macOS
 
-Oreja monitors the *application* that produces the AI's voice output. It never reads prompts,
-replies, or account data.
+Oreja monitors the *applications* that produce an AI's voice output. You can select several at once,
+and any of them pausing or resuming the music counts the same. It never reads prompts, replies,
+or account data. The full list of known apps and their verification status is in
+[compatibility.md](compatibility.md); any other running app can be selected from the picker.
 
 ## Desktop application (default)
 

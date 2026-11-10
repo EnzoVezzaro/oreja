@@ -14,7 +14,7 @@ declares:
 
 ```xml
 <key>NSAudioCaptureUsageDescription</key>
-<string>Oreja listens to the audio output of the app you select so it can pause your music while
+<string>Oreja listens to the audio output of the apps you select so it can pause your music while
 ChatGPT speaks. Audio is analyzed locally as level only; nothing is recorded, stored, or uploaded.</string>
 ```
 

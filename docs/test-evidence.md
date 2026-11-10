@@ -681,3 +681,91 @@ verified with a 21.8 MB physical footprint and all three bundled Oreja dylibs lo
 Not yet observed in this pass: a fresh live ChatGPT desktop voice turn with Apple Music visibly
 playing at 5%. The implementation and deterministic test pass, but this real-device acceptance
 step still needs one manual voice exchange after selecting the new setting.
+
+## Multi-select audio sources (2026-11-09)
+
+Executed:
+
+- `./scripts/test.sh` → **83 passed, 0 failed, 372 assertions**. New cases cover: music players and
+  Oreja excluded as sources; normalisation and de-duplication; one tap with merged prefixes; empty
+  selection listens to nothing; coding-agent and terminal categorisation; ChatGPT helper resolution;
+  unique catalog identifiers; migration from the single `aiSource` key; the multi-source key;
+  music players dropped from stored settings; an explicit empty list kept; settings written without
+  losing other fields.
+- `./scripts/build.sh --probe --no-sign` → app and probe built. `apps/macos` is compiled by this
+  script, not by `test.sh`, so the UI code is verified only by this build.
+- `build/Oreja.app` launched. `vmmap` footprint 13.8 MB and three `Oreja.app/Contents/Frameworks`
+  dylibs loaded. The log shows monitoring of ChatGPT after the settings migration.
+- The real picker list was produced on this Mac by a temporary program against the built libraries.
+  It listed ChatGPT, VS Code, Antigravity, Terminal, Slack, ego lite and other running apps, with
+  running and output state. Orca (`com.stablyai.orca`) was added to the coding-agent group after
+  that run; the code path is the same.
+
+Not executed:
+
+- Live capture with two or more selected apps at once. Only ChatGPT was run live in this session.
+- Live capture of Claude desktop, Cursor, Windsurf, Zed, Warp, Ghostty, iTerm2, Chrome, Edge, Arc,
+  Brave, Firefox, Siri, Zoom, Discord, Teams, or any call app with speech. Claude desktop is not
+  installed on the test Mac, and the identifiers for the other apps were not confirmed against an
+  installed copy.
+- Whether a terminal's own audio process carries speech from `say` or a voice script. On this Mac,
+  `say` runs as its own process with no bundle identifier and is not captured by selecting Terminal.
+  Capturing harness speech needs process ancestry or a global tap, which is not implemented.
+- Whether Safari's `com.apple.WebKit` prefix over-matches other WebKit apps in a live session.
+  Not changed yet, because narrowing it needs a live Safari capture.
+
+## End-to-end capture tests (2026-11-09)
+
+Executed on the development Mac, with no recording and no audio stored:
+
+1. **Real speech, pid target, gate off:** `say` (a multi-sentence reply) tapped with
+   `oreja-probe --pid`. Three activity bursts were reported (−14.8, −29.8, −13.6 dBFS), with
+   silence between sentences.
+2. **Real speech, pid target, speech-shape gate on (`--speech-gate`):** same sentence. Three
+   activity bursts passed (−26.0, −18.2, −15.5 dBFS). Speech is not suppressed by the filter.
+3. **Steady alert tone, bundle target, gate on:** `OrejaFixture` (`com.oreja.fixture`, launched
+   through LaunchServices with `open`) played a 4 s tone. The probe reported
+   `suppressed (a steady alert tone, not speech)` at −15.1 dBFS and no activity.
+4. **Full app, bundle selected through Settings:** the app's settings were pointed at the fixture
+   (`aiSources` = fixture, saved under the v1 key; the previous settings were exported first and
+   restored afterwards). The app log showed, in order: monitor started, waiting for audio, listening
+   to the process, the steady tone ignored, and the process retargeted when the fixture exited. No
+   Music command was issued, because Apple Music was not playing.
+
+Not executed:
+
+- Pause and resume of Apple Music during an AI reply. Apple Music was open with no track loaded,
+  and AGENTS.md forbids changing playback without an explicit request. The harness
+  (`oreja-integration`) requires a playing track.
+- A full app run with **speech** (not a tone) from a selected app. The app-level speech path shares
+  the tap and detector with the probe runs above, but was not run end to end through the coordinator.
+- Real ChatGPT Voice or any other selected voice app under the app.
+
+Observation: in run 1 two sentences separated by about 0.75 s of silence were reported as separate
+bursts. The coordinator's resume delay and conversation hold exist for this case, so the music is not
+resumed between sentences. This was not measured through the coordinator.
+
+## Live test and release 0.3.0 (2026-11-10)
+
+Live session with Apple Music playing, ChatGPT desktop open, and ego lite selected as a browser
+source. The user spoke and asked ChatGPT by voice in both the desktop app and the browser.
+Oreja log, 13:26–13:31 UTC:
+
+- Settings changed to ChatGPT + ego lite at 13:27:37; both monitored.
+- 7 lower-to-11 % and 7 restore-to-100 % events, one pair per reply, with the 1 s quiet interval
+  between them.
+- 4 microphone onsets ("Your voice is active"), 4 steady alert tones ignored, 0 errors.
+
+Limits of this evidence: the log does not record which selected app caused each lower or restore,
+so this run confirms that the browser source was active, not which app spoke each reply on its own.
+A sleep/wake cycle was not run after the fix, so the sleep repair is covered by the code change and
+the 83-test suite, not by a live sleep.
+
+Release 0.3.0 checks:
+
+- `./scripts/test.sh` → 83 passed, 0 failed, 372 assertions.
+- `./scripts/build.sh` → ad-hoc signed; `codesign --verify --strict` passes; entitlements are
+  app-sandbox off, audio-input on, Apple Events on.
+- `open build/Oreja.app` → running, 12.2 MB physical footprint, three Oreja frameworks loaded.
+- `build/Oreja-0.3.0.dmg` created with `hdiutil create`; `hdiutil verify` reports a valid checksum.
+- Not notarized (no Developer ID credentials on this Mac).

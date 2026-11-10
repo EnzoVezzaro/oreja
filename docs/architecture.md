@@ -216,7 +216,7 @@ and feeds the speech-shape filter. Audio samples are never retained beyond the c
 persisted; the gate keeps only a 600 ms window of dBFS values.
 
 The tap is private and unmuted (`CATapMuteBehavior` raw value 0), so the target app keeps its
-normal output. Only the selected application's processes are tapped; Music is never part of the
+normal output. Only the processes of the selected applications are tapped; Music is never part of the
 tap. Taps, the aggregate device, and the IOProc are destroyed on stop, failure, and deinit.
 
 ## Process set while a conversation runs

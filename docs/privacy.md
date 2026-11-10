@@ -19,7 +19,7 @@ does with data; it is a product description, not legal advice.
 
 ## Audio handling
 
-1. Core Audio copies the **selected application's output** into a private aggregate device.
+1. Core Audio copies the **output of the selected applications** into a private aggregate device.
 2. An IOProc on the real-time thread writes samples into a preallocated ring buffer. It never
    allocates, blocks, or writes files.
 3. Every 50 ms, a utility task computes one RMS/dBFS value and overwrites the buffer.
@@ -42,7 +42,7 @@ See `permissions.md`.
 
 `UserDefaults`, domain `app.oreja.van-gogh` (standard defaults for the app):
 
-- `com.oreja.settings.v1` — selected AI source, provider, automation on/off, resume delay, launch at
+- `com.oreja.settings.v1` — selected audio apps (`aiSources`; older builds stored `aiSource`, still read), provider, automation on/off, resume delay, launch at
   login, onboarding completion, verbose diagnostics.
 - `com.oreja.pause-journal.v1` — only while Oreja owns a pause: provider, track identity, pause
   time. Deleted as soon as playback is restored or ownership is released.

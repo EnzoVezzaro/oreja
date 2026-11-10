@@ -17,12 +17,17 @@ read "expected" as verified; see `test-evidence.md`.
 
 | Source | Status | Bundle identifiers | Notes |
 | --- | --- | --- | --- |
-| ChatGPT desktop (2026 build, Voice in Work/Codex) | Installed and discovered; live voice unverified | `com.openai.codex` | `/Applications/ChatGPT.app` on the test Mac registers as `com.openai.codex`. Voice requires sign-in and an interactive session, so no live audio test was possible. |
-| ChatGPT desktop (older builds) | Expected | `com.openai.chat`, `com.openai.chatgpt` | Included in the catalog. |
-| Helper processes | Supported by design | `com.openai.*` | All matching processes that are running output are tapped; if none report output, all matching processes are tapped. |
-| ChatGPT on chatgpt.com in Safari or Chrome | Experimental | `com.apple.Safari`, `com.google.Chrome` | Selectable in onboarding. A browser tap hears every tab in that browser, plus browser sound effects. Edge, Arc, Brave, and Firefox identifiers are recognized by the catalog but are not offered in the picker yet. |
+| ChatGPT desktop (2026 build, Voice / Read aloud) | **Verified live** (desktop Read aloud: two pauses and resumes; see `test-evidence.md`) | `com.openai.codex` | Matched by the `com.openai.` prefix. The full Voice conversation was not separately measured. |
+| ChatGPT desktop (older builds) | Expected | `com.openai.chat`, `com.openai.chatgpt` | Canonicalised to the one ChatGPT selection. |
+| Helper processes | Supported by design | per app | All matching processes are tapped, including ones that are quiet, so the first syllables are not lost. |
+| Claude desktop | **Not verified** | `com.anthropic.claudefordesktop` (from the vendor's identifier; not installed on the test Mac) | Appears under AI assistants if installed with that identifier; otherwise under Other running apps. |
+| Coding agents and terminals (Antigravity, Orca, VS Code, Terminal, iTerm2, Ghostty, Warp, Zed, Cursor, Windsurf) | Listed; live capture of agent speech **not verified** | see `KnownAudioApp` | Only Antigravity, Orca, VS Code and Terminal are installed on the test Mac, and none was tested with speech. A terminal app only captures audio its own processes render. A `say` or script run from a terminal is a separate process with no bundle identifier, so it is not captured. |
+| Calls and messages (FaceTime, WhatsApp, Telegram, Slack, Zoom, Discord, Teams) | Listed; **not verified** | see `KnownAudioApp` | Only Slack, FaceTime, WhatsApp and Telegram are installed on the test Mac; none was tested in a call. |
+| Browsers (Chrome, Safari, Edge, Arc, Brave, Firefox, ego lite) | Experimental | see `KnownAudioApp` | A browser tap hears every tab. ego lite ChatGPT Voice produced no capturable audio on the test Mac (`test-evidence.md`). Chrome has not been tested live. Safari's `com.apple.WebKit` prefix also matches WebKit processes of other apps; narrowing it needs a live Safari capture. |
+| Siri | Experimental, not verified | `com.apple.SiriNCService`, `com.apple.assistant` | Listed as a system service; its audio process is not confirmed. |
+| Any other running app | Supported by design, **not verified per app** | the app's bundle identifier | Shown under Other running apps. Notifications from a selected app can count as speech; the speech-shape filter reduces this. |
 | ChatGPT Classic macOS voice | Unsupported | — | Retired by OpenAI in January 2026. |
-| Claude / Gemini voice apps | Not implemented | — | Ports exist; no adapter yet. |
+| Music players (Apple Music, Spotify, VLC) | Never selectable as an AI source | — | The music is what Oreja pauses; selecting it would trigger its own pause. |
 | Oreja-owned Realtime API session | Not implemented on macOS | — | Planned for the iOS fallback, not required for macOS. |
 
 ## Music provider

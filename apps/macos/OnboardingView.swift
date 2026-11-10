@@ -7,7 +7,6 @@ import OrejaCore
 struct OnboardingView: View {
     @ObservedObject var model: AppModel
     @State private var step = 0
-    @State private var runningApplications: [RunningAudioApplication] = []
 
     private let stepTitles = [
         "Welcome",
@@ -35,7 +34,6 @@ struct OnboardingView: View {
         .frame(minWidth: 620, minHeight: 660)
         .background(OrejaTheme.Palette.paper)
         .tint(OrejaTheme.Palette.accent)
-        .onAppear { runningApplications = RunningApplicationCatalog.runningApplications() }
     }
 
     // MARK: Chrome
@@ -162,94 +160,15 @@ struct OnboardingView: View {
     private var chooseSource: some View {
         VStack(alignment: .leading, spacing: 16) {
             pageHeader(
-                "AI source",
-                "What should Oreja listen to?",
-                "Pick the application that talks to you. Oreja only monitors the application you choose here."
+                "Audio sources",
+                "Which apps should Oreja listen to?",
+                "Pick every app that talks to you: ChatGPT, Claude, a coding agent, a call app or a browser. When any of them speaks, Oreja pauses your music. Apps you do not see appear once they are open."
             )
 
-            sourceRow(
-                selection: .chatGPTDesktop,
-                subtitle: model.settings.aiSource == .chatGPTDesktop ? "Selected" : "Recommended"
-            )
-
-            VStack(alignment: .leading, spacing: 6) {
-                Eyebrow(text: "Experimental: browser sessions")
-                Text("A browser tap captures every tab in that browser, so other tabs can look like AI audio. Use it only if you keep ChatGPT in a dedicated window.")
-                    .font(OrejaTheme.Typography.micro)
-                    .lineSpacing(2)
-                    .foregroundStyle(OrejaTheme.Palette.inkSoft)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-
-            let browsers = runningApplications.filter { AISourceCatalog.isBrowser(bundleIdentifier: $0.bundleIdentifier) }
-            if browsers.isEmpty {
-                Text("No supported browser is running right now.")
-                    .font(OrejaTheme.Typography.caption)
-                    .foregroundStyle(OrejaTheme.Palette.inkSoft)
-            } else {
-                VStack(spacing: 8) {
-                    ForEach(browsers) { app in
-                        sourceRow(
-                            selection: AISourceSelection(
-                                kind: .browser,
-                                bundleIdentifier: app.bundleIdentifier,
-                                displayName: app.name
-                            ),
-                            subtitle: "Experimental"
-                        )
-                    }
-                }
+            AudioSourcePicker(selected: model.settings.aiSources) { selection in
+                model.toggleSource(selection)
             }
         }
-    }
-
-    private func sourceRow(selection: AISourceSelection, subtitle: String) -> some View {
-        let isSelected = model.settings.aiSource.bundleIdentifier == selection.bundleIdentifier
-            && model.settings.aiSource.kind == selection.kind
-        return Button {
-            model.selectSource(selection)
-        } label: {
-            HStack(spacing: 11) {
-                ZStack {
-                    Circle()
-                        .strokeBorder(
-                            isSelected ? OrejaTheme.Palette.accent : OrejaTheme.Palette.hairline,
-                            lineWidth: 1
-                        )
-                        .frame(width: 14, height: 14)
-                    if isSelected {
-                        Circle()
-                            .fill(OrejaTheme.Palette.accent)
-                            .frame(width: 7, height: 7)
-                    }
-                }
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(selection.kind == .chatGPTDesktop ? "ChatGPT desktop app" : selection.displayName)
-                        .font(.system(size: 12.5, weight: .medium))
-                        .foregroundStyle(OrejaTheme.Palette.ink)
-                    Text(subtitle)
-                        .font(OrejaTheme.Typography.micro)
-                        .foregroundStyle(OrejaTheme.Palette.inkSoft)
-                }
-                Spacer(minLength: 0)
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
-            .contentShape(Rectangle())
-            .background(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(isSelected ? OrejaTheme.Palette.accentWash : OrejaTheme.Palette.card)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .strokeBorder(
-                        isSelected ? OrejaTheme.Palette.accent.opacity(0.35) : OrejaTheme.Palette.hairline,
-                        lineWidth: 1
-                    )
-            )
-        }
-        .buttonStyle(.plain)
-        .accessibilityAddTraits(isSelected ? [.isSelected] : [])
     }
 
     private var chooseMusic: some View {
@@ -262,15 +181,15 @@ struct OnboardingView: View {
 
             ThemeCard {
                 HStack(spacing: 11) {
-                    Image(systemName: model.media.isMusicRunning ? "music.note" : "music.note.slash")
+                    Image(systemName: model.media.isProviderRunning ? "music.note" : "music.note.slash")
                         .font(.system(size: 13))
-                        .foregroundStyle(model.media.isMusicRunning ? OrejaTheme.Palette.positive : OrejaTheme.Palette.inkSoft)
+                        .foregroundStyle(model.media.isProviderRunning ? OrejaTheme.Palette.positive : OrejaTheme.Palette.inkSoft)
                         .frame(width: 16)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(model.media.isMusicRunning ? "Music is running" : "Music is not running")
+                        Text(model.media.isProviderRunning ? "Music is running" : "Music is not running")
                             .font(.system(size: 12.5, weight: .medium))
                             .foregroundStyle(OrejaTheme.Palette.ink)
-                        Text(model.media.isMusicRunning
+                        Text(model.media.isProviderRunning
                              ? (model.music?.track.map { "Loaded: \($0.displayName)" } ?? "No track loaded")
                              : "Oreja never launches your music app on its own.")
                             .font(OrejaTheme.Typography.micro)
@@ -278,7 +197,7 @@ struct OnboardingView: View {
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     Spacer(minLength: 8)
-                    if !model.media.isMusicRunning {
+                    if !model.media.isProviderRunning {
                         Button("Open Music") { model.launchMusic() }
                             .controlSize(.small)
                     }

@@ -320,39 +320,13 @@ struct SettingsView: View {
 
     private var source: some View {
         ThemeSection(
-            title: "AI source",
-            caption: "Browser sources capture every tab in that browser; use them only for dedicated ChatGPT windows."
+            title: "Audio sources",
+            caption: "Oreja listens to every app you select and pauses music when any of them speaks. It reads levels only. Browsers capture every tab, and notifications from a selected app can count as speech."
         ) {
-            HStack {
-                Text("Listen to")
-                    .font(.system(size: 13))
-                    .foregroundStyle(OrejaTheme.Palette.ink)
-                Spacer(minLength: 8)
-                Picker("Listen to", selection: Binding(
-                    get: { model.settings.aiSource },
-                    set: { model.selectSource($0) }
-                )) {
-                    ForEach(sourceOptions, id: \.bundleIdentifier) { option in
-                        Text(option.kind == .chatGPTDesktop ? "ChatGPT desktop app" : "\(option.displayName) (experimental)")
-                            .tag(option)
-                    }
-                }
-                .labelsHidden()
-                .pickerStyle(.menu)
-                .frame(maxWidth: 240)
+            AudioSourcePicker(selected: model.settings.aiSources) { selection in
+                model.toggleSource(selection)
             }
         }
-    }
-
-    /// The built-in choices, plus whatever is currently selected if onboarding picked a browser
-    /// that is not in the built-in list, so the picker never shows a blank selection.
-    private var sourceOptions: [AISourceSelection] {
-        var options: [AISourceSelection] = [.chatGPTDesktop, .chrome, .safari, .egoLite]
-        let current = model.settings.aiSource
-        if !options.contains(where: { $0.kind == current.kind && $0.bundleIdentifier == current.bundleIdentifier }) {
-            options.append(current)
-        }
-        return options
     }
 
     /// The real detection controls: how loud the AI has to be, how loud you have to be, and whether

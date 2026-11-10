@@ -3,7 +3,17 @@ import OrejaCore
 
 /// Deterministic in-memory music provider for tests, previews and the onboarding dry run.
 @MainActor
-public final class MockMusicController: MediaPlaybackController {
+public final class MockMusicController: MediaPlaybackController, MediaAdministration {
+    public var isProviderRunning = true
+
+    public func launchProvider() {
+        isProviderRunning = true
+    }
+
+    public func requestAutomationPermission() async -> Result<MediaPlaybackSnapshot, MediaControlError> {
+        .success(snapshot)
+    }
+
     public let provider: MediaProviderID = .mock
     public let capabilities = MediaCapabilities(
         canPause: true,

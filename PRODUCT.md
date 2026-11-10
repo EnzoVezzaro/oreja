@@ -23,7 +23,9 @@ Oreja runs quietly in the macOS menu bar alongside ChatGPT and Apple Music. The 
 ## Capabilities and Constraints
 
 - Supports Apple Music in the current release.
-- Supports ChatGPT desktop as the primary source, with browser sources marked experimental.
+- Listens to any number of selected audio apps at once: AI assistants (ChatGPT, Claude, and any app
+  you choose), coding agents and terminals, calls and messages, and video or podcast apps. Browsers
+  are marked experimental. Music players can never be selected as a source.
 - Supports pause/resume and lower-volume/restore modes.
 - Lower-volume mode has independent live controls for the conversation volume and return volume.
 - Quiet intervals and conversation hold are configurable and apply live.
@@ -41,7 +43,7 @@ The product name is Oreja de Van Gogh. The current identity uses a listening mar
 - Current landing page: `site/index.html`.
 - Current native UI and tokens: `apps/macos/SettingsView.swift` and `apps/macos/Theme.swift`.
 - Current brand notes: `docs/brand.md`.
-- Automated suite currently passes 54 tests.
+- Automated suite currently passes 83 tests.
 - A macOS 0.1.0 DMG is published from the landing page and attached to the GitHub release.
 
 ## Product Principles

@@ -6,6 +6,17 @@ made, not the day it was published.
 
 ## [Unreleased]
 
+### Planned
+
+- **More music players.** Apple Music is the one player Oreja controls today. Spotify and the rest
+  of the desktop players come next.
+- **More coding harnesses.** ChatGPT is the one source today. Claude Code, Codex and the other
+  terminal agents are next, with the same rule: read the level of the app you choose, keep nothing.
+
+## [0.3.0] - 2026-11-10
+
+Several audio apps at once, and the AI listener now comes back after sleep.
+
 ### Added
 
 - **Real detection settings** in Settings → Detection: **The AI's voice** and **Your voice**
@@ -25,13 +36,42 @@ made, not the day it was published.
   single-decay chimes are logged in Diagnostics and ignored, while syllable-modulated speech still
   pauses or lowers Music. Speech that follows an alert inside the same window is still caught.
   The toggle in Settings restores the older any-sound behavior.
+- **Choose the apps Oreja listens to.** Settings and onboarding show one list, grouped as AI
+  assistants and voices (ChatGPT, Claude, Perplexity, Copilot, Siri), coding agents and terminals
+  (Orca, Antigravity, VS Code, Terminal, iTerm2, Ghostty, Warp, Zed, Cursor, Windsurf), browsers
+  (experimental), calls and messages (FaceTime, WhatsApp, Telegram, Slack, Zoom, Discord, Teams),
+  video and podcasts, and any other app that is open. Several can be selected at once: a reply from
+  any of them lowers or pauses Music. Music players cannot be selected as a source.
+- Settings saved by 0.2.1 keep their single source; it becomes the first entry of the list.
+- The Settings and onboarding picker shows which selected apps are running, and which are playing
+  audio right now.
 
-### Planned
+### Fixed
 
-- **More music players.** Apple Music is the one player Oreja controls today. Spotify and the rest
-  of the desktop players come next.
-- **More coding harnesses.** ChatGPT is the one source today. Claude Code, Codex and the other
-  terminal agents are next, with the same rule: read the level of the app you choose, keep nothing.
+- **The AI listener did not come back after sleep.** Sleep stopped the microphone monitor but kept
+  the app monitor, so after waking it was never recreated and the app stopped hearing the assistant.
+  Sleep now stops both monitors and wake recreates them. 0.2.1 fixed the same problem for the
+  microphone only.
+- **A stale activity state could block later pauses.** Stopping the monitor cleared the activity
+  tracker without telling the coordinator, so the next voice could start without pausing or
+  lowering Music.
+
+### Changed
+
+- The audio-capture usage text says "the apps you select" instead of naming one app.
+
+### Known limitations
+
+- Reported working in a live test with ChatGPT desktop and a browser (ego lite) selected. The log
+  records when Music was lowered and restored, but not which selected app caused each change.
+- Not verified live: Claude desktop, Chrome, Safari, calls, and the coding agents other than Orca,
+  Antigravity and VS Code. The bundle identifiers of apps that are not installed are not confirmed.
+  A selected app that uses a different identifier still appears under "Other running apps".
+- A terminal's own audio process carries speech only when the terminal renders it. A `say` command
+  or voice script run inside a terminal is a separate process and is not captured.
+- Safari's audio prefix also matches WebKit processes from other apps.
+- Apple Music is the only music player. Spotify and the others are not supported yet.
+- The build is ad-hoc signed and not notarized.
 
 ## [0.2.1] - 2026-11-02
 

@@ -9,7 +9,7 @@ import OrejaCore
 /// - The adapter never launches Music during coordination and only changes volume when the
 ///   coordinator explicitly requests ducking.
 @MainActor
-public final class AppleMusicController: MediaPlaybackController {
+public final class AppleMusicController: MediaPlaybackController, MediaAdministration {
     public let provider: MediaProviderID = .appleMusic
     public let capabilities = MediaCapabilities(
         canPause: true,
@@ -29,6 +29,10 @@ public final class AppleMusicController: MediaPlaybackController {
     public var isMusicRunning: Bool {
         !NSRunningApplication.runningApplications(withBundleIdentifier: musicBundleIdentifier).isEmpty
     }
+
+    public var isProviderRunning: Bool { isMusicRunning }
+
+    public func launchProvider() { launchMusic() }
 
     public func currentPlayback() async -> MediaPlaybackSnapshot {
         guard isMusicRunning else {

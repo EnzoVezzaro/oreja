@@ -140,7 +140,7 @@ func runMediaAndSettingsSuite(_ t: Harness) async {
         settings.resumeDelay = 0.1
         t.expectClose(settings.resumeDelay, 0.1)
         settings.resumeDelay = 1.4
-        settings.aiSource = .safari
+        settings.aiSources = [.safari, .chatGPTDesktop]
         settings.launchAtLogin = true
         settings.onboardingCompleted = true
         settings.verboseDiagnostics = true
@@ -158,7 +158,7 @@ func runMediaAndSettingsSuite(_ t: Harness) async {
         t.expectEqual(settings.duckVolumePercent, 100, "keep music volume accepts the full range")
         settings.restoreVolumePercent = 67
         t.expectClose(settings.policy.restoreVolume, 0.67)
-        t.expectEqual(decoded.aiSource.bundleIdentifier, "com.apple.Safari")
+        t.expectEqual(decoded.aiSources.map(\.bundleIdentifier), ["com.apple.Safari", "com.openai.codex"])
     }
 
     t.run("conversation hold is clamped and can be switched off") {
@@ -181,7 +181,7 @@ func runMediaAndSettingsSuite(_ t: Harness) async {
         let json = #"{"resumeDelay": 2.0, "unknownKey": true}"#.data(using: .utf8)!
         let decoded = try! JSONDecoder().decode(AppSettings.self, from: json)
         t.expectClose(decoded.resumeDelay, 2.0)
-        t.expectEqual(decoded.aiSource, .chatGPTDesktop)
+        t.expectEqual(decoded.aiSources, [.chatGPTDesktop])
         t.expectEqual(decoded.musicProvider, .appleMusic)
         t.expectEqual(decoded.onboardingCompleted, false)
     }

@@ -38,7 +38,7 @@ final class AppModel: ObservableObject {
 
     let coordinator: PlaybackCoordinator
     let diagnostics: DiagnosticsLog
-    let media: AppleMusicController
+    let media: any MediaPlaybackController & MediaAdministration
     private let monitorFactory: any AIAudioMonitorFactory
     private let settingsStore: any SettingsStoring
     private let pauseJournal: any PauseJournal
@@ -65,7 +65,7 @@ final class AppModel: ObservableObject {
         settingsStore: (any SettingsStoring)? = nil,
         pauseJournal: (any PauseJournal)? = nil,
         monitorFactory: (any AIAudioMonitorFactory)? = nil,
-        media: AppleMusicController? = nil
+        media: (any MediaPlaybackController & MediaAdministration)? = nil
     ) {
         let resolvedStore = settingsStore ?? UserDefaultsSettingsStore()
         let resolvedJournal = pauseJournal ?? UserDefaultsPauseJournal()
@@ -73,7 +73,7 @@ final class AppModel: ObservableObject {
         self.settingsStore = resolvedStore
         self.pauseJournal = resolvedJournal
         self.monitorFactory = monitorFactory ?? ProcessAudioMonitorFactory()
-        let resolvedMedia = media ?? AppleMusicController()
+        let resolvedMedia: any MediaPlaybackController & MediaAdministration = media ?? AppleMusicController()
         self.media = resolvedMedia
         self.settings = loaded
 
@@ -168,9 +168,13 @@ final class AppModel: ObservableObject {
         setAutomationEnabled(!settings.automationEnabled)
     }
 
-    func selectSource(_ selection: AISourceSelection) {
-        guard settings.aiSource != selection else { return }
-        settings.aiSource = selection
+    /// Adds the app to the listened-to set, or removes it when it is already selected.
+    func toggleSource(_ selection: AISourceSelection) {
+        if settings.aiSources.contains(where: { $0.bundleIdentifier == selection.bundleIdentifier }) {
+            settings.aiSources.removeAll { $0.bundleIdentifier == selection.bundleIdentifier }
+        } else {
+            settings.aiSources.append(selection)
+        }
     }
 
     func refreshMusic() {
@@ -184,7 +188,7 @@ final class AppModel: ObservableObject {
     }
 
     func launchMusic() {
-        media.launchMusic()
+        media.launchProvider()
     }
 
     func openSystemAudioSettings() {
@@ -211,8 +215,8 @@ final class AppModel: ObservableObject {
             }
         }
 
-        if settings.aiSource != previous.aiSource {
-            stopMonitoring(reason: "AI source changed")
+        if settings.aiSources != previous.aiSources {
+            stopMonitoring(reason: "audio sources changed")
             if settings.automationEnabled { startMonitoringIfNeeded() }
         }
 
@@ -256,7 +260,12 @@ final class AppModel: ObservableObject {
         retryTask?.cancel()
         retryTask = nil
 
-        let descriptor = AIAudioSourceDescriptor(selection: settings.aiSource)
+        guard !settings.aiSources.isEmpty else {
+            coordinator.monitoringFailed(AudioMonitoringFailure(.sourceUnavailable, "Choose at least one audio app to listen to."))
+            return
+        }
+
+        let descriptor = AIAudioSourceDescriptor(selections: settings.aiSources)
         let newMonitor = monitorFactory.makeMonitor(
             for: descriptor,
             options: settings.audioMonitorOptions
@@ -300,6 +309,9 @@ final class AppModel: ObservableObject {
     func stopMonitoring(reason: String) {
         stopUserSpeechMonitoring(reason: reason)
         activity.reset()
+        // The aggregator forgets activity here, so the coordinator must hear that it ended too.
+        // Otherwise a stale `aiIsActive` makes every later voice onset return without pausing.
+        coordinator.audioActivityEnded()
         retryTask?.cancel()
         retryTask = nil
         isMonitoring = false
@@ -495,12 +507,13 @@ final class AppModel: ObservableObject {
         }
     }
 
-    private func isSourceApplicationRunning() -> Bool {
-        let workspace = NSWorkspace.shared.runningApplications.compactMap(\.bundleIdentifier)
-        if settings.aiSource.kind == .chatGPTDesktop {
-            return workspace.contains { AISourceCatalog.isChatGPT(bundleIdentifier: $0) }
-        }
-        return workspace.contains(settings.aiSource.bundleIdentifier)
+    /// Selected applications that are running now, by display name.
+    private func runningSourceNames() -> [String] {
+        let running = NSWorkspace.shared.runningApplications.compactMap(\.bundleIdentifier)
+        return settings.aiSources.filter { selection in
+            let prefixes = AISourceCatalog.matchPrefixes(for: selection)
+            return running.contains { id in prefixes.contains { id.hasPrefix($0) } }
+        }.map(\.displayName)
     }
 
     // MARK: Music observation
@@ -638,10 +651,11 @@ final class AppModel: ObservableObject {
             MainActor.assumeIsolated {
                 self?.coordinator.systemWillSleep()
                 self?.fire(.sleep, detail: "The Mac is going to sleep")
-                // AVAudioEngine can stop delivering input while the Mac sleeps. Clear the
-                // existing monitor so wake-up creates a fresh microphone tap instead of treating
-                // the stale instance as healthy.
-                self?.stopUserSpeechMonitoring(reason: "system sleep")
+                // Core Audio taps and AVAudioEngine can stop delivering audio while the Mac sleeps.
+                // Both monitors are cleared so wake-up creates fresh taps. Leaving the app monitor
+                // in place made wake-up a no-op, because startMonitoringIfNeeded returns early when
+                // a monitor exists, so the stale tap never came back.
+                self?.stopMonitoring(reason: "system sleep")
                 self?.stopObservation()
             }
         }
@@ -739,8 +753,8 @@ final class AppModel: ObservableObject {
         let steps = [
             CheckStep(title: "Apple Music is running", status: .pending),
             CheckStep(title: "Oreja may control Music", status: .pending),
-            CheckStep(title: "ChatGPT is running", status: .pending),
-            CheckStep(title: "Oreja may capture ChatGPT audio", status: .pending),
+            CheckStep(title: "A selected audio app is running", status: .pending),
+            CheckStep(title: "Oreja may capture the selected audio apps", status: .pending),
         ]
         report = ConnectionCheckReport(steps: steps, startedAt: Date())
 
@@ -766,7 +780,7 @@ final class AppModel: ObservableObject {
     }
 
     private func checkMusicRunning() async {
-        if media.isMusicRunning {
+        if media.isProviderRunning {
             updateStep(0, .passed("Music is open."))
         } else {
             updateStep(0, .failed("Music is not running. Open it, then run the check again."))
@@ -788,17 +802,22 @@ final class AppModel: ObservableObject {
     }
 
     private func checkAISource() async {
-        if isSourceApplicationRunning() {
-            updateStep(2, .passed("\(settings.aiSource.displayName) is running."))
+        guard !settings.aiSources.isEmpty else {
+            updateStep(2, .failed("No audio app is selected. Choose one in Settings."))
+            return
+        }
+        let running = runningSourceNames()
+        if running.isEmpty {
+            updateStep(2, .failed("None of the selected apps is running: \(settings.aiSources.map(\.displayName).joined(separator: ", "))."))
         } else {
-            updateStep(2, .failed("\(settings.aiSource.displayName) is not running."))
+            updateStep(2, .passed("Running: \(running.joined(separator: ", "))."))
         }
     }
 
     private func checkAudioCapture() async {
         guard monitor != nil else {
             // No live monitor: prove the tap can be created, then tear it down again.
-            let descriptor = AIAudioSourceDescriptor(selection: settings.aiSource)
+            let descriptor = AIAudioSourceDescriptor(selections: settings.aiSources)
             let probe = monitorFactory.makeMonitor(
                 for: descriptor,
                 options: settings.audioMonitorOptions
@@ -815,13 +834,13 @@ final class AppModel: ObservableObject {
                 await probe.stop()
                 return
             }
-            updateStep(3, .passed("Audio capture started for \(descriptor.displayName). Play a ChatGPT reply to see activity."))
+            updateStep(3, .passed("Audio capture started for \(descriptor.displayName). Play a reply in a selected app to see activity."))
             await probe.stop()
             return
         }
 
         if isMonitoring {
-            updateStep(3, .passed("Audio capture is active for \(sourceDescription.isEmpty ? settings.aiSource.displayName : sourceDescription)."))
+            updateStep(3, .passed("Audio capture is active for \(sourceDescription.isEmpty ? AIAudioSourceDescriptor(selections: settings.aiSources).displayName : sourceDescription)."))
         } else {
             updateStep(3, .failed("Audio capture is not active right now. Check the audio recording permission."))
         }

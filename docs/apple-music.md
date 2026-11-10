@@ -10,7 +10,7 @@ for the macOS Music application; no private API is used.
 | `playbackState` | Reads `player state`, track persistent ID/name/artist, `sound volume` | Field-separated output parsed by `AppleMusicStateParser`; unknown states become `unavailable` |
 | `pause` | `tell application "Music" to pause` | Track, queue and position preserved |
 | `resume` | `tell application "Music" to play` | Resumes the same track from where it stopped |
-| `setVolume` | Present in the core API, **unused** by the MVP | Clamped 0–100; no ducking is offered because the adapter reports `canSetVolume = false` |
+| `setVolume` | Used for volume ducking while the AI speaks | Clamped 0–100; the adapter reports `canSetVolume = true`; restored when the conversation is quiet |
 
 Every script is wrapped in `if application "Music" is running then`. Oreja never launches Music on
 its own; only the onboarding "Open Music" button does, at the user's request.

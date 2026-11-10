@@ -38,6 +38,16 @@ extension MediaPlaybackController {
     }
 }
 
+/// Setup and diagnostics for a music provider, kept apart from playback control so that the
+/// coordinator's port stays small. Never launches the provider except through `launchProvider()`,
+/// which only onboarding calls.
+@MainActor
+public protocol MediaAdministration: AnyObject, Sendable {
+    var isProviderRunning: Bool { get }
+    func launchProvider()
+    func requestAutomationPermission() async -> Result<MediaPlaybackSnapshot, MediaControlError>
+}
+
 /// Platform-neutral port for an audio-activity source (the AI side of the conversation).
 public protocol AIAudioMonitoring: AnyObject, Sendable {
     var events: AsyncStream<AudioActivityEvent> { get }

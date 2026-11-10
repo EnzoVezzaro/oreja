@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Oreja de Van Gogh is a macOS menu bar utility that pauses Apple Music while ChatGPT speaks and
+Oreja de Van Gogh is a macOS menu bar utility that pauses Apple Music while any selected audio app speaks and
 resumes it after a quiet interval. One job, local only, no OpenAI API, no recording.
 
 ## Architecture boundaries
@@ -47,7 +47,7 @@ paths in sync when moving files.
 ## Test
 
 ```bash
-./scripts/test.sh             # all 54 tests
+./scripts/test.sh             # all 83 tests
 ./scripts/test.sh resume      # name filter
 ./build/bin/oreja-probe --list
 ./build/bin/oreja-probe --pid <pid> --seconds 6
@@ -93,5 +93,6 @@ Do not weaken these properties to make a demo or a distribution step easier.
 - Recording or transcribing conversations.
 - Cross-app audio capture on iOS, or any private API / security bypass.
 - Multi-agent orchestration inside the runtime.
-- Windows, Android, Linux, extra music providers, ducking, or microphone speech detection before
-  the macOS core is verified end to end.
+- Windows, Android, Linux, or extra music providers (Spotify, VLC, browser tabs) before the macOS
+  core is verified end to end. Volume ducking and the microphone "pause while I speak" option are
+  shipped and are no longer non-goals.

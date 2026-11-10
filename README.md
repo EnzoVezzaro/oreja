@@ -14,7 +14,7 @@ goes quiet, Music resumes or its original volume returns exactly where it left o
 
 ## Download
 
-[Oreja 0.2.1](https://github.com/EnzoVezzaro/oreja/releases/latest) is a disk image for macOS 14.2
+[Oreja 0.3.0](https://github.com/EnzoVezzaro/oreja/releases/latest) is a disk image for macOS 14.2
 or newer, also served from [the landing page](https://oreja-tau.vercel.app/). It is ad-hoc signed
 and not notarized, so the first launch on another Mac needs one Gatekeeper approval (System
 Settings › Privacy & Security › Open Anyway). What changed: [CHANGELOG.md](CHANGELOG.md).
@@ -32,10 +32,10 @@ ChatGPT output audio ──► Core Audio process tap ──► level analysis �
 Apple Music playback state ◄── Apple Events ◄── pause / resume commands ◄──┘
 ```
 
-Oreja taps the **output** of the selected application's Core Audio processes (macOS 14.2+),
-unmuted, so ChatGPT keeps playing normally while Oreja listens to a copy. The tap is private,
-targeted at that application's processes (including its helpers), and torn down when monitoring
-stops. A speech-shape filter then decides whether a burst is worth interrupting music for: it wants the
+Oreja taps the **output** of the selected applications' Core Audio processes (macOS 14.2+), unmuted,
+so each app keeps playing normally while Oreja listens to a copy. You can select several apps at
+once (ChatGPT, Claude, a coding agent, a call app, a browser, or any running app); one private tap
+covers all of them, including their helper processes, and is torn down when monitoring stops. A speech-shape filter then decides whether a burst is worth interrupting music for: it wants the
 syllable-shaped loudness changes of speech, so short blips, steady alert tones and single decay
 chimes are ignored instead of pausing your music. Music is controlled with Apple Events against the Music app, which Oreja never launches on
 its own.
@@ -50,8 +50,10 @@ Read [docs/architecture.md](docs/architecture.md) for the full design.
 ## Requirements
 
 - macOS 14.2 or newer (Core Audio process taps). Developed and tested on macOS 26.6.2, arm64.
-- The ChatGPT desktop app (`com.openai.chat`, `com.openai.chatgpt` or `com.openai.codex`) **or**
-  Safari/Chrome running ChatGPT on the web (experimental; captures the whole browser process).
+- At least one audio app to listen to. The ChatGPT desktop app is the default. Others are chosen in
+  Settings or onboarding, and each listed app's support level is in
+  [docs/compatibility.md](docs/compatibility.md). Browsers are experimental and capture every tab.
+  Music players cannot be selected.
 - The Music app for playback control. An Apple Music subscription is not required by Oreja, but
   Music must be the app that is playing.
 - To build: Command Line Tools (`xcode-select --install`) or Xcode. No third-party dependencies.
@@ -74,7 +76,7 @@ Onboarding runs once per install; to see it again, quit Oreja and delete its def
 To run the automated suite:
 
 ```bash
-./scripts/test.sh             # 69 tests, 0 failures
+./scripts/test.sh             # 83 tests, 0 failures
 ./scripts/test.sh resume      # filter by test name
 ```
 
@@ -144,7 +146,7 @@ attention.
 
 Executed on this machine (macOS 26.6.2, Apple M2, Swift 6.3.3):
 
-- ✅ **69/69 automated tests pass** (334 assertions): pause, resume, stale-state recovery, sentence gaps, conversation hold, volume ducking, user-first speech pause, manual pause and resume, process exit, Music exit, permission revoked, device change, rapid responses, sleep/wake, ownership reconciliation, quit restoration, delayed commands, command-failure limits, detector thresholds/hysteresis, speech-shape filter classification of brief, steady, decaying and speech-shaped bursts, sensitivity-to-threshold mapping for the AI and the microphone, hook routing by event, disabled and draft hooks, cooldown, failure reporting and settings round-trip, AppleScript parsing, one-round-trip command scripts, settings, journal recovery, and reactive playback settings.
+- ✅ **83/83 automated tests pass** (372 assertions), including audio source selection, settings migration and music-player exclusion: pause, resume, stale-state recovery, sentence gaps, conversation hold, volume ducking, user-first speech pause, manual pause and resume, process exit, Music exit, permission revoked, device change, rapid responses, sleep/wake, ownership reconciliation, quit restoration, delayed commands, command-failure limits, detector thresholds/hysteresis, speech-shape filter classification of brief, steady, decaying and speech-shaped bursts, sensitivity-to-threshold mapping for the AI and the microphone, hook routing by event, disabled and draft hooks, cooldown, failure reporting and settings round-trip, AppleScript parsing, one-round-trip command scripts, settings, journal recovery, and reactive playback settings.
 - ✅ **App bundle builds, signs, and launches**: the menu bar app stays resident, maps only its own
   `Contents/Frameworks` dylibs, and idles at 0.0–0.1% CPU with a ~37–54 MB physical footprint.
   A packaging bug that made the app abort in dyld at launch was found and fixed; see
