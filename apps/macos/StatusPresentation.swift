@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 import OrejaCore
 
@@ -38,11 +39,17 @@ extension CoordinatorState {
         }
     }
 
-    /// Menu bar glyph. Small, state-only changes; no animation, no distraction.
+    /// Menu bar glyph. Small, state-only changes; no animation, no distraction. A name that the
+    /// running macOS does not have draws nothing, so an unknown symbol falls back to the ear.
     var menuBarSymbol: String {
+        let name = menuBarSymbolName
+        return NSImage(systemSymbolName: name, accessibilityDescription: nil) == nil ? "ear" : name
+    }
+
+    private var menuBarSymbolName: String {
         switch self {
-        case .disabled: "ear.slash"
-        case .searchingForSource: "ear.badge.questionmark"
+        case .disabled: "speaker.slash"
+        case .searchingForSource: "magnifyingglass"
         case .monitoring: "ear"
         case .musicPlaying: "music.note"
         case .aiActive: "waveform"

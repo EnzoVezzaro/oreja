@@ -13,6 +13,16 @@ made, not the day it was published.
 - **More coding harnesses.** ChatGPT is the one source today. Claude Code, Codex and the other
   terminal agents are next, with the same rule: read the level of the app you choose, keep nothing.
 
+## [0.3.1] - 2026-11-10
+
+### Fixed
+
+- **The menu bar icon disappeared when automation was off.** The icon for that state used the SF
+  Symbol `ear.slash`, which does not exist, so the menu bar drew nothing and only the clickable
+  space remained. The same happened to "Looking for the AI source" (`ear.badge.questionmark`).
+  The icons are now `speaker.slash` and `magnifyingglass`. A name the running macOS does not know
+  now falls back to the ear instead of an empty image.
+
 ## [0.3.0] - 2026-11-10
 
 Several audio apps at once, and the AI listener now comes back after sleep.

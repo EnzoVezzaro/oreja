@@ -86,7 +86,7 @@ security controls to pass review.
 ## Versioning
 
 `CFBundleShortVersionString` and `CFBundleVersion` live in `packaging/Info.plist` (currently
-`0.3.0` / `5`). Bump both for every distributed build. There is no auto-updater.
+`0.3.1` / `6`). Bump both for every distributed build. There is no auto-updater.
 
 ## Release checklist
 
