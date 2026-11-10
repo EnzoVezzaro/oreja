@@ -1,6 +1,6 @@
 # Oreja de Van Gogh — Product marketing strategy
 
-Status: launch strategy and copy kit for the current 0.2.1 early release.
+Status: launch strategy and copy kit for the current 0.3.0 release.
 
 ## The job to be known for
 

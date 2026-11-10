@@ -129,7 +129,7 @@
           <h3>What you need</h3>
           <ul>
             <li><strong>macOS 14.2 or newer.</strong> The audio tap relies on Core Audio process taps.</li>
-            <li><strong>ChatGPT desktop app</strong> (<code>com.openai.chat</code>, <code>com.openai.chatgpt</code> or <code>com.openai.codex</code>), or ChatGPT in Safari/Chrome as an experimental source.</li>
+            <li><strong>At least one audio app to listen to.</strong> The ChatGPT desktop app is the default. You can add Claude, coding agents, call apps or any open app. Browsers are experimental: a browser source captures every tab.</li>
             <li><strong>The Music app</strong>, with a song loaded. An Apple Music subscription is not required by Oreja, but Music must be the app that is playing.</li>
             <li><strong>Command Line Tools</strong> if you build from source. There are no third-party dependencies.</li>
           </ul>
@@ -137,7 +137,7 @@
           <pre><code>./scripts/build.sh
 open build/Oreja.app</code></pre>
           <p>
-            The first launch runs a six-step setup: welcome, AI source, music source, audio-capture
+            The first launch runs a six-step setup: welcome, audio sources, music source, audio-capture
             permission, live test, finish. After that the app lives only in the menu bar. To see setup
             again, quit Oreja and run <code>defaults delete app.oreja.van-gogh</code>.
           </p>
@@ -227,7 +227,7 @@ tccutil reset AppleEvents app.oreja.van-gogh</code></pre>
 
           <h3>Music never pauses</h3>
           <ul>
-            <li>Check that the AI source selection matches the app that is talking. ChatGPT app versus browser is a common mismatch.</li>
+            <li>Check that the app that is talking is ticked under Audio sources. ChatGPT app versus browser is a common mismatch.</li>
             <li>Check that Music is the app that is playing, not Spotify or a browser tab.</li>
             <li>Watch Diagnostics for activity events. If none appear, the tap is not receiving audio: re-grant audio capture.</li>
             <li>If activity appears but no pause is issued, Music was already paused, a command is pending, or a manual override was detected. Diagnostics says which.</li>
