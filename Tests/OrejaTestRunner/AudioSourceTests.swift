@@ -1,4 +1,5 @@
 import Foundation
+import OrejaAudio
 import OrejaCore
 
 @MainActor
@@ -13,6 +14,18 @@ func runAudioSourceSuite(_ t: Harness) {
         t.expect(!AISourceCatalog.isSelectable(bundleIdentifier: nil))
         t.expect(AISourceCatalog.isSelectable(bundleIdentifier: "com.apple.Music.helper") == false, "music helpers are excluded too")
         t.expect(AISourceCatalog.isSelectable(bundleIdentifier: "com.anthropic.claudefordesktop"))
+    }
+
+    t.run("Safari remains a listen source but is excluded from safe target muting") {
+        t.expect(AISourceCatalog.isSelectable(bundleIdentifier: "com.apple.Safari"))
+        t.expect(!AISourceCatalog.supportsTargetMute(bundleIdentifier: "com.apple.Safari"))
+        t.expect(AISourceCatalog.supportsTargetMute(bundleIdentifier: "com.google.Chrome"))
+        t.expect(AISourceCatalog.targetMuteBundleIDRoots(for: .safari) == nil)
+        t.expectEqual(AISourceCatalog.targetMuteBundleIDRoots(for: .egoLite), ["com.citrolabs.ego"])
+        t.expectEqual(AISourceCatalog.targetMuteBundleIDRoots(for: .chrome), ["com.google.Chrome"])
+        t.expectEqual(AISourceCatalog.targetMuteBundleIDRoots(for: .chatGPTDesktop), AISourceCatalog.chatGPTBundleIdentifiers)
+        t.expect(AudioProcessCatalog.matches(bundleID: "com.google.Chrome.helper", roots: ["com.google.Chrome"]))
+        t.expect(!AudioProcessCatalog.matches(bundleID: "com.google.ChromeBeta", roots: ["com.google.Chrome"]))
     }
 
     t.run("normalizing drops music players and duplicates, keeping the first") {

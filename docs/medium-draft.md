@@ -16,10 +16,12 @@ I wanted the decision-making code to stay boring. The coordinator owns the pause
 The Core Audio and Music integrations sit behind separate adapters. That keeps the part that decides
 what should happen independent from the parts that talk to macOS.
 
-The current release supports macOS 14.2 and newer, Apple Music, and the ChatGPT desktop app. Browser
-sources are experimental because a browser process can contain more than the ChatGPT tab. The
-download is an early ad-hoc-signed preview. I have also not completed a supervised live ChatGPT
-Voice test yet, so I am looking for early users rather than calling this finished.
+Release 0.4.0 supports macOS 14.2 and newer, Apple Music, and an experimental Browser playback
+target for standard HTML media in Safari, Chrome, Edge, Brave, Arc, and ego lite. Browser control
+uses Apple Events and needs macOS Automation permission. The maker reports a successful real
+playback test, but the exact browser and site were not recorded; protected players may not respond.
+The build is ad-hoc signed and not notarized. I have not completed a supervised live ChatGPT Voice
+test.
 
 If you use Apple Music while talking to a voice assistant, I would like to hear how the handoff feels
 on your Mac. Does Music come back at the right time? Would you prefer pausing it or lowering the

@@ -24,6 +24,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Menu bar utility: no Dock icon and no main window.
         NSApp.setActivationPolicy(.accessory)
         AppModel.shared.bootstrap()
+        // A menu-bar-only app otherwise appears to do nothing when opened from Finder. Show the
+        // main settings surface for returning users; first-run users already get onboarding.
+        if AppModel.shared.settings.onboardingCompleted {
+            AppModel.shared.showSettings()
+        }
     }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {

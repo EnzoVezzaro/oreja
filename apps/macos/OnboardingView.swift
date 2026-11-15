@@ -161,13 +161,16 @@ struct OnboardingView: View {
         VStack(alignment: .leading, spacing: 16) {
             pageHeader(
                 "Audio sources",
-                "Which apps should Oreja listen to?",
-                "Pick every app that talks to you: ChatGPT, Claude, a coding agent, a call app or a browser. When any of them speaks, Oreja pauses your music. Apps you do not see appear once they are open."
+                "Choose the apps that talk and the apps to quiet.",
+                "Choose primary apps Oreja should listen to, then optional apps to mute while a primary reply is active. Apps you do not see appear once they are open."
             )
 
-            AudioSourcePicker(selected: model.settings.aiSources) { selection in
-                model.toggleSource(selection)
-            }
+            AudioSourcePicker(
+                primary: model.settings.aiSources,
+                targets: model.settings.targetAudioApps,
+                onTogglePrimary: model.toggleSource,
+                onToggleTarget: model.toggleTargetAudioApp
+            )
         }
     }
 

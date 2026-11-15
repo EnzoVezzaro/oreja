@@ -2,26 +2,30 @@ import OrejaAudio
 import OrejaCore
 import SwiftUI
 
-/// Multi-select list of the apps Oreja can listen to, grouped by category. Used by onboarding and
-/// Settings so both show the same choices and the same status.
+/// Shared app picker for primary speech sources and apps whose audio should yield during speech.
 struct AudioSourcePicker: View {
-    var selected: [AISourceSelection]
-    var onToggle: (AISourceSelection) -> Void
+    var primary: [AISourceSelection]
+    var targets: [AISourceSelection]
+    var onTogglePrimary: (AISourceSelection) -> Void
+    var onToggleTarget: (AISourceSelection) -> Void
 
     @State private var choices: [AudioAppChoice] = []
+    @State private var searchText = ""
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            ForEach(groups, id: \.category) { group in
-                VStack(alignment: .leading, spacing: 8) {
-                    Eyebrow(text: group.category.title)
-                    VStack(spacing: 8) {
-                        ForEach(group.choices) { choice in
-                            row(choice)
-                        }
-                    }
-                }
-            }
+            selectionSection(
+                title: "Listen to",
+                caption: "Any selected app can trigger an interruption.",
+                selected: primary,
+                isTarget: false
+            )
+            selectionSection(
+                title: "Other app audio",
+                caption: "Selected apps are muted while speech is active. Browser media is a separate playback target in Playback settings.",
+                selected: targets,
+                isTarget: true
+            )
 
             if choices.isEmpty {
                 Text("No supported app is open. Open the app you use, then refresh the list.")
@@ -35,25 +39,62 @@ struct AudioSourcePicker: View {
         .onAppear { reload() }
     }
 
-    private var groups: [(category: AudioSourceCategory, choices: [AudioAppChoice])] {
-        AudioSourceCategory.allCases.compactMap { category in
-            let items = choices.filter { $0.category == category }
+    private func groups(isTarget: Bool) -> [(category: AudioSourceCategory, choices: [AudioAppChoice])] {
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        return AudioSourceCategory.allCases.compactMap { category in
+            if isTarget && category == .browser { return nil }
+            let items = choices.filter {
+                $0.category == category
+                    && (!isTarget || !AISourceCatalog.isBrowser(bundleIdentifier: $0.id))
+                    && (query.isEmpty || $0.selection.displayName.localizedCaseInsensitiveContains(query))
+            }
             return items.isEmpty ? nil : (category, items)
         }
     }
 
     private func reload() {
-        choices = RunningApplicationCatalog.choices(including: selected)
+        choices = RunningApplicationCatalog.choices(including: AISourceCatalog.normalized(primary + targets))
     }
 
-    private func isSelected(_ choice: AudioAppChoice) -> Bool {
-        selected.contains { $0.bundleIdentifier == choice.id }
+    private func selectionSection(
+        title: String,
+        caption: String,
+        selected: [AISourceSelection],
+        isTarget: Bool
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 9) {
+            Text(title).font(OrejaTheme.Typography.body).foregroundStyle(OrejaTheme.Palette.ink)
+            Text(caption).font(OrejaTheme.Typography.caption).foregroundStyle(OrejaTheme.Palette.inkSoft)
+            if title == "Listen to" {
+                HStack(spacing: 7) {
+                    Image(systemName: "magnifyingglass").foregroundStyle(OrejaTheme.Palette.inkSoft)
+                    TextField("Search apps", text: $searchText)
+                        .textFieldStyle(.plain)
+                        .accessibilityLabel("Search audio apps")
+                }
+                .padding(.horizontal, 10)
+                .frame(height: 32)
+                .background(OrejaTheme.Palette.hairline.opacity(0.3))
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            }
+            ForEach(groups(isTarget: isTarget), id: \.category) { group in
+                VStack(alignment: .leading, spacing: 8) {
+                    Eyebrow(text: group.category.title)
+                    VStack(spacing: 8) {
+                        ForEach(group.choices) { choice in
+                            row(choice, selected: selected, isTarget: isTarget)
+                        }
+                    }
+                }
+            }
+        }
     }
 
-    private func row(_ choice: AudioAppChoice) -> some View {
-        let on = isSelected(choice)
+    private func row(_ choice: AudioAppChoice, selected: [AISourceSelection], isTarget: Bool) -> some View {
+        let on = selected.contains { $0.bundleIdentifier == choice.id }
+        let supported = !isTarget || targetControlSupported(choice.id)
         return Button {
-            onToggle(choice.selection)
+            if isTarget { onToggleTarget(choice.selection) } else { onTogglePrimary(choice.selection) }
         } label: {
             HStack(spacing: 11) {
                 RoundedRectangle(cornerRadius: 4, style: .continuous)
@@ -82,7 +123,7 @@ struct AudioSourcePicker: View {
                                 .foregroundStyle(OrejaTheme.Palette.warning)
                         }
                     }
-                    Text(status(for: choice))
+                    Text(supported ? status(for: choice) : (on ? "Selected, but this app has no supported audio control; click to remove" : "Audio control is not available for this app"))
                         .font(OrejaTheme.Typography.micro)
                         .foregroundStyle(OrejaTheme.Palette.inkSoft)
                 }
@@ -97,8 +138,9 @@ struct AudioSourcePicker: View {
             )
         }
         .buttonStyle(.plain)
+        .disabled(!supported && !on)
         .accessibilityLabel(choice.selection.displayName)
-        .accessibilityValue(status(for: choice))
+        .accessibilityValue(supported ? status(for: choice) : (on ? "Selected but unsupported; activate to remove" : "Audio control is not available"))
         .accessibilityAddTraits(on ? [.isSelected] : [])
     }
 
@@ -107,5 +149,12 @@ struct AudioSourcePicker: View {
         if choice.isRunning { return "Running" }
         if choice.isInstalled { return "Installed, not running" }
         return "Not running"
+    }
+
+    private func targetControlSupported(_ bundleIdentifier: String) -> Bool {
+        if AISourceCatalog.isBrowser(bundleIdentifier: bundleIdentifier) {
+            return BrowserAudioController.supportedBrowserBundleIDs.contains(bundleIdentifier)
+        }
+        return AISourceCatalog.supportsTargetMute(bundleIdentifier: bundleIdentifier)
     }
 }

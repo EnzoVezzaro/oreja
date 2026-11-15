@@ -19,7 +19,7 @@ does with data; it is a product description, not legal advice.
 
 ## Audio handling
 
-1. Core Audio copies the **output of the selected applications** into a private aggregate device.
+1. For primary apps, Core Audio copies their **output** into a private aggregate device.
 2. An IOProc on the real-time thread writes samples into a preallocated ring buffer. It never
    allocates, blocks, or writes files.
 3. Every 50 ms, a utility task computes one RMS/dBFS value and overwrites the buffer.
@@ -27,13 +27,18 @@ does with data; it is a product description, not legal advice.
 5. Raw samples are never persisted, never inspected for content, and never sent anywhere. No speech
    recognition, transcription, or speaker identification is performed.
 
-The target app keeps playing normally: the tap is unmuted. Music is not part of the monitored
-source.
+Primary apps keep playing normally: their analysis tap is unmuted. Release 0.4.0 includes an
+experimental Browser playback target using Apple Events and page scripting for standard HTML media
+in its listed adapters. Page scripts control media elements in open tabs; they do not inspect page
+text. The maker reported successful real playback testing, but the exact browser/site/settings were
+not recorded. Music is not part of the analysis tap and remains controlled through its provider
+adapter.
 
 ## Permissions and purpose strings
 
 - **System audio recording** — to measure the selected app's output level.
-- **Automation (Music)** — to pause and resume Music.
+- **Automation (Music and experimental Browser target)** — to control Music, and to run Apple
+  Events/page scripts against selected browser adapters.
 - No microphone, screen content, accessibility, full disk, contacts, or location access.
 
 See `permissions.md`.
@@ -42,7 +47,7 @@ See `permissions.md`.
 
 `UserDefaults`, domain `app.oreja.van-gogh` (standard defaults for the app):
 
-- `com.oreja.settings.v1` — selected audio apps (`aiSources`; older builds stored `aiSource`, still read), provider, automation on/off, resume delay, launch at
+- `com.oreja.settings.v1` — primary apps (`aiSources`), secondary mute targets (`targetAudioApps`; older builds stored `aiSource`, still read), provider, automation on/off, resume delay, launch at
   login, onboarding completion, verbose diagnostics.
 - `com.oreja.pause-journal.v1` — only while Oreja owns a pause: provider, track identity, pause
   time. Deleted as soon as playback is restored or ownership is released.

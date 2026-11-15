@@ -8,10 +8,42 @@ made, not the day it was published.
 
 ### Planned
 
-- **More music players.** Apple Music is the one player Oreja controls today. Spotify and the rest
-  of the desktop players come next.
-- **More coding harnesses.** ChatGPT is the one source today. Claude Code, Codex and the other
-  terminal agents are next, with the same rule: read the level of the app you choose, keep nothing.
+- **More music players.** Apple Music and the experimental Browser target are available. Spotify
+  and other desktop players remain planned.
+- **More app sources.** Add and verify more audio-source profiles as apps and their audio process
+  identifiers change.
+
+## [0.4.0] - 2026-11-15
+
+### Added
+
+- **Separate interruption sources from playback targets.** Choose the apps Oreja listens to and
+  independently choose playback targets. The optional Browser target controls standard HTML audio
+  and video in supported scriptable browsers: Safari, Chrome, Edge, Brave, Arc, and ego lite. Choose
+  all supported browsers or the active browser.
+- **Browser interruption modes.** Pause media that was already playing when the interruption began
+  and resume it at the same position, or lower its volume and restore it when the interruption ends.
+  Oreja tracks its own changes and honors manual playback or volume changes.
+- **User speech can interrupt selected targets.** When “Pause while I speak” is enabled, the same
+  selected playback targets respond while the user talks.
+
+### Changed
+
+- **Settings reorganized.** Audio sources, playback targets, automation, permissions, and privacy
+  controls are grouped into focused sections with clearer browser capability and permission guidance.
+- **Direct launch opens Settings.** Returning users see the app's main window when opening Oreja
+  from Finder; first-run onboarding is unchanged.
+
+### Verified and limitations
+
+- Automated suite: 89 tests passed, 422 assertions. App built and launched on macOS 26.6.2 (Apple
+  M2). A user reported successful real browser playback testing; the exact browser, website, and
+  interruption settings were not recorded in the test evidence.
+- Browser control uses browser scripting permissions and standard HTML media elements. Some
+  protected or custom players may not respond. Firefox has no adapter; Internet Explorer is not
+  available on macOS. Spotify's native app is not a playback target.
+- The build is ad-hoc signed and not notarized. See `docs/compatibility.md` and
+  `docs/distribution.md` for support boundaries and installation details.
 
 ## [0.3.1] - 2026-11-10
 

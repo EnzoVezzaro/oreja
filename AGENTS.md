@@ -2,8 +2,9 @@
 
 ## Purpose
 
-Oreja de Van Gogh is a macOS menu bar utility that pauses Apple Music while any selected audio app speaks and
-resumes it after a quiet interval. One job, local only, no OpenAI API, no recording.
+Oreja de Van Gogh is a macOS menu bar utility that pauses or lowers selected playback targets while
+any selected audio app speaks, then restores them after a quiet interval. Apple Music is supported;
+browser media control is experimental. One job, local only, no OpenAI API, no recording.
 
 ## Architecture boundaries
 
@@ -12,7 +13,8 @@ resumes it after a quiet interval. One job, local only, no OpenAI API, no record
   deterministic so it can be reused by the iOS companion and tested without hardware.
 - `packages/OrejaAudio` — Core Audio process discovery, process taps, level sampling, activity
   detector. Imports CoreAudio; must not import SwiftUI.
-- `packages/OrejaMedia` — Music control through Apple Events (`NSAppleScript`) plus a mock provider.
+- `packages/OrejaMedia` — Music and browser media scripting through Apple Events (`NSAppleScript`)
+  plus a mock provider.
 - `apps/macos` — SwiftUI menu bar app, onboarding, settings, diagnostics, AppKit glue. Presentation
   reads coordinator state; it never decides pause/resume.
 - `Tests/OrejaTestRunner` — executable test suite (this machine has no XCTest runtime).
@@ -47,7 +49,7 @@ paths in sync when moving files.
 ## Test
 
 ```bash
-./scripts/test.sh             # all 83 tests
+./scripts/test.sh             # all 88 tests
 ./scripts/test.sh resume      # name filter
 ./build/bin/oreja-probe --list
 ./build/bin/oreja-probe --pid <pid> --seconds 6
@@ -93,6 +95,6 @@ Do not weaken these properties to make a demo or a distribution step easier.
 - Recording or transcribing conversations.
 - Cross-app audio capture on iOS, or any private API / security bypass.
 - Multi-agent orchestration inside the runtime.
-- Windows, Android, Linux, or extra music providers (Spotify, VLC, browser tabs) before the macOS
-  core is verified end to end. Volume ducking and the microphone "pause while I speak" option are
-  shipped and are no longer non-goals.
+- Windows, Android, Linux, or extra native music providers (Spotify, VLC). Browser media control is
+  experimental and must not be described as universal. Volume ducking and the microphone "pause
+  while I speak" option are shipped and are no longer non-goals.

@@ -1,10 +1,11 @@
 # Oreja de Van Gogh
 
-**Your AI talks. Your music listens.**
+**Your AI talks. Your audio makes room.**
 
-Oreja is a tiny macOS menu bar companion with one job: when the selected AI app starts speaking,
-Oreja either pauses Apple Music or lowers its volume, depending on your chosen mode. When the app
-goes quiet, Music resumes or its original volume returns exactly where it left off.
+Oreja is a tiny macOS menu bar companion. Choose apps whose audio signals an interruption, then
+choose how a playback target responds. Release 0.4.0 adds an experimental Browser target alongside
+Apple Music. The browser control path uses Apple Events and page scripting; the maker reported
+successful real playback testing, though the exact browser and site were not recorded.
 
 - It runs alongside ChatGPT. It does not replace it, proxy it, or change your account.
 - It needs no OpenAI API key, no account, and no network connection.
@@ -14,10 +15,11 @@ goes quiet, Music resumes or its original volume returns exactly where it left o
 
 ## Download
 
-[Oreja 0.3.1](https://github.com/EnzoVezzaro/oreja/releases/latest) is a disk image for macOS 14.2
+[Oreja 0.4.0](https://github.com/EnzoVezzaro/oreja/releases/latest) is a disk image for macOS 14.2
 or newer, also served from [the landing page](https://oreja-tau.vercel.app/). It is ad-hoc signed
 and not notarized, so the first launch on another Mac needs one Gatekeeper approval (System
-Settings › Privacy & Security › Open Anyway). What changed: [CHANGELOG.md](CHANGELOG.md).
+Settings › Privacy & Security › Open Anyway). What changed: [CHANGELOG.md](CHANGELOG.md), with
+[0.4.0 release details](docs/releases/0.4.0.md).
 
 Status: **macOS MVP built and working on the development machine** (macOS 26.6.2, Apple M2). The
 Core Audio capture path and real Apple Music pause/resume have been exercised end to end against a
@@ -29,13 +31,19 @@ controlled audio fixture. A live **ChatGPT Voice session has not** been run; see
 ```
 ChatGPT output audio ──► Core Audio process tap ──► level analysis ──► coordinator
                                                                           │
-Apple Music playback state ◄── Apple Events ◄── pause / resume commands ◄──┘
+Apple Music playback state ◄── Apple Events ◄── pause / duck commands ◄──┘
 ```
 
 Oreja taps the **output** of the selected applications' Core Audio processes (macOS 14.2+), unmuted,
-so each app keeps playing normally while Oreja listens to a copy. You can select several apps at
-once (ChatGPT, Claude, a coding agent, a call app, a browser, or any running app); one private tap
-covers all of them, including their helper processes, and is torn down when monitoring stops. A speech-shape filter then decides whether a burst is worth interrupting music for: it wants the
+so each primary app keeps playing normally while Oreja listens to a copy. You can select several
+apps as primary sources (ChatGPT, Claude, a coding agent, a call app, a browser, or any running app).
+The Browser target supports standard HTML media in Safari, Chrome, Edge, Brave, Arc, and ego lite
+through browser scripting. Choose all supported browsers or the active browser; use Pause (resume at
+the same position) or Lower volume. An Oreja user confirmed real playback works in their setup, but
+did not record the exact browser, site, or settings, so browser-specific and protected-player
+behavior may vary. Firefox has no adapter, Internet Explorer is unavailable on macOS, and Spotify's
+native app is not a playback target. A speech-shape
+filter then decides whether a burst is worth interrupting music for: it wants the
 syllable-shaped loudness changes of speech, so short blips, steady alert tones and single decay
 chimes are ignored instead of pausing your music. Music is controlled with Apple Events against the Music app, which Oreja never launches on
 its own.
@@ -52,10 +60,12 @@ Read [docs/architecture.md](docs/architecture.md) for the full design.
 - macOS 14.2 or newer (Core Audio process taps). Developed and tested on macOS 26.6.2, arm64.
 - At least one audio app to listen to. The ChatGPT desktop app is the default. Others are chosen in
   Settings or onboarding, and each listed app's support level is in
-  [docs/compatibility.md](docs/compatibility.md). Browsers are experimental and capture every tab.
-  Music players cannot be selected.
+  [docs/compatibility.md](docs/compatibility.md). A browser selected as an interruption source is
+  process-wide, so audio from any tab may count. This does not make browser playback a supported
+  target.
 - The Music app for playback control. An Apple Music subscription is not required by Oreja, but
-  Music must be the app that is playing.
+  Music must be the app that is playing for the Apple Music target. Browser media is a separate,
+  experimental playback target; Spotify's native app is not supported.
 - To build: Command Line Tools (`xcode-select --install`) or Xcode. No third-party dependencies.
 
 ## Build and run
@@ -76,7 +86,7 @@ Onboarding runs once per install; to see it again, quit Oreja and delete its def
 To run the automated suite:
 
 ```bash
-./scripts/test.sh             # 83 tests, 0 failures
+./scripts/test.sh             # 89 tests, 0 failures
 ./scripts/test.sh resume      # filter by test name
 ```
 
@@ -146,7 +156,7 @@ attention.
 
 Executed on this machine (macOS 26.6.2, Apple M2, Swift 6.3.3):
 
-- ✅ **83/83 automated tests pass** (372 assertions), including audio source selection, settings migration and music-player exclusion: pause, resume, stale-state recovery, sentence gaps, conversation hold, volume ducking, user-first speech pause, manual pause and resume, process exit, Music exit, permission revoked, device change, rapid responses, sleep/wake, ownership reconciliation, quit restoration, delayed commands, command-failure limits, detector thresholds/hysteresis, speech-shape filter classification of brief, steady, decaying and speech-shaped bursts, sensitivity-to-threshold mapping for the AI and the microphone, hook routing by event, disabled and draft hooks, cooldown, failure reporting and settings round-trip, AppleScript parsing, one-round-trip command scripts, settings, journal recovery, and reactive playback settings.
+- ✅ **88/88 automated tests pass** (411 assertions), including settings migration, browser scripting dialect selection and escaping, primary/secondary selection separation, microphone-driven target control, and safe process matching.
 - ✅ **App bundle builds, signs, and launches**: the menu bar app stays resident, maps only its own
   `Contents/Frameworks` dylibs, and idles at 0.0–0.1% CPU with a ~37–54 MB physical footprint.
   A packaging bug that made the app abort in dyld at launch was found and fixed; see
@@ -208,7 +218,9 @@ There is no analytics SDK and no server. Full text: [docs/privacy.md](docs/priva
 - The speech-shape filter classifies audio by shape, not meaning. It reliably ignores short blips, steady
   tones and single-decay chimes, but a long, loudly modulated non-speech sound (a ringtone melody,
   a beat-driven alarm) still counts. It is not speech recognition and makes no semantic claims.
-- Browser-based ChatGPT is experimental and captures every tab in that browser.
+- Browser-based ChatGPT can be selected as an interruption source, but monitoring is process-wide
+  and captures activity from every tab in that browser. This is separate from browser playback
+  control, which is experimental in release 0.4.0.
 - The app is ad-hoc signed and unnotarized, so another Mac will require a Gatekeeper bypass.
 - The name has not been cleared for trademark use; do not publish under it without a search.
 
@@ -216,7 +228,8 @@ There is no analytics SDK and no server. Full text: [docs/privacy.md](docs/priva
 
 See [docs/roadmap.md](docs/roadmap.md). Next milestone: a supervised live test against a real
 ChatGPT Voice session and Apple Music, including measured pause/resume latency and a device matrix.
-Then breadth: more music players (Spotify and the other desktop players) and more coding harnesses
+Then breadth: browser playback control with reliable per-session ownership and manual-pause handling,
+followed by more music players (including Spotify) and more coding harnesses
 (Claude Code, Codex and the other terminal agents), each behind the same ports and capability
 declarations.
 

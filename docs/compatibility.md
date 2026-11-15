@@ -23,7 +23,7 @@ read "expected" as verified; see `test-evidence.md`.
 | Claude desktop | **Not verified** | `com.anthropic.claudefordesktop` (from the vendor's identifier; not installed on the test Mac) | Appears under AI assistants if installed with that identifier; otherwise under Other running apps. |
 | Coding agents and terminals (Antigravity, Orca, VS Code, Terminal, iTerm2, Ghostty, Warp, Zed, Cursor, Windsurf) | Listed; live capture of agent speech **not verified** | see `KnownAudioApp` | Only Antigravity, Orca, VS Code and Terminal are installed on the test Mac, and none was tested with speech. A terminal app only captures audio its own processes render. A `say` or script run from a terminal is a separate process with no bundle identifier, so it is not captured. |
 | Calls and messages (FaceTime, WhatsApp, Telegram, Slack, Zoom, Discord, Teams) | Listed; **not verified** | see `KnownAudioApp` | Only Slack, FaceTime, WhatsApp and Telegram are installed on the test Mac; none was tested in a call. |
-| Browsers (Chrome, Safari, Edge, Arc, Brave, Firefox, ego lite) | Experimental | see `KnownAudioApp` | A browser tap hears every tab. ego lite ChatGPT Voice produced no capturable audio on the test Mac (`test-evidence.md`). Chrome has not been tested live. Safari's `com.apple.WebKit` prefix also matches WebKit processes of other apps; narrowing it needs a live Safari capture. |
+| Browsers as interruption sources (Chrome, Safari, Edge, Arc, Brave, Firefox, ego lite) | Experimental | see `KnownAudioApp` | Process-level monitoring can include audio from every tab; the browser source has not been verified live as a group. ego lite ChatGPT Voice produced no capturable audio on the test Mac (`test-evidence.md`). Safari's `com.apple.WebKit` prefix can also match WebKit processes of other apps. This row describes listening only, not controlling browser playback. |
 | Siri | Experimental, not verified | `com.apple.SiriNCService`, `com.apple.assistant` | Listed as a system service; its audio process is not confirmed. |
 | Any other running app | Supported by design, **not verified per app** | the app's bundle identifier | Shown under Other running apps. Notifications from a selected app can count as speech; the speech-shape filter reduces this. |
 | ChatGPT Classic macOS voice | Unsupported | — | Retired by OpenAI in January 2026. |
@@ -36,7 +36,10 @@ read "expected" as verified; see `test-evidence.md`.
 | --- | --- | --- |
 | Apple Music (Music.app), local library | Control implemented, live unverified | Apple Events. Requires Automation consent; never launched by Oreja. |
 | Apple Music streaming/radio | Expected, unverified | Same play/pause commands; buffer/queue behavior untested. |
-| Spotify, YouTube Music, VLC | Not implemented | Capability-based adapters planned. |
+| Spotify | Not implemented | Spotify's native app is not available as a playback target. |
+| Browser media (HTML audio/video) | **Experimental in 0.4.0** | Uses Apple Events and page scripting for Safari, Chrome, Edge, Brave, Arc, and ego lite. The user reported successful real playback testing, but did not identify the browser, site, or settings. All supported browsers and active browser scopes are available. Protected/custom players may not respond. Firefox has no adapter; Internet Explorer is unavailable on macOS. |
+| Internet Explorer | Unsupported | Internet Explorer has no current macOS release and cannot be a target on this macOS-only app. |
+| YouTube Music, VLC | Not implemented | No playback adapter. |
 
 ## Audio devices
 
@@ -74,7 +77,11 @@ real ChatGPT/Music conversation).
 ## Known limitations
 
 - Detection is speech-*shaped* output activity, not speech recognition: a long modulated non-speech sound still counts.
-- Browser monitoring is whole-browser.
+- Browser monitoring as an interruption source is process-wide; audio from any tab may count. This
+  is separate from the Browser playback target.
+- Browser control is experimental and relies on browser scripting permissions and standard HTML
+  media elements. The exact browser/site used in the reported manual playback test was not recorded;
+  protected/custom players and other edge cases may behave differently.
 - Ad-hoc signing means TCC grants may reset when the app is rebuilt.
 - No notarization: another Mac needs Gatekeeper approval.
 - The app is a menu bar utility; there is no Dock icon or main window by design.

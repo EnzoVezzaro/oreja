@@ -49,6 +49,15 @@ public final class PlaybackCoordinator {
     public private(set) var state: CoordinatorState = .disabled
     public private(set) var automationEnabled = false
     public private(set) var aiIsActive = false
+    public private(set) var userSpeechIsActive = false
+    /// Whether selected secondary applications should currently be muted by the platform adapter.
+    public var shouldMuteTargetAudio: Bool {
+        automationEnabled
+            && state != .suspended
+            && state != .error
+            && state != .permissionRequired
+            && (userSpeechIsActive || (sourceIsValid && (aiIsActive || silenceToken != nil)))
+    }
     public private(set) var ownership: PauseOwnership?
     public private(set) var volumeOwnership: VolumeOwnership?
     public private(set) var lastSnapshot: MediaPlaybackSnapshot?
@@ -109,6 +118,7 @@ public final class PlaybackCoordinator {
         automationEnabled = false
         cancelSilence()
         aiIsActive = false
+        userSpeechIsActive = false
         userOverrodeDuringActivity = false
         // Disabling automation releases responsibility for any pause Oreja owns, restoring
         // the user's playback so Oreja never leaves music stuck.
@@ -116,6 +126,15 @@ public final class PlaybackCoordinator {
         restoreOwnedVolume(reason: "automation disabled")
         transition(.disabled)
         log(.info, .lifecycle, "Automation disabled.")
+    }
+
+    /// Tracks optional microphone activity separately so secondary app muting can follow the
+    /// user's speech even when the selected AI source is temporarily unavailable.
+    public func setUserSpeechActive(_ active: Bool) {
+        guard !active || automationEnabled else { return }
+        guard active != userSpeechIsActive else { return }
+        userSpeechIsActive = active
+        notify()
     }
 
     public func updatePolicy(_ policy: PlaybackPolicy) {
@@ -480,6 +499,7 @@ public final class PlaybackCoordinator {
     public func systemWillSleep() {
         cancelSilence()
         aiIsActive = false
+        userSpeechIsActive = false
         activityOnsetTime = nil
         transition(.suspended)
         log(.info, .lifecycle, "System is going to sleep; automation suspended.")
@@ -536,6 +556,7 @@ public final class PlaybackCoordinator {
         silenceToken = nil
         ownership = nil
         aiIsActive = false
+        userSpeechIsActive = false
         userOverrodeDuringActivity = false
         lastSnapshot = nil
         lastError = nil

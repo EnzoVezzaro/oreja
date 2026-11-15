@@ -5,6 +5,34 @@ import OrejaCore
 func runCoordinatorSuite(_ t: Harness) async {
     print("\nPlayback coordinator")
 
+    await t.runAsync("secondary app mute follows the owned interruption and quiet interval") {
+        let f = CoordinatorFixture()
+        await f.startMonitoring()
+        t.expect(!f.coordinator.shouldMuteTargetAudio)
+
+        f.coordinator.audioActivityStarted(levelDB: -20)
+        t.expect(f.coordinator.shouldMuteTargetAudio, "selected targets mute when primary speech starts")
+        f.completeLast(nextState: .paused)
+        f.coordinator.audioActivityEnded()
+        t.expect(f.coordinator.shouldMuteTargetAudio, "targets stay muted during the resume delay")
+
+        f.scheduler.advance(by: 0.81)
+        t.expect(!f.coordinator.shouldMuteTargetAudio, "targets unmute when the quiet interval ends")
+        f.coordinator.setAutomationEnabled(false)
+        t.expect(!f.coordinator.shouldMuteTargetAudio, "disabling automation always releases target mute")
+    }
+
+    await t.runAsync("secondary apps mute on detected user speech even if the AI monitor is unavailable") {
+        let f = CoordinatorFixture()
+        await f.startMonitoring()
+        f.coordinator.sourceInvalidated(reason: "selected app closed")
+
+        f.coordinator.setUserSpeechActive(true)
+        t.expect(f.coordinator.shouldMuteTargetAudio, "microphone speech can mute targets without an AI source tap")
+        f.coordinator.setUserSpeechActive(false)
+        t.expect(!f.coordinator.shouldMuteTargetAudio, "target mute releases after user speech ends")
+    }
+
     await t.runAsync("1. music playing + AI begins audio = pause") {
         let f = CoordinatorFixture()
         await f.startMonitoring()

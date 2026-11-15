@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Oreja de Van Gogh: pause Apple Music while ChatGPT speaks</title>
-  <meta name="description" content="A macOS menu bar app that pauses or lowers Apple Music while ChatGPT speaks, then puts it back where you left it. Local only, records nothing.">
+  <meta name="description" content="A macOS menu bar app that pauses or lowers Apple Music or supported browser media while selected apps speak. Browser playback is experimental.">
   <link rel="canonical" href="https://oreja-tau.vercel.app/">
   <meta name="robots" content="index, follow, max-image-preview:large">
   <meta name="theme-color" content="#080a20">
@@ -60,19 +60,20 @@
           "name": "Oreja de Van Gogh",
           "alternateName": "Oreja",
           "url": "https://oreja-tau.vercel.app/",
-          "downloadUrl": "https://oreja-tau.vercel.app/downloads/Oreja-0.3.1.dmg",
+          "downloadUrl": "https://oreja-tau.vercel.app/downloads/Oreja-0.4.0.dmg",
           "image": "https://oreja-tau.vercel.app/assets/og.png",
-          "description": "A macOS menu bar app that pauses or lowers Apple Music while the audio apps you choose speak, such as ChatGPT, then returns it at the level and position you chose.",
+          "description": "A macOS menu bar app that pauses or lowers Apple Music or browser media while selected audio apps speak. Browser playback is experimental.",
           "applicationCategory": "MultimediaApplication",
           "applicationSubCategory": "Menu bar utility",
           "operatingSystem": "macOS 14.2 or later",
-          "softwareVersion": "0.3.1",
+          "softwareVersion": "0.4.0",
           "license": "https://www.gnu.org/licenses/gpl-3.0.html",
           "isAccessibleForFree": true,
           "publisher": { "@id": "https://oreja-tau.vercel.app/#publisher" },
           "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
           "featureList": [
-            "Pauses or lowers Apple Music while ChatGPT speaks",
+            "Pauses or lowers Apple Music or browser media while selected audio apps speak",
+            "Experimental Browser playback target for standard HTML media in supported browsers",
             "Returns playback at the level and position you chose",
             "Follows the app's audio level instead of recognising words",
             "Runs on the Mac, with no account and no recording"
@@ -101,10 +102,10 @@
             },
             {
               "@type": "Question",
-              "name": "Why only Apple Music?",
+              "name": "Which playback targets are available?",
               "acceptedAnswer": {
                 "@type": "Answer",
-                "text": "Apple Music is the one player Oreja controls today. More players are coming."
+                "text": "Apple Music and an experimental Browser target. Browser media controls standard HTML audio and video in Safari, Chrome, Edge, Brave, Arc, and ego lite using Apple Events and page scripting. Firefox has no adapter; protected or custom players may not respond. Spotify's native app is not a playback target."
               }
             },
             {
@@ -218,7 +219,7 @@
         <p class="n-kicker"><span class="n-dot" aria-hidden="true"></span> Menu bar app for macOS 14.2 and later</p>
         <h1 id="hero-title" class="n-display">
           <span>Your AI talks.</span>
-          <span>Your music</span>
+          <span>Your audio</span>
           <span class="n-underline">
             <em>waits its turn.</em>
             <svg viewBox="0 0 300 18" aria-hidden="true" focusable="false" preserveAspectRatio="none">
@@ -227,9 +228,11 @@
           </span>
         </h1>
         <p class="n-lede">
-          Oreja pauses Apple Music while ChatGPT speaks, or lowers it to a level you pick, then
-          puts it back where you left it. It follows the app's audio level, so it works with any
-          voice in any language and never listens to the words.
+          Oreja pauses Apple Music or supported browser media while a selected app speaks, or lowers
+          the volume to a level you pick. It restores playback when the interruption ends. Browser
+          control is experimental and needs Automation permission; some protected players may not
+          respond. Oreja follows the app's audio level, so it works with any voice in any language
+          and never listens to the words.
         </p>
         <div class="n-actions">
           <a class="n-btn n-btn-solid n-btn-lg" href="#get" data-sc-magnet="0.24" data-sc-rise="0">Download Oreja for Mac</a>
@@ -390,7 +393,7 @@
             </div>
 
             <div class="n-panel-foot">
-              <span>Version 0.3.1</span>
+              <span>Version 0.4.0</span>
               <span>GitHub · Changelog</span>
             </div>
           </div>
@@ -451,8 +454,8 @@
             <p>No. Oreja does not talk to OpenAI. It observes the local audio output of the app you choose and controls Apple Music through macOS automation.</p>
           </details>
           <details>
-            <summary>Why only Apple Music?</summary>
-            <p>Apple Music is the one player Oreja controls today. More players are coming.</p>
+            <summary>Which playback targets are available?</summary>
+            <p>Apple Music and an experimental Browser target. Browser media controls standard HTML audio and video in Safari, Chrome, Edge, Brave, Arc, and ego lite using Apple Events and page scripting. Firefox has no adapter; protected or custom players may not respond. Spotify's native app is not a playback target.</p>
           </details>
           <details>
             <summary>Pause, or just lower it?</summary>
@@ -483,20 +486,22 @@
       <div class="n-dawn-sky" aria-hidden="true"></div>
       <div class="n-sun" aria-hidden="true"></div>
       <div class="n-dawn-hills" aria-hidden="true"></div>
-      <div class="n-dawn-figure" aria-hidden="true">
+      <button class="n-dawn-figure" type="button" aria-label="Wake Vincent and reveal a note" aria-pressed="false" data-dawn-character>
         <img src="assets/vincent-back.png" width="208" height="304" alt="" loading="lazy" decoding="async">
-      </div>
+      </button>
+      <p class="n-dawn-whisper" aria-live="polite" data-dawn-whisper>He has been waiting for the music.</p>
 
       <div class="n-wrap n-dawn-inner">
         <p class="n-eyebrow n-eyebrow-dark">Morning</p>
         <h2 id="get-title" class="n-h2 n-dawn-title">Bring him home.</h2>
         <p class="n-lede n-lede-dark">
-          Download the 0.3.1 build for macOS 14.2 or later. It is ad-hoc signed and not notarized, so
-          macOS asks for approval once. The source builds with one script and no dependencies.
+          Download Oreja 0.4.0 for macOS 14.2 or later. The Browser target is experimental and needs
+          browser Automation permission. The app is ad-hoc signed and not notarized, so macOS asks
+          for approval once. The source builds with one script and no dependencies.
         </p>
         <div class="n-actions">
-          <a class="n-btn n-btn-dark n-btn-lg" href="downloads/Oreja-0.3.1.dmg">Download Oreja 0.3.1</a>
-          <a class="n-link n-link-dark" href="docs.html#building">Build from source <span aria-hidden="true">→</span></a>
+          <a class="n-btn n-btn-dark n-btn-lg" href="downloads/Oreja-0.4.0.dmg">Download Oreja 0.4.0</a>
+          <a class="n-link n-link-dark" href="https://github.com/EnzoVezzaro/oreja/blob/main/CHANGELOG.md">Changelog <span aria-hidden="true">→</span></a>
         </div>
         <ul class="n-facts n-facts-dark">
           <li>macOS 14.2+</li>

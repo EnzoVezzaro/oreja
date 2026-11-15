@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Documentation — Oreja de Van Gogh</title>
-  <meta name="description" content="Install, permissions, day-to-day use, troubleshooting and privacy for Oreja de Van Gogh, the macOS menu bar companion for ChatGPT and Apple Music.">
+  <meta name="description" content="Install, permissions, day-to-day use, troubleshooting and privacy for Oreja de Van Gogh 0.4.0, including its experimental Browser playback target.">
   <link rel="canonical" href="https://oreja-tau.vercel.app/docs.html">
   <meta name="robots" content="index, follow, max-image-preview:large">
   <meta name="theme-color" content="#f7f2e8" media="(prefers-color-scheme: light)">
@@ -122,15 +122,16 @@
         <section id="start">
           <h2>Quick start</h2>
           <p>
-            Oreja is a menu bar app for macOS with one job: coordinate Apple Music while the AI app you
-            choose is speaking. You can pause and resume Music, or keep it playing at a lower volume and
-            restore that volume when the reply ends.
+            Oreja is a menu bar app for macOS with one job: coordinate playback while a selected
+            interruption source is speaking. Release 0.4.0 supports Apple Music and adds an
+            experimental Browser playback target using Apple Events and page scripting for standard
+            HTML media in Safari, Chrome, Edge, Brave, Arc, and ego lite.
           </p>
           <h3>What you need</h3>
           <ul>
             <li><strong>macOS 14.2 or newer.</strong> The audio tap relies on Core Audio process taps.</li>
-            <li><strong>At least one audio app to listen to.</strong> The ChatGPT desktop app is the default. You can add Claude, coding agents, call apps or any open app. Browsers are experimental: a browser source captures every tab.</li>
-            <li><strong>The Music app</strong>, with a song loaded. An Apple Music subscription is not required by Oreja, but Music must be the app that is playing.</li>
+            <li><strong>At least one audio app to listen to.</strong> The ChatGPT desktop app is the default. You can add Claude, coding agents, call apps or any open app. Browser sources are process-wide: audio from any tab may count as interruption activity.</li>
+            <li><strong>A playback target.</strong> Use Apple Music or the experimental Browser target for standard HTML media. Browser control requires Automation permission and may not work with protected or custom players. Spotify's native app is unavailable.</li>
             <li><strong>Command Line Tools</strong> if you build from source. There are no third-party dependencies.</li>
           </ul>
           <h3>Build and open</h3>
@@ -150,7 +151,7 @@ open build/Oreja.app</code></pre>
 
         <section id="permissions">
           <h2>Permissions</h2>
-          <p>Oreja asks for two permissions, each with a specific purpose string.</p>
+          <p>Oreja asks for two permissions, each with a specific purpose string. Automation is used for Music and the experimental Browser target.</p>
           <div class="table-wrap" role="region" tabindex="0" aria-label="Permissions required by Oreja">
             <table>
               <thead>
@@ -158,7 +159,7 @@ open build/Oreja.app</code></pre>
               </thead>
               <tbody>
                 <tr><td>System audio recording</td><td>Read the selected app's output level through a Core Audio process tap.</td><td>System Settings › Privacy &amp; Security › Screen &amp; System Audio Recording</td></tr>
-                <tr><td>Automation (Music)</td><td>Pause, resume, or adjust the Music app's volume, depending on the selected mode.</td><td>The macOS prompt on first control, then Privacy &amp; Security › Automation</td></tr>
+                <tr><td>Automation (Music and browsers)</td><td>Pause/resume or adjust Music; control standard media in selected supported browsers.</td><td>The macOS prompt on first control, then Privacy &amp; Security › Automation</td></tr>
               </tbody>
             </table>
           </div>
@@ -176,7 +177,7 @@ tccutil reset AppleEvents app.oreja.van-gogh</code></pre>
           <h2>Using Oreja</h2>
           <ul>
             <li><strong>The switch</strong> in the panel enables or disables coordination. Turning it off while Oreja owns a pause or volume change restores Music first.</li>
-            <li><strong>Interruption mode</strong> lets you choose between pausing and resuming Music, or keeping it playing at a lower volume and restoring the original volume afterward.</li>
+            <li><strong>Playback targets</strong> include Apple Music and the experimental Browser target. Choose Pause (resume at the same position) or Lower volume. Browser uses Apple Events/page scripting; protected and custom players may not respond.</li>
             <li><strong>Resume delay</strong> (0.3–3.0 s, default 0.8 s) is how long ChatGPT must stay quiet before music resumes. It is layered on top of the detector's 0.25 s silence window.</li>
             <li><strong>Pause while I speak</strong> optionally includes your microphone activity, so Music also responds while you answer.</li>
             <li><strong>Manual control always wins.</strong> If you pause Music yourself, Oreja will not resume it. If you resume Music while ChatGPT speaks, Oreja releases its claim.</li>
@@ -228,7 +229,7 @@ tccutil reset AppleEvents app.oreja.van-gogh</code></pre>
           <h3>Music never pauses</h3>
           <ul>
             <li>Check that the app that is talking is ticked under Audio sources. ChatGPT app versus browser is a common mismatch.</li>
-            <li>Check that Music is the app that is playing, not Spotify or a browser tab.</li>
+            <li>Check that the selected playback target is running and that Oreja has Automation permission. Spotify's native app is not a playback target.</li>
             <li>Watch Diagnostics for activity events. If none appear, the tap is not receiving audio: re-grant audio capture.</li>
             <li>If activity appears but no pause is issued, Music was already paused, a command is pending, or a manual override was detected. Diagnostics says which.</li>
           </ul>
@@ -292,6 +293,10 @@ tccutil reset AppleEvents app.oreja.van-gogh</code></pre>
             that application's processes and helpers, and torn down when monitoring stops.
           </p>
           <p>
+            Release 0.4.0 includes an experimental Browser playback target using Apple Events and page
+            scripting for standard media in supported browsers. Browser source monitoring is a
+            separate process-level input and may include every tab. The maker reported a successful
+            real playback test; the browser and media site used were not recorded.
             The decision to pause or resume lives in one deterministic state machine with no AppKit,
             no Core Audio and no AppleScript, so it is fully unit-tested. Platform code sits behind
             ports.
