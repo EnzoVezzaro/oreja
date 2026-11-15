@@ -17,6 +17,13 @@ const progress = document.querySelector("[data-progress]");
 const waveCanvas = document.querySelector("[data-wave]");
 const storyAct = document.querySelector("#story");
 const dawnSection = document.querySelector("[data-dawn]");
+const dawnCharacter = document.querySelector("[data-dawn-character]");
+const dawnWhisper = document.querySelector("[data-dawn-whisper]");
+if (dawnCharacter && dawnSection) dawnCharacter.addEventListener("click", () => {
+  const awake = dawnSection.classList.toggle("is-awake");
+  dawnCharacter.setAttribute("aria-pressed", String(awake));
+  if (dawnWhisper) dawnWhisper.textContent = awake ? "There you are. Let the music begin." : "He has been waiting for the music.";
+});
 const aiBar = document.querySelector("[data-level-ai]");
 const musicBar = document.querySelector("[data-level-music]");
 const aiValue = document.querySelector("[data-value-ai]");

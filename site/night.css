@@ -659,6 +659,7 @@ code {
 
 @media (prefers-reduced-motion: reduce) {
   .n-dawn-figure,
+  .n-dawn.is-awake .n-dawn-figure,
   .n-dawn-figure::before,
   .n-dawn-figure::after,
   .n-sun::after {
@@ -1995,7 +1996,18 @@ code {
   transform-origin: 50% 100%;
   animation: n-back-breathe 9s var(--ease-soft) infinite;
   will-change: transform;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
 }
+
+.n-dawn-figure:focus-visible { outline: 2px solid #fff1c9; outline-offset: 8px; border-radius: 48%; }
+.n-dawn.is-awake .n-dawn-figure { animation: n-character-wake 1.15s var(--ease-out) both, n-back-breathe 9s 1.15s var(--ease-soft) infinite; }
+.n-dawn-whisper { position:absolute; z-index:5; right: max(4vw, calc((100% - var(--wrap))/2)); bottom: 42%; max-width: 17ch; color:#fff1d7; font: italic 1.35rem var(--serif); opacity:0; transform:translateY(10px); transition:opacity .35s ease, transform .45s var(--ease-out); pointer-events:none; }
+.n-dawn.is-awake .n-dawn-whisper { opacity:1; transform:translateY(0); }
+@keyframes n-character-wake { 35% { transform:translateY(-18px) rotate(3deg) scale(1.04); } 68% { transform:translateY(2px) rotate(-1.5deg); } 100% { transform:translateY(0) rotate(0); } }
 
 /* The warmth the sun puts on him, in front of the hills but behind his pixels. */
 .n-dawn-figure::before {
