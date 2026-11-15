@@ -40,6 +40,8 @@ final class AppModel: ObservableObject {
     let diagnostics: DiagnosticsLog
     let media: any MediaPlaybackController & MediaAdministration
     private let monitorFactory: any AIAudioMonitorFactory
+    private var targetAudioMuteController: ProcessAudioTargetMuteController?
+    private let browserAudioController = BrowserAudioController()
     private let settingsStore: any SettingsStoring
     private let pauseJournal: any PauseJournal
     private let hookExecutor: any HookExecuting = MacHookExecutor()
@@ -60,6 +62,12 @@ final class AppModel: ObservableObject {
     /// Last ownership seen, so hooks fire on the transition and not on every state refresh.
     private var lastOwnership: PauseOwnership?
     private var lastVolumeOwnership: VolumeOwnership?
+    private var lastTargetMuteIntent: Bool?
+    private var lastUnsupportedBrowserTargetIDs = Set<String>()
+    private var lastBrowserControlError: String?
+    private var browserInterruptionTargets: [AISourceSelection]?
+    private var browserInterruptionMode: MusicInterruptionMode?
+    private var browserInterruptionDuckPercent: Int?
 
     init(
         settingsStore: (any SettingsStoring)? = nil,
@@ -73,6 +81,9 @@ final class AppModel: ObservableObject {
         self.settingsStore = resolvedStore
         self.pauseJournal = resolvedJournal
         self.monitorFactory = monitorFactory ?? ProcessAudioMonitorFactory()
+        if #available(macOS 14.2, *) {
+            self.targetAudioMuteController = ProcessAudioTargetMuteController()
+        }
         let resolvedMedia: any MediaPlaybackController & MediaAdministration = media ?? AppleMusicController()
         self.media = resolvedMedia
         self.settings = loaded
@@ -173,7 +184,17 @@ final class AppModel: ObservableObject {
         if settings.aiSources.contains(where: { $0.bundleIdentifier == selection.bundleIdentifier }) {
             settings.aiSources.removeAll { $0.bundleIdentifier == selection.bundleIdentifier }
         } else {
+            settings.targetAudioApps.removeAll { $0.bundleIdentifier == selection.bundleIdentifier }
             settings.aiSources.append(selection)
+        }
+    }
+
+    func toggleTargetAudioApp(_ selection: AISourceSelection) {
+        if settings.targetAudioApps.contains(where: { $0.bundleIdentifier == selection.bundleIdentifier }) {
+            settings.targetAudioApps.removeAll { $0.bundleIdentifier == selection.bundleIdentifier }
+        } else {
+            settings.aiSources.removeAll { $0.bundleIdentifier == selection.bundleIdentifier }
+            settings.targetAudioApps.append(selection)
         }
     }
 
@@ -250,6 +271,9 @@ final class AppModel: ObservableObject {
             }
         }
 
+        // Playback mode and target duck level are applied by the target adapters directly, so
+        // refresh them even when changing those preferences does not emit a coordinator event.
+        syncTargetAudioMute()
         record(.info, .settings, "Settings updated.")
     }
 
@@ -424,6 +448,7 @@ final class AppModel: ObservableObject {
         if activity.set(false, for: .user) {
             coordinator.audioActivityEnded()
         }
+        coordinator.setUserSpeechActive(false)
         Task { await monitor.stop() }
         record(.info, .monitoring, "Stopped listening for your voice: \(reason).")
         publishCoordinatorState()
@@ -441,11 +466,16 @@ final class AppModel: ObservableObject {
         case .monitorFailed(let failure):
             isListeningForUser = false
             userSpeechError = failure.message
+            if activity.set(false, for: .user) {
+                coordinator.audioActivityEnded()
+            }
+            coordinator.setUserSpeechActive(false)
         case .activityStarted(let levelDB):
             // User speech must be able to start a pause when the person speaks first. Headphones
             // are recommended because speakers can feed Music back into this microphone. The
             // coordinator still owns the pause and the activity aggregator prevents duplicate
             // pause requests when AI and user activity overlap.
+            coordinator.setUserSpeechActive(true)
             if activity.set(true, for: .user) {
                 record(.info, .monitoring, "Your voice is active; pausing music.")
                 coordinator.audioActivityStarted(levelDB: levelDB)
@@ -454,6 +484,7 @@ final class AppModel: ObservableObject {
             if activity.set(false, for: .user) {
                 coordinator.audioActivityEnded()
             }
+            coordinator.setUserSpeechActive(false)
         case .activitySuppressed:
             // The microphone path is not gated: it exists to hear the person in the room, and a
             // hesitation in their own sentence should not be second-guessed.
@@ -615,6 +646,7 @@ final class AppModel: ObservableObject {
     private func publishCoordinatorState() {
         state = coordinator.state
         lastError = coordinator.lastError
+        syncTargetAudioMute()
 
         // Hooks fire on ownership transitions: the moment Oreja takes responsibility for playback
         // and the moment it gives it back. Comparing ownership rather than state keeps this
@@ -637,6 +669,75 @@ final class AppModel: ObservableObject {
         lastVolumeOwnership = volumeOwnership
 
         objectWillChange.send()
+    }
+
+    private func syncTargetAudioMute() {
+        guard #available(macOS 14.2, *), let targetAudioMuteController else { return }
+        let primaryIDs = Set(settings.aiSources.map(\.bundleIdentifier))
+        let targets = settings.targetAudioApps.filter { !primaryIDs.contains($0.bundleIdentifier) }
+        let shouldInterrupt = coordinator.shouldMuteTargetAudio
+        if shouldInterrupt {
+            if browserInterruptionTargets == nil {
+                browserInterruptionTargets = browserPlaybackTargets()
+                browserInterruptionMode = settings.interruptionMode
+                browserInterruptionDuckPercent = settings.duckVolumePercent
+            }
+        } else {
+            browserInterruptionTargets = nil
+            browserInterruptionMode = nil
+            browserInterruptionDuckPercent = nil
+        }
+        browserAudioController.update(
+            applications: settings.browserPlaybackEnabled ? (browserInterruptionTargets ?? []) : [],
+            active: shouldInterrupt,
+            mode: browserInterruptionMode ?? settings.interruptionMode,
+            duckPercent: browserInterruptionDuckPercent ?? settings.duckVolumePercent
+        )
+        let unsupported = Set(browserAudioController.unsupportedBundleIdentifiers)
+        if unsupported != lastUnsupportedBrowserTargetIDs {
+            if !unsupported.isEmpty {
+                record(.warning, .monitoring, "No browser media adapter is available for: \(unsupported.sorted().joined(separator: ", ")).")
+            }
+            lastUnsupportedBrowserTargetIDs = unsupported
+        }
+        if let error = browserAudioController.lastErrorMessage, error != lastBrowserControlError {
+            record(.warning, .monitoring, error)
+            lastBrowserControlError = error
+        } else if browserAudioController.lastErrorMessage == nil {
+            lastBrowserControlError = nil
+        }
+
+        // Browser playback is controlled through the selected media sessions. Other selected app
+        // targets retain the existing process-level mute behavior.
+        let processMuteTargets = targets.filter { !AISourceCatalog.isBrowser(bundleIdentifier: $0.bundleIdentifier) }
+        let shouldMute = shouldInterrupt && !processMuteTargets.isEmpty
+        do {
+            try targetAudioMuteController.update(
+                applications: processMuteTargets,
+                shouldMute: shouldMute
+            )
+            if !processMuteTargets.isEmpty, lastTargetMuteIntent != shouldMute {
+                record(.info, .monitoring, shouldMute
+                    ? "Muting selected secondary app audio during speech."
+                    : "Released selected secondary app mute.")
+            }
+            lastTargetMuteIntent = shouldMute
+        } catch {
+            lastTargetMuteIntent = nil
+            record(.warning, .monitoring, "Could not control selected app audio: \(error.localizedDescription)")
+        }
+    }
+
+    private func browserPlaybackTargets() -> [AISourceSelection] {
+        let supported = AISourceCatalog.knownApps.filter {
+            $0.category == .browser && BrowserAudioController.supportedBrowserBundleIDs.contains($0.bundleIdentifier)
+        }
+        let candidates = supported.map {
+            AISourceSelection.browser(bundleIdentifier: $0.bundleIdentifier, displayName: $0.displayName)
+        }
+        guard settings.browserTargetScope == .activeBrowserOnly else { return candidates }
+        guard let frontmostID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier else { return [] }
+        return candidates.filter { $0.bundleIdentifier == frontmostID }
     }
 
     // MARK: System events
@@ -684,6 +785,9 @@ final class AppModel: ObservableObject {
     /// Restores an owned pause before the process exits. Returns `.terminateLater` when a resume
     /// command must run first, so quitting never leaves the user's music stuck.
     func handleTermination() -> NSApplication.TerminateReply {
+        if #available(macOS 14.2, *) {
+            try? targetAudioMuteController?.update(applications: [], shouldMute: false)
+        }
         guard coordinator.commandForTermination() != nil else {
             stopObservation()
             stopMonitoring(reason: "quitting")
@@ -719,7 +823,7 @@ final class AppModel: ObservableObject {
     }
 
     func showSettings() {
-        windows.show(id: "settings", title: "Oreja Settings", size: NSSize(width: 560, height: 560)) { [weak self] in
+        windows.show(id: "settings", title: "Oreja Settings", size: NSSize(width: 820, height: 640)) { [weak self] in
             guard let self else { return AnyView(EmptyView()) }
             return AnyView(SettingsView(model: self))
         }
@@ -871,9 +975,11 @@ final class WindowRegistry {
             return
         }
         let hosting = NSHostingView(rootView: content())
+        var styleMask: NSWindow.StyleMask = [.titled, .closable, .miniaturizable]
+        if id == "settings" { styleMask.insert(.resizable) }
         let window = NSWindow(
             contentRect: NSRect(origin: .zero, size: size),
-            styleMask: [.titled, .closable, .miniaturizable],
+            styleMask: styleMask,
             backing: .buffered,
             defer: false
         )

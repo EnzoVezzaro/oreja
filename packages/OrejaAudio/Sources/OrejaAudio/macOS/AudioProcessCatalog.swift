@@ -35,6 +35,21 @@ public enum AudioProcessCatalog {
         }
     }
 
+    /// Processes whose bundle IDs equal a selected app's identity or a dot-delimited helper
+    /// identity. This avoids matching unrelated apps with a merely similar textual prefix.
+    public static func processes(matchingBundleIDRoots roots: [String]) throws -> [AudioProcess] {
+        let cleaned = roots.filter { !$0.isEmpty }
+        guard !cleaned.isEmpty else { return [] }
+        return try allProcesses().filter { process in
+            guard let bundleID = process.bundleID else { return false }
+            return Self.matches(bundleID: bundleID, roots: cleaned)
+        }
+    }
+
+    public static func matches(bundleID: String, roots: [String]) -> Bool {
+        roots.contains { bundleID == $0 || bundleID.hasPrefix($0 + ".") }
+    }
+
     private static func processObjectIDs() throws -> [AudioObjectID] {
         var address = AudioObjectPropertyAddress(
             mSelector: kAudioHardwarePropertyProcessObjectList,

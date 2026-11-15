@@ -769,3 +769,121 @@ Release 0.3.0 checks:
 - `open build/Oreja.app` → running, 12.2 MB physical footprint, three Oreja frameworks loaded.
 - `build/Oreja-0.3.0.dmg` created with `hdiutil create`; `hdiutil verify` reports a valid checksum.
 - Not notarized (no Developer ID credentials on this Mac).
+
+## Primary and secondary audio apps (2026-11-14)
+
+Feature branch `codex/dual-audio-sources` adds separate primary (`aiSources`) and secondary
+(`targetAudioApps`) app selections. The coordinator's existing activity and quiet/conversation hold
+state controls a second private Core Audio process tap. That tap uses Core Audio's muted behavior for
+the selected secondary processes; its IOProc discards buffers. It does not lower targets to a
+percentage. Apple Music continues to use its existing pause or volume-duck path.
+
+The first target-tap implementation crashed when Core Audio invoked an IOProc closure that had
+inherited `MainActor` isolation. The crash report showed `_swift_task_checkIsolatedSwift` on
+`com.apple.audio.IOThread.client`. The tap lifecycle now lives in a nonisolated, `@unchecked Sendable`
+adapter; its callback captures no state and performs no work. Target bundle-ID roots include known
+app helpers (including ego lite), matching only exact IDs and dot-delimited helper IDs. Safari is
+excluded because `com.apple.WebKit` is shared.
+
+- `./scripts/build.sh --no-sign` → passed; the menu bar app bundle built. After the final build,
+  `open build/Oreja.app` launched PID 50746; `vmmap` reported a 31.0 MB physical footprint and
+  `lsof` showed all three Oreja frameworks loaded.
+- `./scripts/test.sh` → 87 passed, 0 failed, 391 assertions. Added coverage for target settings
+  round-trip and overlap removal, Safari target exclusion, exact/helper-ID matching, including ego
+  lite and ChatGPT roots, plus target-mute ownership through speech and the quiet interval.
+- Controlled adapter smoke check: the `com.oreja.fixture` audio process was targeted; the muted tap
+  started and restored without a crash. The rebuilt app also launched with all three Oreja frameworks
+  loaded. This checks Core Audio lifecycle, not audible attenuation.
+- Live ChatGPT + Apple Music + secondary browser/app audio was not run for this branch. Whether
+  YouTube/browser output is actually muted and restored during ChatGPT speech remains unverified.
+- No deployment, publication, or release was performed.
+
+## Finder launch opens Settings (2026-11-15)
+
+The user reported that the app could not be opened. The built bundle was valid and not crashing;
+the menu-bar-only app did not give returning users a visible surface on direct launch. `AppDelegate`
+now opens Settings after bootstrap for returning users; first-run users continue to receive onboarding.
+
+- `./scripts/test.sh` → 89 passed, 0 failed, 422 assertions.
+- `./scripts/build.sh` → passed and produced a valid ad-hoc signed `build/Oreja.app`.
+- Relaunched the rebuilt bundle with `open build/Oreja.app`. System Events found the `Oreja Settings`
+  window at 820×672; `vmmap` reported a 52.4 MB physical footprint and `lsof` showed all three
+  Oreja frameworks loaded. This confirms the app launched and its Settings window was created.
+- `git diff --check` → passed.
+- No release or external announcement was made. Browser playback remains experimental pending live
+  browser and interruption acceptance checks.
+
+## 0.4.0 release acceptance (2026-11-15)
+
+- The maker reported successful real playback testing with browser audio and confirmed the behavior
+  works in their setup. The exact browser, website, playback mode, and interruption sequence were
+  not specified in the report; this is user-reported acceptance, not an independently reproduced
+  result.
+- `./scripts/test.sh` → 89 passed, 0 failed, 422 assertions. `./scripts/build.sh` passed; the
+  rebuilt 0.4.0 app opened Settings, had a 51.7 MB physical footprint, and loaded its Core, Audio,
+  and Media frameworks.
+- `codesign --verify --deep --strict build/Oreja.app` → passed. `CFBundleShortVersionString` is
+  0.4.0 and `CFBundleVersion` is 7.
+- `hdiutil create` built `build/Oreja-0.4.0.dmg`; `hdiutil verify` reported a valid checksum. The
+  site download copy has the same SHA-256:
+  `229cc6b648ead40ab6c6ab6828ee0aa8f90d5d101eb43a670a9f69d60f237f83`.
+- Browser playback remains labeled experimental because browser and protected-player coverage is
+  not universal. Supported scripting adapters are Safari, Chrome, Edge, Brave, Arc, and ego lite;
+  Firefox and Internet Explorer are unavailable targets.
+
+## User speech also mutes secondary apps (2026-11-15)
+
+Follow-up: the user reported that AI speech muted the selected secondary app, but their own speech
+did not. `pauseWhileISpeak` was enabled in the saved settings. The coordinator now tracks microphone
+activity explicitly for target muting, including when the primary AI monitor is unavailable; the
+existing microphone activity path still owns the music pause/duck decision.
+
+- `./scripts/test.sh` → 87 passed, 0 failed, 391 assertions. Added a regression case for user speech
+  keeping targets muted without a valid AI monitor.
+- `./scripts/build.sh --no-sign` → passed.
+- Real microphone speech causing a secondary app to mute was not run. This is an automated state
+  check, not a verified live microphone-to-browser result.
+
+## Mode-aware browser targets and Settings organization (2026-11-15)
+
+Browser targets now use per-browser Apple Events scripting for standard HTML audio/video elements.
+Safari uses its `do JavaScript` command; ego lite and the selected Chromium-family browsers use the
+`execute ... javascript` command. Pause resumes only elements Oreja paused, without seeking. Ducking
+tracks the applied level so restoration can preserve a user's volume adjustment. Tab execution errors
+are counted and sent to Oreja diagnostics. Other selected apps continue to use the Core Audio mute
+adapter.
+
+- `./scripts/test.sh` → 88 passed, 0 failed, 411 assertions. New coverage checks browser dialect
+selection, AppleScript argument escaping, failure counts, duck level generation, playback override
+handling, and that pause scripts do not seek.
+- `./scripts/build.sh --no-sign` → passed; `packaging/Info.plist` passes `plutil -lint`.
+- The installed ego lite and Chrome scripting dictionaries were inspected; browser media behavior
+was not exercised with live tab audio. Safari, Edge, Brave, and Arc adapters were not run against
+their applications. ChatGPT speech, user microphone speech, and audible pause/duck/restore remain
+unverified for the browser adapter.
+- The final rebuilt app launched with three Oreja frameworks loaded and a 25.5 MB physical footprint.
+- Settings were reviewed from source and reorganized into Audio, Playback, Automation, and Privacy
+pages. A rendered click-through was not completed: the native settings window could not be opened
+through the available desktop automation session.
+- Firefox has no tab-control adapter and is unavailable as a secondary target. Internet Explorer
+is not a macOS target supported by Oreja. No deployment or publication occurred.
+
+## Browser playback target and Settings repair (2026-11-15)
+
+The feature branch now separates interruption sources from playback targets. Browser selection and
+the `All supported browsers` / `Active browser only` scope are in Playback settings; browser apps are
+no longer selected in the generic app-target list. Legacy browser selections migrate to the
+experimental Browser target without expanding to all browsers. Settings uses fixed section
+navigation and a fixed page header with one scrollable content pane. Playback, Automation, and
+Privacy were opened in the rebuilt app and visually inspected.
+
+- `./scripts/test.sh` → 89 passed, 0 failed, 422 assertions. Coverage includes separate browser
+  target migration, scope persistence, initially-playing media selection, and distinct playback and
+  volume override states. Browser adapter checks generate scripts; they do not exercise a browser.
+- `./scripts/build.sh` → passed. `open build/Oreja.app` launched PID 72765; `vmmap` reported a 26.9 MB
+  physical footprint and `lsof` showed `libOrejaCore`, `libOrejaAudio`, and `libOrejaMedia` loaded.
+- YouTube, Spotify Web, multiple simultaneous tabs, manual browser pause/resume, overlapping browser
+  interruptions, and real ChatGPT Voice were not tested. Browser control remains experimental in
+  this branch. Firefox has no adapter; Spotify playback control is not implemented. Internet
+  Explorer is unavailable on macOS.
+- No deployment, publication, or release was performed.

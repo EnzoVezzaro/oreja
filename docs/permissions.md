@@ -5,7 +5,7 @@ revoked at any time; the app degrades to "automation off" instead of guessing.
 
 ## 1. System audio recording (Core Audio process tap)
 
-**Why:** to know when the selected ChatGPT process is producing sound. Oreja creates a private
+**Why:** to know when a selected primary app is producing sound. Oreja creates a private
 process tap and reads levels from a copy of that app's output. It does not capture the microphone,
 the screen, or other apps.
 
@@ -14,8 +14,8 @@ declares:
 
 ```xml
 <key>NSAudioCaptureUsageDescription</key>
-<string>Oreja listens to the audio output of the apps you select so it can pause your music while
-ChatGPT speaks. Audio is analyzed locally as level only; nothing is recorded, stored, or uploaded.</string>
+<string>Oreja listens to the audio output of the apps you select so it can pause or lower playback
+while they speak. Audio is analyzed locally as level only; nothing is recorded, stored, or uploaded.</string>
 ```
 
 **Pane:** System Settings › Privacy & Security › **Screen & System Audio Recording**.
@@ -40,13 +40,16 @@ tccutil reset AudioCapture app.oreja.van-gogh
 tccutil reset ScreenCapture app.oreja.van-gogh
 ```
 
-## 2. Automation (Music)
+## 2. Automation (Music and experimental Browser target)
 
-**Why:** to pause and resume the Music app. Oreja sends only `pause`, `play`, and read-only state
-queries. It never changes tracks, clears the queue, adjusts volume, or launches Music.
+**Why:** in release 0.4.0, to pause/resume or change Music's volume, and to pause or lower standard
+HTML media in the optional experimental Browser target. Oreja never changes Music tracks, clears its
+queue, or launches Music.
 
-**What macOS shows:** the standard "Oreja wants to control Music" Automation dialog the first time
-Oreja reads or controls Music.
+**What macOS shows:** an Automation dialog when Oreja reads or controls Music. Browser control may
+show a separate dialog for each selected browser. Safari and Chromium-family browsers also require
+their JavaScript-from-Apple-Events setting to be enabled. Some protected or custom players may not
+respond.
 
 **Pane:** System Settings › Privacy & Security › **Automation** → Oreja → Music.
 
@@ -54,15 +57,14 @@ Oreja reads or controls Music.
 
 ```xml
 <key>NSAppleEventsUsageDescription</key>
-<string>Oreja controls the Music app to pause and resume your music when ChatGPT starts and stops
-speaking. Oreja never reads your library or conversations.</string>
+<string>Oreja controls Music to pause or lower playback while a primary audio source speaks. It does
+not read page content, prompts, or conversations.</string>
 ```
 
 **Entitlement:** `com.apple.security.automation.apple-events`.
 
-**If denied:** the controller returns `MediaControlError.permissionDenied("Music")`. The menu bar
-shows the error with a link to the Automation pane. Oreja never reports a pause or resume that did
-not happen.
+**If denied:** Music or browser control failures are reported in diagnostics. Browser media control
+is experimental in release 0.4.0.
 
 ### Resetting
 
@@ -74,7 +76,7 @@ Or System Settings › Privacy & Security › Automation → Oreja → toggle Mu
 
 ## Permissions Oreja does **not** need
 
-- Microphone (the default behavior never listens to the room).
+- Microphone unless “Apply the interruption while I speak” is enabled.
 - Screen Recording content (only system audio capture, which shares a pane name).
 - Accessibility, Input Monitoring, Full Disk Access.
 - Root, kernel extensions, developer tools.

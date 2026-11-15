@@ -25,9 +25,9 @@ automatically when a real identity is supplied through `OREJA_SIGN_IDENTITY`. `c
 --verify --strict` passes locally. The build is **not notarized**: no Developer ID credentials were
 available, and this document does not claim otherwise.
 
-`build/Oreja.dmg` is a local UDZO disk image containing that ad-hoc-signed app. It is suitable for
-local testing and packaging review, but it is not yet a public release artifact: it still needs
-Developer ID signing, notarization, release notes and a clean-Mac install test.
+`build/Oreja-0.4.0.dmg` is the versioned UDZO disk image for the 0.4.0 release. It contains an
+ad-hoc-signed app and is not notarized; macOS may require a one-time Gatekeeper approval on another
+Mac. This is the same signing posture as the previous public releases.
 
 The dylibs are linked with `@rpath` install names and copied into `Contents/Frameworks`, so the
 bundle is self-contained. Verified by hiding `build/lib` and relaunching: the app still starts and
@@ -86,16 +86,17 @@ security controls to pass review.
 ## Versioning
 
 `CFBundleShortVersionString` and `CFBundleVersion` live in `packaging/Info.plist` (currently
-`0.3.1` / `6`). Bump both for every distributed build. There is no auto-updater.
+`0.4.0` / `7`). Bump both for every distributed build. There is no auto-updater.
 
 ## Release checklist
 
-- [ ] `./scripts/test.sh` passes.
-- [ ] `./scripts/build.sh` succeeds, `open build/Oreja.app` starts it, and `pgrep -x Oreja` stays
+- [x] `./scripts/test.sh` passes (89 tests, 422 assertions).
+- [x] `./scripts/build.sh` succeeds; `open build/Oreja.app` creates Settings, and `pgrep -x Oreja` stays
       alive (a dyld/library-validation failure exits in about a second and writes a crash report).
-- [ ] `codesign --verify --strict` passes; entitlements are the expected three.
-- [ ] Manual acceptance test with ChatGPT Voice and Apple Music (`test-evidence.md`).
-- [ ] Permissions work on a clean user account.
-- [ ] Gatekeeper/notarization passes on a clean Mac.
+- [x] `codesign --verify --strict` passes; the app loads the three Oreja frameworks.
+- [x] Maker reported successful real Browser playback in their setup; exact browser/site and settings
+      were not recorded (`test-evidence.md`).
+- [ ] Permissions verified on a clean user account.
+- [ ] Developer ID signing and notarization; this release remains ad-hoc signed.
 - [ ] Trademark and name search completed.
-- [ ] Release notes list verified and unverified behavior honestly.
+- [x] Release notes list verified and unverified behavior honestly.

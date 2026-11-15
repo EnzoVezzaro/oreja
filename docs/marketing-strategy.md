@@ -131,10 +131,11 @@ There is no OpenAI API, account, recording, transcription, analytics, or network
 project is split into a platform-neutral coordinator, a Core Audio adapter, and an Apple Events
 Music adapter. The repo includes the executable test runner and the audio probe.
 
-Current limits: macOS 14.2+, Apple Music only, ChatGPT desktop as the primary source, browser
-sources experimental. The distributed build is currently an early ad-hoc-signed preview, and a
-live ChatGPT Voice session still needs supervised verification. Feedback on the permissions and
-audio-state edge cases would be especially useful.
+Current limits: macOS 14.2+, Apple Music plus an experimental Browser playback target, and selected
+apps as interruption sources. The 0.4.0 build is ad-hoc signed and not notarized. The maker reports
+successful real browser playback in their setup, but the exact browser/site was not recorded; a live
+ChatGPT Voice session still needs supervised verification. Feedback on permissions and audio-state
+edge cases would be especially useful.
 
 ### Blog article
 

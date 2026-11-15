@@ -6,9 +6,9 @@ One decision, made in one place: *should the user's music pause or resume right 
 else is an adapter. That is what makes the behavior testable without ChatGPT, Music, or a Mac audio
 device, and what will let the same engine run on iPhone later.
 
-Oreja is a companion, not a proxy. It does not touch ChatGPT's audio route, account, session, or
-network traffic. It observes the selected application's audio output and controls a separate music
-application.
+Oreja is a companion, not a proxy. It does not touch ChatGPT's account, session, or network traffic.
+It observes primary app output, controls selected secondary apps during a reply, and controls Apple
+Music separately.
 
 ## Modules
 
@@ -54,11 +54,24 @@ ChatGPT processes → │ AudioProcessCatalog → CATapDescription → aggregate
                                       ┌────────▼─┴───────┐
                                       │ PlaybackCoordinator │  deterministic, @MainActor
                                       └────────┬─────────┘
-                                               │ pause() / resume()
+                                               │ pause() / resume() / target interruption state
                                       ┌────────▼─────────┐
                                       │ AppleMusicController │ → NSAppleScript → Music
                                       └──────────────────┘
+                                               │ target interruption state
+                                      ┌────────▼─────────┐
+                                      │ BrowserAudioController          │
+                                      │ ProcessAudioTargetMuteController│
+                                      └──────────────────┘
 ```
+
+Primary app selections (`aiSources`) trigger activity. Secondary app selections
+(`targetAudioApps`) follow the selected interruption mode while the coordinator reports primary-app
+activity, optional microphone speech, or the configured quiet/conversation hold. Supported browsers
+use per-browser Apple Events adapters to change standard HTML media elements across tabs. Oreja
+stores prior volume and whether it paused an element, then restores them without seeking. Other
+selected apps use a separate private Core Audio process tap; that tap discards its buffers and does
+not feed the detector. Apps in both sets are excluded from the target set.
 
 Media state is observed once per second via `currentPlayback()`; the coordinator uses those
 observations to detect manual overrides, track changes, and provider exit.

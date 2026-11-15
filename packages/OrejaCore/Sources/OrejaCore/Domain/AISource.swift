@@ -211,6 +211,23 @@ public enum AISourceCatalog {
         return !isMusicPlayer(bundleIdentifier: bundleIdentifier) && !bundleIdentifier.hasPrefix(ownBundlePrefix)
     }
 
+    /// Whether process matching is narrow enough to mute this app without touching unrelated apps.
+    /// Safari's audio can appear under the shared `com.apple.WebKit` helper identity, which is too
+    /// broad for a target mute operation.
+    public static func supportsTargetMute(bundleIdentifier: String) -> Bool {
+        bundleIdentifier != "com.apple.Safari"
+    }
+
+    /// Bundle-ID roots narrow enough for target muting. Helpers use a dot suffix; matching must not
+    /// include unrelated apps whose identifiers only share a textual prefix.
+    public static func targetMuteBundleIDRoots(for selection: AISourceSelection) -> [String]? {
+        guard supportsTargetMute(bundleIdentifier: selection.bundleIdentifier) else { return nil }
+        if isChatGPT(bundleIdentifier: selection.bundleIdentifier) {
+            return chatGPTBundleIdentifiers
+        }
+        return profile(for: selection.bundleIdentifier)?.prefixes ?? [selection.bundleIdentifier]
+    }
+
     /// Canonicalises ChatGPT builds, removes non-selectable entries and duplicates, and keeps the
     /// first occurrence of each app.
     public static func normalized(_ selections: [AISourceSelection]) -> [AISourceSelection] {

@@ -19,9 +19,9 @@
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>0.3.1</string>
+	<string>0.4.0</string>
 	<key>CFBundleVersion</key>
-	<string>6</string>
+	<string>7</string>
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.utilities</string>
 	<key>LSMinimumSystemVersion</key>
@@ -31,11 +31,11 @@
 	<key>NSHumanReadableCopyright</key>
 	<string>Oreja de Van Gogh — an independent audio companion. Not affiliated with OpenAI or Apple.</string>
 	<key>NSAudioCaptureUsageDescription</key>
-	<string>Oreja listens to the audio output of the apps you select so it can pause your music while they speak. Audio is analyzed locally as level only; nothing is recorded, stored, or uploaded.</string>
+	<string>Oreja listens to the audio output of the apps you select so it can pause or lower playback while they speak. Audio is analyzed locally as level only; nothing is recorded, stored, or uploaded.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Only if you turn on “Pause while I speak”: Oreja measures the level of your microphone to keep the music paused while you talk. The audio never leaves your Mac and nothing is recorded.</string>
+	<string>Only if you turn on “Apply the interruption while I speak”: Oreja measures your microphone level so selected media stays paused or lowered while you talk. Audio never leaves your Mac and nothing is recorded.</string>
 	<key>NSAppleEventsUsageDescription</key>
-	<string>Oreja controls the Music app to pause and resume your music when ChatGPT starts and stops speaking. Oreja never reads your library or conversations.</string>
+	<string>Oreja controls Music and, when selected, browser tabs to lower or pause media while a primary audio source speaks. It only changes standard media playback and does not read page content.</string>
 	<key>NSHighResolutionCapable</key>
 	<true/>
 	<key>NSSupportsAutomaticTermination</key>

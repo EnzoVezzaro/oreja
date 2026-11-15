@@ -6,6 +6,47 @@ import OrejaMedia
 func runMediaAndSettingsSuite(_ t: Harness) async {
     print("\nApple Music scripting, settings and recovery")
 
+    t.run("browser media adapters select Safari and Chromium scripting dialects") {
+        t.expectEqual(BrowserMediaScripting.dialectsByBundleIdentifier["com.apple.Safari"], .safari)
+        for bundleID in [
+            "com.citrolabs.ego.lite", "com.google.Chrome", "com.microsoft.edgemac",
+            "com.brave.Browser", "company.thebrowser.Browser",
+        ] {
+            t.expectEqual(BrowserMediaScripting.dialectsByBundleIdentifier[bundleID], .chromium)
+        }
+        t.expect(BrowserMediaScripting.dialectsByBundleIdentifier["org.mozilla.firefox"] == nil)
+        t.expect(BrowserMediaScripting.controlScript(bundleIdentifier: "com.microsoft.internetexplorer", javascript: "1") == nil)
+
+        let chromium = BrowserMediaScripting.controlScript(
+            bundleIdentifier: "com.google.Chrome",
+            javascript: #"document.title = "quoted"\path"#
+        ) ?? ""
+        t.expect(chromium.contains("execute t javascript"))
+        t.expect(chromium.contains("application id \"com.google.Chrome\" is running"))
+        t.expect(chromium.contains(#"document.title = \"quoted\"\\path"#))
+
+        let safari = BrowserMediaScripting.controlScript(
+            bundleIdentifier: "com.apple.Safari",
+            javascript: "return 'ok'"
+        ) ?? ""
+        t.expect(safari.contains("do JavaScript"))
+        t.expect(safari.contains("in t"))
+        t.expect(safari.contains("failures as text"), "tab command failures are counted for diagnostics")
+
+        let ducking = BrowserMediaScripting.mediaControlJavaScript(mode: .duck, duckPercent: 5)
+        t.expect(ducking.contains("s.level = 0.05"))
+        t.expect(ducking.contains("old.appliedVolume = Math.min(old.volume, s.level)"))
+        t.expect(ducking.contains("Math.abs(m.volume - old.appliedVolume)"), "restoration preserves a user's volume adjustment")
+
+        let pausing = BrowserMediaScripting.mediaControlJavaScript(mode: .pause, duckPercent: 5)
+        t.expect(pausing.contains("old.pausedByOreja = true"))
+        t.expect(pausing.contains("old.playbackOverride"), "restoration respects manual play and pause actions")
+        t.expect(pausing.contains("old.volumeOverride"), "restoration respects manual volume changes independently")
+        t.expect(pausing.contains("if (m.paused || m.ended) return"), "only media already playing at interruption start is captured")
+        t.expect(pausing.contains("e.isTrusted"), "trusted browser controls relinquish Oreja ownership")
+        t.expect(!pausing.contains("currentTime"), "pause and restore never seeks")
+    }
+
     t.run("AppleScript state parser reads playing state and track") {
         let sep = AppleMusicScript.fieldSeparator
         let output = "playing\(sep)ABC-123\(sep)Aja\(sep)Steely Dan\(sep)72"
@@ -141,6 +182,9 @@ func runMediaAndSettingsSuite(_ t: Harness) async {
         t.expectClose(settings.resumeDelay, 0.1)
         settings.resumeDelay = 1.4
         settings.aiSources = [.safari, .chatGPTDesktop]
+        settings.targetAudioApps = [.app(bundleIdentifier: "com.apple.Preview", displayName: "Preview")]
+        settings.browserPlaybackEnabled = true
+        settings.browserTargetScope = .activeBrowserOnly
         settings.launchAtLogin = true
         settings.onboardingCompleted = true
         settings.verboseDiagnostics = true
@@ -148,6 +192,9 @@ func runMediaAndSettingsSuite(_ t: Harness) async {
         let data = try! JSONEncoder().encode(settings)
         let decoded = try! JSONDecoder().decode(AppSettings.self, from: data)
         t.expectEqual(decoded, settings)
+        t.expectEqual(decoded.targetAudioApps, [.app(bundleIdentifier: "com.apple.Preview", displayName: "Preview")])
+        t.expect(decoded.browserPlaybackEnabled)
+        t.expectEqual(decoded.browserTargetScope, .activeBrowserOnly)
         t.expectClose(decoded.policy.quietInterval, 1.4)
         t.expectClose(decoded.policy.conversationHold, 0, "conversation hold is disabled by default for immediate volume restore")
         t.expectClose(decoded.policy.resumeWait, 1.4)
@@ -159,6 +206,29 @@ func runMediaAndSettingsSuite(_ t: Harness) async {
         settings.restoreVolumePercent = 67
         t.expectClose(settings.policy.restoreVolume, 0.67)
         t.expectEqual(decoded.aiSources.map(\.bundleIdentifier), ["com.apple.Safari", "com.openai.codex"])
+    }
+
+    t.run("primary apps are removed from secondary target selections") {
+        let data = #"{"aiSources":[{"kind":"browser","bundleIdentifier":"com.google.Chrome","displayName":"Google Chrome"}],"targetAudioApps":[{"kind":"browser","bundleIdentifier":"com.google.Chrome","displayName":"Google Chrome"}]}"#
+        let decoded = try! JSONDecoder().decode(AppSettings.self, from: Data(data.utf8))
+        t.expectEqual(decoded.aiSources.map(\.bundleIdentifier), ["com.google.Chrome"])
+        t.expect(decoded.targetAudioApps.isEmpty)
+    }
+
+    t.run("browser playback target is separate and legacy browser targets migrate") {
+        let legacy = #"{"aiSources":[{"kind":"chatGPTDesktop","bundleIdentifier":"com.openai.codex","displayName":"ChatGPT"}],"targetAudioApps":[{"kind":"browser","bundleIdentifier":"com.google.Chrome","displayName":"Google Chrome"}]}"#
+        let decoded = try! JSONDecoder().decode(AppSettings.self, from: Data(legacy.utf8))
+        t.expect(decoded.browserPlaybackEnabled, "old browser target selection becomes the Browser playback target")
+        t.expect(decoded.targetAudioApps.isEmpty, "browser is removed from the other-app target list")
+        t.expectEqual(decoded.browserTargetScope, .activeBrowserOnly, "legacy browser app selections do not expand to all browsers")
+
+        var settings = AppSettings(browserPlaybackEnabled: true, browserTargetScope: .activeBrowserOnly)
+        settings.aiSources = [.safari, .chatGPTDesktop]
+        let encoded = try! JSONEncoder().encode(settings)
+        let roundTrip = try! JSONDecoder().decode(AppSettings.self, from: encoded)
+        t.expect(roundTrip.browserPlaybackEnabled, "browser playback remains independent from a browser interruption source")
+        t.expectEqual(roundTrip.browserTargetScope, .activeBrowserOnly)
+        t.expectEqual(roundTrip.aiSources, settings.aiSources)
     }
 
     t.run("conversation hold is clamped and can be switched off") {
