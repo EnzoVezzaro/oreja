@@ -160,6 +160,8 @@ struct AudioProbe {
                 print("■ activity ended at \(String(format: "%.1f", levelDB)) dBFS")
             case .activitySuppressed(let reason, let levelDB):
                 print("· suppressed (\(reason.explanation)) at \(String(format: "%.1f", levelDB)) dBFS")
+            case .noSignalDetected(let detail):
+                print("! no signal: \(detail)")
             case .monitorFailed(let failure):
                 print("✕ monitor failed: \(failure.message)")
             case .monitorStopped(let reason):

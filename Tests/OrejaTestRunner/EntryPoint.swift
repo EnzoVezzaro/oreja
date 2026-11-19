@@ -16,6 +16,7 @@ struct TestMain {
         runDetectionSuite(harness)
         await runMediaAndSettingsSuite(harness)
         runAudioSourceSuite(harness)
+        runMonitorRecoverySuite(harness)
         await runHookSuite(harness)
 
         print("\n\(harness.summary)")

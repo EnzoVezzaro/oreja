@@ -29,6 +29,20 @@ public final class ProcessAudioMonitor: AIAudioMonitoring, @unchecked Sendable {
     /// thread — the IOProc only touches the sampler.
     private let lifecycleLock = NSLock()
     private var processListListener: AudioObjectPropertyListenerBlock?
+    private var systemDeviceListener: AudioObjectPropertyListenerBlock?
+    private var tapAliveListener: AudioObjectPropertyListenerBlock?
+    private var aggregateRateListener: AudioObjectPropertyListenerBlock?
+
+    /// Recovery state is guarded by its own lock so a Core Audio listener callback can update it
+    /// without taking `lifecycleLock` (a listener may fire while a rebuild holds that lock).
+    /// Lock order is always lifecycleLock → recoveryLock, never the reverse.
+    private let recoveryLock = NSLock()
+    private var deviceChangeDeadline: TimeInterval?
+    private var lastFrameTime = ProcessInfo.processInfo.systemUptime
+    private var lastRebuildTime: TimeInterval = 0
+    private var tapLiveSince: TimeInterval?
+    private var hasDeliveredAudio = false
+    private var noSignalReported = false
 
     private enum SampleFormat {
         case float32
@@ -268,6 +282,7 @@ public final class ProcessAudioMonitor: AIAudioMonitoring, @unchecked Sendable {
         tapID = tap
 
         try createAggregateDevice(description: description)
+        noteTapLive()
     }
 
     private func createAggregateDevice(description: CATapDescription) throws {
@@ -302,6 +317,66 @@ public final class ProcessAudioMonitor: AIAudioMonitoring, @unchecked Sendable {
         sampleFormat = Self.detectSampleFormat(deviceID: aggregate)
         try createIOProc()
         try startDevice()
+        addDeviceChangeListeners(tapID: tapID, aggregateID: aggregate)
+    }
+
+    /// Watches the signals that can strand a tap after a route change: the system default output,
+    /// the tap object's liveness, and the aggregate's sample rate. Listeners only queue a debounced
+    /// recovery check; they never touch Core Audio objects or the audio thread.
+    private func addDeviceChangeListeners(tapID: AudioObjectID, aggregateID: AudioObjectID) {
+        if systemDeviceListener == nil {
+            var address = AudioObjectPropertyAddress(
+                mSelector: kAudioHardwarePropertyDefaultOutputDevice,
+                mScope: kAudioObjectPropertyScopeGlobal,
+                mElement: kAudioObjectPropertyElementMain
+            )
+            let block: AudioObjectPropertyListenerBlock = { [weak self] _, _ in
+                self?.queueDeviceChangeCheck()
+            }
+            let status = AudioObjectAddPropertyListenerBlock(
+                AudioObjectID(kAudioObjectSystemObject),
+                &address,
+                DispatchQueue.global(qos: .userInitiated),
+                block
+            )
+            if status == noErr { systemDeviceListener = block }
+        }
+
+        if tapAliveListener == nil {
+            var address = AudioObjectPropertyAddress(
+                mSelector: kAudioDevicePropertyDeviceIsAlive,
+                mScope: kAudioObjectPropertyScopeGlobal,
+                mElement: kAudioObjectPropertyElementMain
+            )
+            let block: AudioObjectPropertyListenerBlock = { [weak self] _, _ in
+                self?.queueDeviceChangeCheck()
+            }
+            let status = AudioObjectAddPropertyListenerBlock(
+                tapID, &address, DispatchQueue.global(qos: .userInitiated), block
+            )
+            if status == noErr { tapAliveListener = block }
+        }
+
+        if aggregateRateListener == nil {
+            var address = AudioObjectPropertyAddress(
+                mSelector: kAudioDevicePropertyNominalSampleRate,
+                mScope: kAudioObjectPropertyScopeGlobal,
+                mElement: kAudioObjectPropertyElementMain
+            )
+            let block: AudioObjectPropertyListenerBlock = { [weak self] _, _ in
+                self?.queueDeviceChangeCheck()
+            }
+            let status = AudioObjectAddPropertyListenerBlock(
+                aggregateID, &address, DispatchQueue.global(qos: .userInitiated), block
+            )
+            if status == noErr { aggregateRateListener = block }
+        }
+    }
+
+    private func queueDeviceChangeCheck() {
+        recoveryLock.lock()
+        deviceChangeDeadline = ProcessInfo.processInfo.systemUptime + MonitorRecoveryPolicy.deviceChangeSettle
+        recoveryLock.unlock()
     }
 
     private func tapFailure(_ status: OSStatus) -> AudioMonitoringFailure {
@@ -362,6 +437,88 @@ public final class ProcessAudioMonitor: AIAudioMonitoring, @unchecked Sendable {
         }
     }
 
+    // MARK: - Tap recovery
+
+    private func noteTapLive() {
+        let now = ProcessInfo.processInfo.systemUptime
+        recoveryLock.lock()
+        tapLiveSince = now
+        lastFrameTime = now
+        lastRebuildTime = now
+        hasDeliveredAudio = false
+        noSignalReported = false
+        deviceChangeDeadline = nil
+        recoveryLock.unlock()
+    }
+
+    private func noteFrame(levelDB: Double) {
+        recoveryLock.lock()
+        lastFrameTime = ProcessInfo.processInfo.systemUptime
+        // Zero-filled buffers from a tap without the capture grant are not evidence that the
+        // selected app spoke. Only a real level clears the no-signal hint.
+        if levelDB > MonitorRecoveryPolicy.audibleLevelDBFloor {
+            hasDeliveredAudio = true
+        }
+        recoveryLock.unlock()
+    }
+
+    /// Called by the watchdog when a previously active tap stops delivering. Sets a deadline so
+    /// the next analysis tick can rebuild (subject to the policy's cooldown) if the route did not
+    /// recover on its own.
+    private func markTapStalled() {
+        recoveryLock.lock()
+        deviceChangeDeadline = ProcessInfo.processInfo.systemUptime - MonitorRecoveryPolicy.deviceChangeSettle
+        recoveryLock.unlock()
+    }
+
+    private func applyRecovery(now: TimeInterval) -> (rebuildReason: String?, noSignal: Bool) {
+        recoveryLock.lock()
+        defer { recoveryLock.unlock() }
+        guard isRunning, tapID != AudioObjectID(kAudioObjectUnknown) else { return (nil, false) }
+
+        let decision = MonitorRecoveryPolicy.deviceChangeDecision(
+            pendingDeadline: deviceChangeDeadline,
+            lastFrameTime: lastFrameTime,
+            lastRebuildTime: lastRebuildTime,
+            now: now
+        )
+        var rebuildReason: String?
+        if decision.shouldRebuild {
+            deviceChangeDeadline = nil
+            lastRebuildTime = now
+            rebuildReason = decision.reason
+        }
+
+        let shouldReport = !noSignalReported && MonitorRecoveryPolicy.shouldReportNoSignal(
+            tapLiveSince: tapLiveSince,
+            hasDeliveredAudio: hasDeliveredAudio,
+            now: now
+        )
+        if shouldReport { noSignalReported = true }
+        return (rebuildReason, shouldReport)
+    }
+
+    /// Rebuilds the aggregate device, IOProc and tap through the same path used for re-targeting.
+    /// Called only from the analysis task, never from the real-time audio callback.
+    private func rebuildTap(reason: String) {
+        lifecycleLock.lock()
+        defer { lifecycleLock.unlock() }
+        guard isRunning, tapID != AudioObjectID(kAudioObjectUnknown) else { return }
+        let targets = tappedTargetIDs
+        teardown(removeListener: false)
+        guard !targets.isEmpty else { return }
+        do {
+            try createTap(targetIDs: targets)
+            continuation.yield(.targetsChanged(processDescription: processSummary))
+        } catch let failure as AudioMonitoringFailure {
+            continuation.yield(.monitorFailed(failure))
+        } catch {
+            continuation.yield(.monitorFailed(AudioMonitoringFailure(
+                .unknown, "Could not rebuild the tap after an audio route change: \(error.localizedDescription)"
+            )))
+        }
+    }
+
     // MARK: - Analysis
 
     private func startAnalysis() {
@@ -383,6 +540,16 @@ public final class ProcessAudioMonitor: AIAudioMonitoring, @unchecked Sendable {
                 }
                 let now = ProcessInfo.processInfo.systemUptime
 
+                let recovery = self.applyRecovery(now: now)
+                if let reason = recovery.rebuildReason {
+                    self.rebuildTap(reason: reason)
+                }
+                if recovery.noSignal {
+                    self.continuation.yield(.noSignalDetected(detail:
+                        "The tap is running but has received no audio. If the selected app is speaking, check Screen & System Audio Recording permission in System Settings."
+                    ))
+                }
+
                 if now >= nextRetarget {
                     nextRetarget = now + Self.retargetInterval
                     do {
@@ -399,10 +566,13 @@ public final class ProcessAudioMonitor: AIAudioMonitoring, @unchecked Sendable {
 
                 if let summary = self.sampler.drain() {
                     lastDataTime = now
+                    self.noteFrame(levelDB: summary.levelDB)
                     self.publish(gate.ingest(levelDB: summary.levelDB, at: now))
                 } else if gate.isActive, now - lastDataTime > Self.dataWatchdog {
-                    // The tap stopped delivering audio (device change / process exit). Treat it
-                    // as silence so music is not left paused forever.
+                    // The tap stopped delivering audio (device change / process exit). End activity
+                    // so music is not left paused forever, and queue a rebuild if the route did
+                    // not recover on its own.
+                    self.markTapStalled()
                     self.publish(gate.ingest(levelDB: -100, at: now))
                 }
             }
@@ -425,6 +595,9 @@ public final class ProcessAudioMonitor: AIAudioMonitoring, @unchecked Sendable {
     // MARK: - Teardown
 
     private func teardown(removeListener: Bool = true) {
+        // Object-scoped listeners must go before the objects they watch are destroyed, on every
+        // teardown, including a rebuild. The process-list and system listeners survive a rebuild.
+        removeObjectDeviceChangeListeners()
         if aggregateDeviceID != AudioObjectID(kAudioObjectUnknown), let ioProcID {
             AudioDeviceStop(aggregateDeviceID, ioProcID)
             AudioDeviceDestroyIOProcID(aggregateDeviceID, ioProcID)
@@ -440,7 +613,49 @@ public final class ProcessAudioMonitor: AIAudioMonitoring, @unchecked Sendable {
         }
         if removeListener {
             removeProcessListListener()
+            removeSystemDeviceListener()
         }
+    }
+
+    private func removeObjectDeviceChangeListeners() {
+        if let tapAliveListener {
+            var address = AudioObjectPropertyAddress(
+                mSelector: kAudioDevicePropertyDeviceIsAlive,
+                mScope: kAudioObjectPropertyScopeGlobal,
+                mElement: kAudioObjectPropertyElementMain
+            )
+            AudioObjectRemovePropertyListenerBlock(
+                tapID, &address, DispatchQueue.global(qos: .userInitiated), tapAliveListener
+            )
+            self.tapAliveListener = nil
+        }
+        if let aggregateRateListener {
+            var address = AudioObjectPropertyAddress(
+                mSelector: kAudioDevicePropertyNominalSampleRate,
+                mScope: kAudioObjectPropertyScopeGlobal,
+                mElement: kAudioObjectPropertyElementMain
+            )
+            AudioObjectRemovePropertyListenerBlock(
+                aggregateDeviceID, &address, DispatchQueue.global(qos: .userInitiated), aggregateRateListener
+            )
+            self.aggregateRateListener = nil
+        }
+    }
+
+    private func removeSystemDeviceListener() {
+        guard let systemDeviceListener else { return }
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDefaultOutputDevice,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        AudioObjectRemovePropertyListenerBlock(
+            AudioObjectID(kAudioObjectSystemObject),
+            &address,
+            DispatchQueue.global(qos: .userInitiated),
+            systemDeviceListener
+        )
+        self.systemDeviceListener = nil
     }
 
     /// A tap device starts with a large IO buffer, so audio would reach the analysis task several

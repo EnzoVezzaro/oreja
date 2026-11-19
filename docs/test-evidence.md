@@ -54,6 +54,11 @@ for an interactive UI check in this verification pass.
 Still not executed: a real ChatGPT Voice session, real Apple Music control on a clean account, and
 notarization. Nothing above claims them.
 
+The monitor-recovery cases above are pure policy tests. They do not exercise a real device switch:
+no alternate, Bluetooth, or AirPods output was available on the test machine, so the listeners and
+tap rebuild are verified by construction and by the existing controlled-process probe only, not by a
+hardware route change. The "device change" coordinator case remains a simulated stream failure.
+
 Coverage (names as printed by the suite):
 
 | Area | Cases |
@@ -61,6 +66,7 @@ Coverage (names as printed by the suite):
 | Coordinator | music playing + AI audio = pause; quiet + threshold = resume; stale "playing" after a successful pause still resumes; brief gap stays paused; already-paused music is not resumed; manual pause blocks resume; manual resume is honored; ChatGPT process exit; Music exit; permission revoked; device change; two rapid responses; non-speech output; sleep/wake; track changed while paused; quit while owning a pause; delayed pause + end of speech; AI resumes during an in-flight resume; command failure limit; disabling automation; commands without a valid source |
 | Detector | dBFS conversion; minimum activity duration; sub-threshold blips; silence duration; hysteresis; short gaps; reset; level-sampler averaging |
 | Media/settings | AppleScript state parsing (playing/paused/stopped/unavailable); scripts never launch/stop/clear the track; track identity; settings round-trip and clamping; unknown/missing fields; separate defaults keys; stale-pause recovery; ChatGPT/browser catalog matching; quiet-interval clamping; mock provider |
+| Monitor recovery | route change with frames still arriving does not rebuild; stalled tap rebuilds after settle; change before settle is ignored; rebuild cooldown; no-signal window; a previously speaking app's silence is not a permission warning; zero-filled buffers are not speech; no tap means no report; no-signal event is diagnostic only |
 
 The suite is an executable, not XCTest, because this machine has no XCTest runtime. The test cases
 are plain functions and will migrate to Swift Testing on a full Xcode toolchain.

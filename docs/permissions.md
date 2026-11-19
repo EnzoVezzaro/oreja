@@ -23,8 +23,12 @@ while they speak. Audio is analyzed locally as level only; nothing is recorded, 
 **Entitlement:** `com.apple.security.device.audio-input` (applied to the ad-hoc build; the hardened
 runtime is only enabled for Developer ID builds).
 
-**If denied:** tap creation fails. Oreja enters `permissionRequired`, shows the reason, offers a
-button that opens the pane, and does not control Music. No blind resume is attempted.
+**If denied:** tap creation can fail with OSStatus -50/-4, which Oreja maps to `permissionRequired`,
+shows the reason, offers a button that opens the pane, and stops controlling Music. No blind resume
+is attempted. macOS has no public API to query this grant, and on some versions a tap created
+without it succeeds but delivers only zero-filled buffers. In that case Oreja cannot prove a denial:
+after 30 seconds with no audio it records a diagnostic hint pointing at this pane, and continues
+monitoring. If the app is speaking and Oreja hears nothing, check this permission first.
 
 ### Resetting
 

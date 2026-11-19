@@ -366,6 +366,12 @@ final class AppModel: ObservableObject {
             isMonitoring = false
             sourceDescription = ""
             record(.info, .monitoring, reason)
+        case .noSignalDetected(let detail):
+            // Diagnostic only. There is no public API to query the System Audio Recording grant,
+            // so a silent tap cannot be treated as a confirmed permission failure — doing so would
+            // stop automation and restore playback on a false positive. Call the user's attention
+            // to the check without changing the coordinator's state.
+            record(.warning, .permissions, detail)
         case .monitorFailed(let failure):
             isMonitoring = false
             if failure.kind == .permissionDenied { hasAudioPermission = false }
@@ -488,6 +494,9 @@ final class AppModel: ObservableObject {
         case .activitySuppressed:
             // The microphone path is not gated: it exists to hear the person in the room, and a
             // hesitation in their own sentence should not be second-guessed.
+            break
+        case .noSignalDetected:
+            // Only the process tap emits this hint; the microphone monitor does not.
             break
         }
         publishCoordinatorState()

@@ -256,6 +256,23 @@ Monitoring is therefore driven entirely by the Core Audio process list. There is
 rebuilds a tap for an app that is closed, and no separate "is the app running" poll to disagree with
 what Core Audio reports.
 
+### Audio route and recovery
+
+The process tap is attached to processes, not to the default output device, so the common headphone
+or AirPods switch does not normally affect it. The monitor still listens for
+`kAudioHardwarePropertyDefaultOutputDevice`, tap `kAudioDevicePropertyDeviceIsAlive`, and the
+aggregate's `kAudioDevicePropertyNominalSampleRate`. Those listeners only queue a 350 ms debounced
+check on a background queue: the tap is rebuilt **only if frames actually stopped**, using the same
+teardown/create path as re-targeting and a five-second rebuild cooldown. A healthy tap is never torn
+down just because a route changed, and nothing runs on the real-time IO thread. The existing 1.5 s
+watchdog remains the universal safety net and also queues a rebuild.
+
+macOS has no public API to query the System Audio Recording grant. Tap creation maps OSStatus -50/-4
+to `permissionRequired`, but a tap created without the grant can also deliver zero-filled buffers.
+A live tap that has never delivered a level above -90 dBFS for 30 seconds produces a diagnostic-only
+hint about the permission pane; it never changes the coordinator state, stops automation, or resumes
+playback. Normal silence between turns is not reported as a permission problem.
+
 ## Failure handling
 
 | Failure | Behavior |
@@ -265,7 +282,7 @@ what Core Audio reports.
 | Source app has no audio process yet | monitor stays up without a tap; the process-list listener attaches it when one appears |
 | Music quits | provider unavailable; ownership released; no retry storm |
 | Music automation denied | typed error, actionable message, no silent success |
-| Output device change | tap stops delivering; watchdog ends activity; monitor is re-established |
+| Output device change | listeners for default output, tap liveness and sample rate queue a debounced check; the tap is rebuilt only if frames actually stopped (with a cooldown); watchdog still ends activity so music is never left paused |
 | Sleep/wake | state `suspended`; on wake the coordinator reconciles with observed playback |
 | Oreja quits while holding a pause | resume once before termination |
 | Oreja crashes while holding a pause | journal restores only the same paused track on next launch |

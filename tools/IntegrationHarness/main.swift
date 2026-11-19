@@ -105,6 +105,11 @@ struct IntegrationHarness {
                         resumeCount += 1
                         resumeIssuedAt = issued
                         snapshot = try await media.resumeReporting()
+                    case .setVolume:
+                        // The harness verifies pause/resume timing; ducking is still executed so
+                        // the coordinator completes its command rather than stalling.
+                        try await media.setVolume(command.targetVolume ?? 0)
+                        snapshot = await media.currentPlayback()
                     }
                     let done = ProcessInfo.processInfo.systemUptime
                     switch command.kind {
@@ -114,6 +119,8 @@ struct IntegrationHarness {
                     case .resume:
                         resumeDoneAt = done
                         resumeSnapshot = snapshot
+                    case .setVolume:
+                        break
                     }
                     coordinator.complete(command.id, outcome: .succeeded(snapshot))
                 } catch {
@@ -175,6 +182,8 @@ struct IntegrationHarness {
                 coordinator.audioActivityEnded()
             case .activitySuppressed(let reason, let levelDB):
                 print(String(format: "event: suppressed (%@) at %.1f dBFS", reason.explanation, levelDB))
+            case .noSignalDetected(let detail):
+                print("no signal: \(detail)")
             case .monitorFailed(let failure):
                 monitorError = failure.message
                 print("monitor failed: \(failure.message)")

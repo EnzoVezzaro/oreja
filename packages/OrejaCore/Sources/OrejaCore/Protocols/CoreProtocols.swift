@@ -69,6 +69,11 @@ public enum AudioActivityEvent: Sendable, Equatable {
     case targetsChanged(processDescription: String)
     case monitorStopped(String)
     case monitorFailed(AudioMonitoringFailure)
+    /// A live tap has delivered no audio at all for an extended window. This is a diagnostic hint,
+    /// not a failure: macOS exposes no public check for the System Audio Recording grant, and a tap
+    /// created without it may deliver silence instead of returning an error. The coordinator's
+    /// pause/resume state is deliberately unchanged by this event.
+    case noSignalDetected(detail: String)
     case activityStarted(levelDB: Double)
     case activityEnded(levelDB: Double)
     /// The source produced sound that was deliberately not treated as AI activity. Nothing is

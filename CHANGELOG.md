@@ -6,6 +6,17 @@ made, not the day it was published.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Audio route changes no longer risk a silent tap.** The monitor watches the default output
+  device, tap liveness and sample rate, and rebuilds the tap only when frames actually stop — after
+  a 350 ms settle and with a five-second cooldown. A healthy tap is not torn down on a headphone or
+  AirPods switch. The 1.5 s watchdog still ends activity so music is never left paused.
+- **Missing audio-capture permission is more visible when it presents as silence.** A live tap with
+  no audio for 30 seconds now records an actionable diagnostic hint about Screen & System Audio
+  Recording. It is deliberately diagnostic only: macOS exposes no public permission check, so it
+  cannot stop automation or restore playback on a guess. Normal quiet between turns is unaffected.
+
 ### Planned
 
 - **More music players.** Apple Music and the experimental Browser target are available. Spotify
