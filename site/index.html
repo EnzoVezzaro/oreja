@@ -89,7 +89,7 @@
               "name": "Does Oreja record or transcribe what ChatGPT says?",
               "acceptedAnswer": {
                 "@type": "Answer",
-                "text": "No. It reads the output level of the selected application's audio and keeps only an active or quiet state. No samples are stored, no speech is recognised, and the app contains no networking code."
+                "text": "No. It reads the output level of the selected application's audio and keeps only a speaking-or-quiet state. No samples are stored, no speech is recognised, and the app contains no networking code."
               }
             },
             {
@@ -229,7 +229,7 @@
         </h1>
         <p class="n-lede">
           Oreja pauses or lowers your music while a selected app speaks, then brings it back.
-          It follows audio levels, not words, so any voice in any language works.
+          By default it listens to the app's output level, not your microphone or the words being said.
         </p>
         <div class="n-actions">
           <a class="n-btn n-btn-solid n-btn-lg" href="#get" data-sc-magnet="0.24" data-sc-rise="0">Download Oreja for Mac</a>
@@ -282,13 +282,13 @@
             <div class="n-beats">
               <article class="n-beat" data-sc-cue="0 0.38 0 0.34">
                 <h3>The reply starts.</h3>
-                <p>Oreja reads the app's output level and acts on the first sound. Apple Music stops in pause mode, or drops to the level you set in lower-volume mode.</p>
+                <p>Oreja reads the app's output level and reacts when it sounds like speech. Apple Music stops in pause mode, or drops to the level you set in lower-volume mode.</p>
                 <p class="n-state">mode · pause, or lower volume</p>
               </article>
               <article class="n-beat" data-sc-cue="0.30 0.70">
                 <h3>You take your turn.</h3>
-                <p>Music stays down through the conversation hold, so the next reply does not restart it in the middle of your sentence.</p>
-                <p class="n-state">conversation hold · 12 seconds, adjustable</p>
+                <p>Turn on the conversation hold and music stays down through the quiet stretches, so the next reply does not restart it in the middle of your sentence. It is off by default.</p>
+                <p class="n-state">conversation hold · optional, up to 60 seconds</p>
               </article>
               <article class="n-beat" data-sc-cue="0.62 1">
                 <h3>The room goes quiet.</h3>
@@ -341,8 +341,8 @@
           <h2 id="panel-title" class="n-h2">Small enough to <em>read once.</em></h2>
           <p class="n-body-copy">
             The menu bar holds the panel: one status, one switch, the music line. Everything you
-            decide lives in a single Settings window — the app to follow, what happens while
-            ChatGPT speaks, the level music drops to, and when it comes back.
+            decide lives in a single Settings window — which apps to follow, what happens while
+            they speak, the level music drops to, and when it comes back.
           </p>
           <dl class="n-rows">
             <div><dt>Listen to</dt><dd>Several apps at once: ChatGPT, coding agents, calls, or a browser marked experimental</dd></div>
@@ -409,8 +409,9 @@
             It measures <em>how loud</em> the app is.
           </h2>
           <p class="n-body-copy">
-            That is the whole input: one level from macOS's process tap, held in memory for a moment
-            and thrown away. Oreja keeps a single answer, speaking or quiet, and nothing else.
+            That is the whole audio input: one level from macOS's process tap, held in memory for a
+            moment and thrown away. Oreja keeps a speaking-or-quiet state, your settings, and a short
+            pause journal used to restore playback after a crash.
           </p>
         </div>
         <ul class="n-privacy-grid" data-sc-in data-sc-stagger="90">
@@ -447,7 +448,7 @@
         <div class="n-faq-list" data-sc-in data-sc-stagger="40">
           <details>
             <summary>Does Oreja record or transcribe what ChatGPT says?</summary>
-            <p>No. It reads the output level of the selected application's audio and keeps only an active or quiet state. No samples are stored, no speech is recognised, and the app contains no networking code.</p>
+            <p>No. It reads the output level of the selected application's audio and keeps only a speaking-or-quiet state. No samples are stored, no speech is recognised, and the app contains no networking code.</p>
           </details>
           <details>
             <summary>Do I need an OpenAI account or API key?</summary>
@@ -496,8 +497,8 @@
         <h2 id="get-title" class="n-h2 n-dawn-title">Bring him home.</h2>
         <p class="n-lede n-lede-dark">
           Download Oreja 0.4.0 for macOS 14.2 or later. The Browser target is experimental and needs
-          browser Automation permission. The app is ad-hoc signed and not notarized, so macOS asks
-          for approval once. The source builds with one script and no dependencies.
+          browser Automation permission. The app is ad-hoc signed and not notarized, so another Mac
+          may ask for a one-time approval. The source builds with one script and no dependencies.
         </p>
         <div class="n-actions">
           <a class="n-btn n-btn-dark n-btn-lg" href="downloads/Oreja-0.4.0.dmg">Download Oreja 0.4.0</a>
@@ -522,7 +523,7 @@
               <span class="n-brand-sub">de van gogh</span>
             </span>
           </a>
-          <p class="n-footer-note">A menu bar app for ChatGPT and Apple Music. Runs on your Mac and keeps no record of what it hears.</p>
+          <p class="n-footer-note">A menu bar app that gives your music room while selected apps speak. Runs on your Mac and keeps no record of what it hears.</p>
         </div>
         <nav class="n-footer-links" aria-label="Footer">
           <a href="#story">How it works</a>
