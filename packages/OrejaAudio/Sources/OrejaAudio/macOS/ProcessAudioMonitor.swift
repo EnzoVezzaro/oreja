@@ -24,6 +24,9 @@ public final class ProcessAudioMonitor: AIAudioMonitoring, @unchecked Sendable {
     private var isRunning = false
     private var matchedProcessCount = 0
     private var tappedTargetIDs: [AudioObjectID] = []
+    /// Exact helper processes behind the tap, kept so logs can attribute an onset to a process
+    /// instead of only naming the selected app.
+    private var tappedProcesses: [AudioProcessIdentity] = []
     /// Guards tap creation and teardown: the analysis task re-targets the tap when the monitored
     /// app spawns new audio processes, which can race with `stop()`. Never taken on the audio
     /// thread — the IOProc only touches the sampler.
@@ -131,7 +134,7 @@ public final class ProcessAudioMonitor: AIAudioMonitoring, @unchecked Sendable {
         guard matchedProcessCount > 0 else {
             return "\(descriptor.displayName) (waiting for its audio process)"
         }
-        return "\(descriptor.displayName) (\(matchedProcessCount) audio process\(matchedProcessCount == 1 ? "" : "es"))"
+        return "\(descriptor.displayName): \(AudioProcessDiagnostics.describe(tappedProcesses))"
     }
 
     // MARK: - Setup
@@ -143,6 +146,7 @@ public final class ProcessAudioMonitor: AIAudioMonitoring, @unchecked Sendable {
                 throw AudioMonitoringFailure(.sourceUnavailable, "No audio process was supplied to monitor.")
             }
             matchedProcessCount = explicitTargets.count
+            tappedProcesses = []
             targetIDs = explicitTargets
         } else {
             guard let resolved = try resolveTargets() else {
@@ -154,6 +158,7 @@ public final class ProcessAudioMonitor: AIAudioMonitoring, @unchecked Sendable {
                 // Core Audio process-list listener (with the one-second poll as a fallback).
                 matchedProcessCount = 0
                 tappedTargetIDs = []
+                tappedProcesses = []
                 addProcessListListener()
                 return
             }
@@ -176,7 +181,13 @@ public final class ProcessAudioMonitor: AIAudioMonitoring, @unchecked Sendable {
     /// first syllables. Tapping a silent process costs nothing.
     private func resolveTargets() throws -> [AudioObjectID]? {
         let processes = try AudioProcessCatalog.processes(matchingPrefixes: descriptor.bundleIdentifierPrefixes)
-        guard !processes.isEmpty else { return nil }
+        guard !processes.isEmpty else {
+            tappedProcesses = []
+            return nil
+        }
+        tappedProcesses = processes.map {
+            AudioProcessIdentity(bundleID: $0.bundleID, pid: $0.pid, isRunningOutput: $0.isRunningOutput)
+        }
         return processes.map(\.objectID).sorted()
     }
 
@@ -200,6 +211,7 @@ public final class ProcessAudioMonitor: AIAudioMonitoring, @unchecked Sendable {
             guard tapID != AudioObjectID(kAudioObjectUnknown) else { return .unchanged }
             teardown(removeListener: false)
             tappedTargetIDs = []
+            tappedProcesses = []
             matchedProcessCount = 0
             return .changed
         }

@@ -100,6 +100,55 @@ public struct MediaCapabilities: Sendable, Equatable {
     }
 }
 
+/// A media service a user might expect Oreja to control. This is deliberately broader than
+/// `MediaProviderID`: an unavailable target must still be nameable in Settings without pretending
+/// an adapter exists.
+public enum PlaybackTargetID: String, Sendable, Equatable, CaseIterable {
+    case appleMusic
+    case spotify
+    case browser
+
+    public var displayName: String {
+        switch self {
+        case .appleMusic: "Apple Music"
+        case .spotify: "Spotify"
+        case .browser: "Browser"
+        }
+    }
+}
+
+/// What Oreja can actually do for a target. Unsupported targets are surfaced verbatim instead of
+/// running a best-effort script that would look like working control.
+public enum PlaybackTargetCapability: Sendable, Equatable {
+    case supported
+    case unavailable(reason: String)
+
+    public var isSupported: Bool {
+        if case .supported = self { return true }
+        return false
+    }
+
+    public var reason: String? {
+        if case .unavailable(let reason) = self { return reason }
+        return nil
+    }
+}
+
+public enum PlaybackTargets {
+    /// Capability findings from the v0.4.0 dependency audits. These describe supported platform
+    /// APIs and local installation state, not an intention to fake control.
+    public static func capability(for target: PlaybackTargetID) -> PlaybackTargetCapability {
+        switch target {
+        case .appleMusic:
+            return .supported
+        case .spotify:
+            return .unavailable(reason: "Not implemented. Spotify is not installed here and no official desktop scripting dictionary was available to verify; its Web API needs a Premium account and a remote service, which Oreja does not use.")
+        case .browser:
+            return .unavailable(reason: "No supported whole-browser control: macOS exposes no public per-process gain or pause/transport API for a browser. Oreja does not use per-tab JavaScript, app mute, or system volume as a substitute, and selected conversation audio stays audible.")
+        }
+    }
+}
+
 public enum MediaControlError: Error, Sendable, Equatable, LocalizedError {
     case providerUnavailable(String)
     case notRunning(String)

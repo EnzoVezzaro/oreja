@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Documentation — Oreja de Van Gogh</title>
-  <meta name="description" content="Install, permissions, day-to-day use, troubleshooting and privacy for Oreja de Van Gogh 0.4.0, including its experimental Browser playback target.">
+  <meta name="description" content="Install, permissions, day-to-day use, troubleshooting and privacy for Oreja de Van Gogh 0.5.0, including browser and player lowering through process taps.">
   <link rel="canonical" href="https://oreja-tau.vercel.app/docs.html">
   <meta name="robots" content="index, follow, max-image-preview:large">
   <meta name="theme-color" content="#f7f2e8" media="(prefers-color-scheme: light)">
@@ -123,9 +123,8 @@
           <h2>Quick start</h2>
           <p>
             Oreja is a menu bar app for macOS with one job: coordinate playback while a selected
-            interruption source is speaking. Release 0.4.0 supports Apple Music and adds an
-            experimental Browser playback target using Apple Events and page scripting for standard
-            HTML media in Safari, Chrome, Edge, Brave, Arc, and ego lite.
+            interruption source or your voice speaks. Release 0.5.0 pauses or lowers Apple Music and
+            lowers browsers and other players (except Safari) through Core Audio process taps.
           </p>
           <h3>What you need</h3>
           <ul>
@@ -293,10 +292,10 @@ tccutil reset AppleEvents app.oreja.van-gogh</code></pre>
             that application's processes and helpers, and torn down when monitoring stops.
           </p>
           <p>
-            Release 0.4.0 includes an experimental Browser playback target using Apple Events and page
-            scripting for standard media in supported browsers. Browser source monitoring is a
-            separate process-level input and may include every tab. The maker reported a successful
-            real playback test; the browser and media site used were not recorded.
+            Release 0.5.0 lowers browsers and other players through a muted Core Audio process tap and
+            replays their audio at the chosen duck level; no browser setting or page scripting is
+            involved. Browser source monitoring is a separate process-level input and may include
+            every tab, so use a different browser for ChatGPT Web and music.
             The decision to pause or resume lives in one deterministic state machine with no AppKit,
             no Core Audio and no AppleScript, so it is fully unit-tested. Platform code sits behind
             ports.

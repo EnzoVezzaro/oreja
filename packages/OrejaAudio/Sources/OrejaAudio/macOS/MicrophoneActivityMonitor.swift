@@ -1,4 +1,6 @@
 import AVFoundation
+import AudioToolbox
+import CoreAudio
 import Foundation
 import OrejaCore
 
@@ -19,6 +21,8 @@ public final class MicrophoneActivityMonitor: @unchecked Sendable {
     private let continuation: AsyncStream<AudioActivityEvent>.Continuation
     private let sampler = LevelSampler()
     private var engine: AVAudioEngine?
+    /// The microphone this monitor captures from, set when it starts.
+    public private(set) var inputDeviceID: AudioDeviceID?
     private var analysisTask: Task<Void, Never>?
     private var isRunning = false
 
@@ -45,6 +49,13 @@ public final class MicrophoneActivityMonitor: @unchecked Sendable {
 
         let engine = AVAudioEngine()
         let input = engine.inputNode
+        // See `InputDeviceSelection`: the headset mic only while another app already uses it,
+        // otherwise the built-in mic, so Oreja never switches a headset into call mode itself.
+        let device = InputDeviceSelection.effectiveInputForMonitoring()
+        if InputDeviceSelection.preferredInputForMonitoring() != nil {
+            Self.route(input, to: device)
+        }
+        inputDeviceID = device
         let format = input.inputFormat(forBus: 0)
         guard format.sampleRate > 0, format.channelCount > 0 else {
             throw AudioMonitoringFailure(
@@ -95,6 +106,21 @@ public final class MicrophoneActivityMonitor: @unchecked Sendable {
         continuation.finish()
     }
 
+    /// Points the engine's input unit at a specific device. On failure the engine keeps the system
+    /// default, which is still a valid microphone, so the error is not fatal.
+    private static func route(_ input: AVAudioInputNode, to device: AudioDeviceID) {
+        guard let unit = input.audioUnit else { return }
+        var deviceID = device
+        _ = AudioUnitSetProperty(
+            unit,
+            kAudioOutputUnitProperty_CurrentDevice,
+            kAudioUnitScope_Global,
+            0,
+            &deviceID,
+            UInt32(MemoryLayout<AudioDeviceID>.size)
+        )
+    }
+
     private func ensurePermission() async throws {
         switch AVCaptureDevice.authorizationStatus(for: .audio) {
         case .authorized:
@@ -119,6 +145,7 @@ public final class MicrophoneActivityMonitor: @unchecked Sendable {
         analysisTask = Task.detached(priority: .utility) { [weak self] in
             guard let self else { return }
             var detector = AudioActivityDetector(configuration: self.configuration)
+            var levelWindow = MicrophoneLevelWindow()
             while !Task.isCancelled {
                 do {
                     try await Task.sleep(nanoseconds: Self.analysisIntervalNanos)
@@ -126,7 +153,16 @@ public final class MicrophoneActivityMonitor: @unchecked Sendable {
                     return
                 }
                 let now = ProcessInfo.processInfo.systemUptime
-                guard let summary = self.sampler.drain() else { continue }
+                let summary = self.sampler.drain()
+                if let report = levelWindow.ingest(levelDB: summary?.levelDB, at: now) {
+                    self.continuation.yield(.microphoneLevels(
+                        peakDB: report.peakDB,
+                        meanDB: report.meanDB,
+                        frameCount: report.frameCount,
+                        activationDB: self.configuration.activationThresholdDB
+                    ))
+                }
+                guard let summary else { continue }
                 if let transition = detector.ingest(levelDB: summary.levelDB, at: now) {
                     switch transition {
                     case .started:

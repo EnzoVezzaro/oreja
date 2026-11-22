@@ -285,14 +285,17 @@ struct ThemeSection<Content: View>: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Eyebrow(text: title)
-            ThemeCard { content() }
-            if let caption {
-                Text(caption)
-                    .font(OrejaTheme.Typography.micro)
-                    .foregroundStyle(OrejaTheme.Palette.inkSoft)
-                    .fixedSize(horizontal: false, vertical: true)
+            VStack(alignment: .leading, spacing: 3) {
+                Eyebrow(text: title)
+                    .accessibilityAddTraits(.isHeader)
+                if let caption {
+                    Text(caption)
+                        .font(OrejaTheme.Typography.micro)
+                        .foregroundStyle(OrejaTheme.Palette.inkSoft)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
+            ThemeCard { content() }
         }
     }
 }

@@ -184,6 +184,8 @@ struct IntegrationHarness {
                 print(String(format: "event: suppressed (%@) at %.1f dBFS", reason.explanation, levelDB))
             case .noSignalDetected(let detail):
                 print("no signal: \(detail)")
+            case .microphoneLevels:
+                break
             case .monitorFailed(let failure):
                 monitorError = failure.message
                 print("monitor failed: \(failure.message)")

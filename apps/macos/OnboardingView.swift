@@ -137,7 +137,7 @@ struct OnboardingView: View {
                 pageHeader(
                     "Welcome",
                     "One job, done automatically.",
-                    "Oreja pauses Apple Music or lowers its volume when ChatGPT starts speaking, then restores playback when the reply ends. It sits in the menu bar and stays out of the way."
+                    "Oreja pauses Apple Music or lowers its volume when a selected app speaks or when you speak with microphone monitoring enabled. Playback restores after the configured quiet interval. It sits in the menu bar and stays out of the way."
                 )
                 Spacer(minLength: 12)
                 VincentCompanion(size: 80, isListening: false, isMusicPlaying: false)
@@ -145,7 +145,7 @@ struct OnboardingView: View {
             }
             ThemeCard {
                 BulletList(items: [
-                    "It listens to ChatGPT's own audio output. Microphone access is optional if you want Music to stay interrupted while you speak.",
+                    "It listens to selected apps. If you enable microphone monitoring, your voice can start the configured interruption and keep it active while you speak.",
                     "Nothing is recorded, transcribed or uploaded. Audio levels are discarded immediately.",
                     "Music keeps its track, queue and position. In lower-volume mode, Oreja restores the volume it found before speaking started.",
                     "It never starts music you had paused yourself.",
@@ -224,12 +224,12 @@ struct OnboardingView: View {
             pageHeader(
                 "Audio access",
                 "Allow audio monitoring",
-                "To know when ChatGPT is speaking, Oreja captures a copy of that application's audio output using Apple's Core Audio process taps. Only levels are computed; audio is never stored."
+                "To know when a selected app is speaking, Oreja captures a copy of that application's audio output using Apple's Core Audio process taps. Only levels are computed; audio is never stored."
             )
             ThemeCard {
                 BulletList(items: [
                     "macOS asks for Screen & System Audio Recording permission. Oreja needs the audio part only.",
-                    "You do not need to share your screen. Microphone access is optional and only supports “Pause while I speak.”",
+                    "You do not need to share your screen. Microphone access is optional; when enabled, your voice starts the configured interruption while you speak.",
                     "The permission is required by macOS 14.2+ for any process tap, including this one.",
                 ])
             }
@@ -303,7 +303,7 @@ struct OnboardingView: View {
             pageHeader(
                 "Ready",
                 "Oreja now runs from the menu bar",
-                "Closing this window leaves automation running. Your music is only touched while ChatGPT is speaking."
+                "Closing this window leaves automation running. Playback is adjusted while a selected app or your voice is active, and may stay adjusted through the configured quiet interval or conversation hold."
             )
 
             ThemeCard {
@@ -396,12 +396,16 @@ struct CheckRow: View {
 struct InlineNotice: View {
     var text: String
     var symbol: String = "info.circle"
+    /// Informational notes use the accent; anything that needs the person's attention stays warm.
+    var isInformational: Bool = false
+
+    private var toneColor: Color { isInformational ? OrejaTheme.Palette.accent : OrejaTheme.Palette.warning }
 
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
             Image(systemName: symbol)
                 .font(.system(size: 10))
-                .foregroundStyle(OrejaTheme.Palette.warning)
+                .foregroundStyle(toneColor)
                 .padding(.top, 1)
                 .accessibilityHidden(true)
             Text(text)
@@ -413,7 +417,7 @@ struct InlineNotice: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 9, style: .continuous)
-                .fill(OrejaTheme.Palette.warning.opacity(0.09))
+                .fill(toneColor.opacity(0.09))
         )
     }
 }

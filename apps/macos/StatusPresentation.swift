@@ -10,11 +10,11 @@ extension CoordinatorState {
     var title: String {
         switch self {
         case .disabled: "Automation off"
-        case .searchingForSource: "Looking for the AI source"
-        case .monitoring: "Monitoring ChatGPT"
+        case .searchingForSource: "Waiting for a selected app"
+        case .monitoring: "Listening"
         case .musicPlaying: "Music playing"
-        case .aiActive: "ChatGPT is speaking"
-        case .musicPausedByOreja: "Music paused by Oreja"
+        case .aiActive: "Someone is speaking"
+        case .musicPausedByOreja: "Interrupted by Oreja"
         case .waitingForSilence: "Waiting for silence"
         case .restoringPlayback: "Resuming music"
         case .suspended: "Suspended"
@@ -25,12 +25,12 @@ extension CoordinatorState {
 
     var detail: String {
         switch self {
-        case .disabled: "Turn automation on to coordinate music with ChatGPT."
-        case .searchingForSource: "Open ChatGPT and start a voice session."
-        case .monitoring: "Listening for AI output. Music is left alone until ChatGPT speaks."
-        case .musicPlaying: "ChatGPT is quiet; your music is playing."
-        case .aiActive: "Oreja is holding playback so the response stays clear."
-        case .musicPausedByOreja: "Paused because ChatGPT is speaking. It will resume after the quiet interval."
+        case .disabled: "Turn automation on to coordinate playback with your conversation."
+        case .searchingForSource: "Open an app selected under Audio › Listen to, such as ChatGPT."
+        case .monitoring: "Playback is left alone until a selected app or your voice speaks."
+        case .musicPlaying: "Nobody is speaking; your music is playing."
+        case .aiActive: "Oreja is pausing or lowering playback so speech stays clear."
+        case .musicPausedByOreja: "Paused or lowered while someone speaks. It comes back after the quiet interval."
         case .waitingForSilence: "Counting the quiet interval before music resumes."
         case .restoringPlayback: "Handing playback back to your music."
         case .suspended: "The Mac went to sleep; Oreja will reconcile playback on wake."

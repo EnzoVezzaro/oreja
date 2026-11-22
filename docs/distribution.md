@@ -25,7 +25,7 @@ automatically when a real identity is supplied through `OREJA_SIGN_IDENTITY`. `c
 --verify --strict` passes locally. The build is **not notarized**: no Developer ID credentials were
 available, and this document does not claim otherwise.
 
-`build/Oreja-0.4.0.dmg` is the versioned UDZO disk image for the 0.4.0 release. It contains an
+`build/Oreja-0.5.0.dmg` is the versioned UDZO disk image for the 0.5.0 release. It contains an
 ad-hoc-signed app and is not notarized; macOS may require a one-time Gatekeeper approval on another
 Mac. This is the same signing posture as the previous public releases.
 
@@ -85,17 +85,18 @@ security controls to pass review.
 
 ## Versioning
 
-`CFBundleShortVersionString` and `CFBundleVersion` live in `packaging/Info.plist` (currently
-`0.4.0` / `7`). Bump both for every distributed build. There is no auto-updater.
+`CFBundleShortVersionString` and `CFBundleVersion` are stamped into the built app from the
+latest git tag and commit count by `./scripts/build.sh`; set `OREJA_VERSION` to override. Tag the
+release before building the distributed app. There is no auto-updater.
 
 ## Release checklist
 
-- [x] `./scripts/test.sh` passes (89 tests, 422 assertions).
+- [x] `./scripts/test.sh` passes (122 tests, 571 assertions).
 - [x] `./scripts/build.sh` succeeds; `open build/Oreja.app` creates Settings, and `pgrep -x Oreja` stays
       alive (a dyld/library-validation failure exits in about a second and writes a crash report).
 - [x] `codesign --verify --strict` passes; the app loads the three Oreja frameworks.
-- [x] Maker reported successful real Browser playback in their setup; exact browser/site and settings
-      were not recorded (`test-evidence.md`).
+- [x] Maker reported Apple Music lowering while ChatGPT Desktop spoke and while they spoke;
+      YouTube in a browser was lowered to 11% by a real voice onset and restored (`test-evidence.md`).
 - [ ] Permissions verified on a clean user account.
 - [ ] Developer ID signing and notarization; this release remains ad-hoc signed.
 - [ ] Trademark and name search completed.

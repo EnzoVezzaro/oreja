@@ -162,6 +162,8 @@ struct AudioProbe {
                 print("· suppressed (\(reason.explanation)) at \(String(format: "%.1f", levelDB)) dBFS")
             case .noSignalDetected(let detail):
                 print("! no signal: \(detail)")
+            case .microphoneLevels(let peakDB, let meanDB, let frameCount, let activationDB):
+                print("· level peak \(peakDB.map { String(format: "%.1f", $0) } ?? "none") mean \(meanDB.map { String(format: "%.1f", $0) } ?? "none") dBFS over \(frameCount) frames (threshold \(String(format: "%.0f", activationDB)))")
             case .monitorFailed(let failure):
                 print("✕ monitor failed: \(failure.message)")
             case .monitorStopped(let reason):

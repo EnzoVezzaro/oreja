@@ -44,16 +44,16 @@ tccutil reset AudioCapture app.oreja.van-gogh
 tccutil reset ScreenCapture app.oreja.van-gogh
 ```
 
-## 2. Automation (Music and experimental Browser target)
+## 2. Automation (Music)
 
-**Why:** in release 0.4.0, to pause/resume or change Music's volume, and to pause or lower standard
-HTML media in the optional experimental Browser target. Oreja never changes Music tracks, clears its
-queue, or launches Music.
+**Why:** to pause/resume or change Music's volume. Browsers and other players are lowered through
+Core Audio process taps instead and need no Automation consent. Oreja never changes Music tracks,
+clears its queue, or launches Music.
 
-**What macOS shows:** an Automation dialog when Oreja reads or controls Music. Browser control may
-show a separate dialog for each selected browser. Safari and Chromium-family browsers also require
-their JavaScript-from-Apple-Events setting to be enabled. Some protected or custom players may not
-respond.
+**What macOS shows:** an Automation dialog when Oreja reads or controls Music. Lowering a browser
+or another player needs no Automation dialog: Oreja taps its audio process, silences the original,
+and replays a copy at the duck level. Safari cannot be lowered because its audio runs in a WebKit
+process shared with other apps.
 
 **Pane:** System Settings › Privacy & Security › **Automation** → Oreja → Music.
 
@@ -61,14 +61,14 @@ respond.
 
 ```xml
 <key>NSAppleEventsUsageDescription</key>
-<string>Oreja controls Music to pause or lower playback while a primary audio source speaks. It does
-not read page content, prompts, or conversations.</string>
+<string>Oreja controls Music to pause or lower playback while a selected app or your voice speaks.
+It does not read page content, prompts, or conversations.</string>
 ```
 
 **Entitlement:** `com.apple.security.automation.apple-events`.
 
-**If denied:** Music or browser control failures are reported in diagnostics. Browser media control
-is experimental in release 0.4.0.
+**If denied:** Music control failures are reported in diagnostics. Browser and player lowering
+continues to work, because it does not use Apple Events.
 
 ### Resetting
 

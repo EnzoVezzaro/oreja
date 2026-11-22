@@ -27,12 +27,11 @@ does with data; it is a product description, not legal advice.
 5. Raw samples are never persisted, never inspected for content, and never sent anywhere. No speech
    recognition, transcription, or speaker identification is performed.
 
-Primary apps keep playing normally: their analysis tap is unmuted. Release 0.4.0 includes an
-experimental Browser playback target using Apple Events and page scripting for standard HTML media
-in its listed adapters. Page scripts control media elements in open tabs; they do not inspect page
-text. The maker reported successful real playback testing, but the exact browser/site/settings were
-not recorded. Music is not part of the analysis tap and remains controlled through its provider
-adapter.
+Primary apps keep playing normally: their analysis tap is unmuted. In release 0.5.0, browsers and
+other players chosen under "Lower these apps" are silenced at the source through a second process
+tap and replayed at the chosen level. That tap carries audio only; no page content, prompt or
+conversation is read, and no browser setting or page scripting is involved. Music is not part of the
+analysis tap and remains controlled through its provider adapter.
 
 ## Permissions and purpose strings
 
