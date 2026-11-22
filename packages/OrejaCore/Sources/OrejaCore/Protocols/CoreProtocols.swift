@@ -74,6 +74,9 @@ public enum AudioActivityEvent: Sendable, Equatable {
     /// The source produced sound that was deliberately not treated as AI activity. Nothing is
     /// paused for it; the event exists so the app can say so in diagnostics and in the UI.
     case activitySuppressed(reason: AudioSuppressionReason, levelDB: Double)
+    /// One-second microphone level summary, for verbose diagnostics only. Carries dBFS numbers
+    /// and a frame count, never audio.
+    case microphoneLevels(peakDB: Double?, meanDB: Double?, frameCount: Int, activationDB: Double)
 }
 
 /// Why a burst of audio from a monitored app was not treated as speech.

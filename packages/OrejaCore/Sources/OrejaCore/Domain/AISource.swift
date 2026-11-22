@@ -65,6 +65,8 @@ public enum AudioSourceCategory: String, Codable, Sendable, CaseIterable {
     case browser
     case calling
     case media
+    /// Music players other than Apple Music. Never a speech source; can be lowered as another app.
+    case music
     case other
 
     public var title: String {
@@ -74,6 +76,7 @@ public enum AudioSourceCategory: String, Codable, Sendable, CaseIterable {
         case .browser: "Browsers (experimental)"
         case .calling: "Calls and messages"
         case .media: "Video and podcasts"
+        case .music: "Music players"
         case .other: "Other running apps"
         }
     }
@@ -175,6 +178,9 @@ public enum AISourceCatalog {
         KnownAudioApp(bundleIdentifier: "com.hnc.Discord", displayName: "Discord", category: .calling),
         KnownAudioApp(bundleIdentifier: "com.microsoft.teams2", displayName: "Microsoft Teams", category: .calling),
 
+        KnownAudioApp(bundleIdentifier: "com.spotify.client", displayName: "Spotify", category: .music),
+        KnownAudioApp(bundleIdentifier: "org.videolan.vlc", displayName: "VLC", category: .music),
+
         KnownAudioApp(bundleIdentifier: "com.apple.podcasts", displayName: "Podcasts", category: .media),
         KnownAudioApp(bundleIdentifier: "com.apple.TV", displayName: "TV", category: .media),
     ]
@@ -209,6 +215,24 @@ public enum AISourceCatalog {
     public static func isSelectable(bundleIdentifier: String?) -> Bool {
         guard let bundleIdentifier, !bundleIdentifier.isEmpty else { return false }
         return !isMusicPlayer(bundleIdentifier: bundleIdentifier) && !bundleIdentifier.hasPrefix(ownBundlePrefix)
+    }
+
+    /// Whether an application may be lowered as another app while someone speaks. Unlike sources,
+    /// music players qualify (that is their purpose); Apple Music does not, because Oreja controls it
+    /// natively, and neither does Oreja itself or an app whose audio cannot be isolated.
+    public static func isTargetSelectable(bundleIdentifier: String?) -> Bool {
+        guard let bundleIdentifier, !bundleIdentifier.isEmpty else { return false }
+        return bundleIdentifier != "com.apple.Music"
+            && !bundleIdentifier.hasPrefix(ownBundlePrefix)
+            && supportsTargetMute(bundleIdentifier: bundleIdentifier)
+    }
+
+    /// Canonicalises, filters with `isTargetSelectable` and removes duplicates, keeping order.
+    public static func normalizedTargets(_ selections: [AISourceSelection]) -> [AISourceSelection] {
+        var seen = Set<String>()
+        return selections
+            .map { isChatGPT(bundleIdentifier: $0.bundleIdentifier) ? AISourceSelection.chatGPTDesktop : $0 }
+            .filter { isTargetSelectable(bundleIdentifier: $0.bundleIdentifier) && seen.insert($0.bundleIdentifier).inserted }
     }
 
     /// Whether process matching is narrow enough to mute this app without touching unrelated apps.

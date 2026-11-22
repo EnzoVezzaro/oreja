@@ -175,6 +175,8 @@ struct IntegrationHarness {
                 coordinator.audioActivityEnded()
             case .activitySuppressed(let reason, let levelDB):
                 print(String(format: "event: suppressed (%@) at %.1f dBFS", reason.explanation, levelDB))
+            case .microphoneLevels:
+                break
             case .monitorFailed(let failure):
                 monitorError = failure.message
                 print("monitor failed: \(failure.message)")

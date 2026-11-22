@@ -169,8 +169,7 @@ struct OnboardingView: View {
                 primary: model.settings.aiSources,
                 targets: model.settings.targetAudioApps,
                 onTogglePrimary: model.toggleSource,
-                onToggleTarget: model.toggleTargetAudioApp,
-                isSourceBlocked: model.isSourceBlockedForAddition
+                onToggleTarget: model.toggleTargetAudioApp
             )
         }
     }
@@ -397,12 +396,16 @@ struct CheckRow: View {
 struct InlineNotice: View {
     var text: String
     var symbol: String = "info.circle"
+    /// Informational notes use the accent; anything that needs the person's attention stays warm.
+    var isInformational: Bool = false
+
+    private var toneColor: Color { isInformational ? OrejaTheme.Palette.accent : OrejaTheme.Palette.warning }
 
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
             Image(systemName: symbol)
                 .font(.system(size: 10))
-                .foregroundStyle(OrejaTheme.Palette.warning)
+                .foregroundStyle(toneColor)
                 .padding(.top, 1)
                 .accessibilityHidden(true)
             Text(text)
@@ -414,7 +417,7 @@ struct InlineNotice: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 9, style: .continuous)
-                .fill(OrejaTheme.Palette.warning.opacity(0.09))
+                .fill(toneColor.opacity(0.09))
         )
     }
 }

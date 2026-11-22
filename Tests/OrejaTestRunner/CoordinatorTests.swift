@@ -593,6 +593,19 @@ func runCoordinatorSuite(_ t: Harness) async {
                  "a mic onset with no AI interruption is rejected on speakers")
         t.expect(f.lastCommand == nil, "no pause command is issued from speaker feedback")
         t.expect(f.coordinator.ownership == nil)
+        t.expect(f.diagnostics.messages(level: .info).contains { $0.contains("did not pause music") },
+                 "a rejected voice onset is recorded, not dropped silently")
+    }
+
+    await t.runAsync("27b. headphones: an accepted voice onset is not logged as rejected") {
+        let f = CoordinatorFixture()
+        await f.startMonitoring()
+        f.coordinator.monitoringFailed(AudioMonitoringFailure(.sourceUnavailable, "No AI source is speaking."))
+        f.coordinator.setUserSpeechMayStartAlone(true)
+
+        t.expect(f.coordinator.setActivity(true, source: .user, levelDB: -30))
+        t.expect(!f.diagnostics.messages().contains { $0.contains("did not pause music") },
+                 "no rejection message when the voice was accepted")
     }
 
     await t.runAsync("28. built-in speakers: your voice keeps an AI-started interruption alive") {
@@ -610,6 +623,32 @@ func runCoordinatorSuite(_ t: Harness) async {
         t.expect(f.coordinator.userSpeechIsActive, "your voice is accepted while that interruption is in progress")
         f.coordinator.setActivity(false, source: .user)
         t.expect(!f.coordinator.userSpeechIsActive, "releasing the voice clears only the microphone half")
+    }
+
+    await t.runAsync("29. test interruption pauses and restores without any AI source") {
+        let f = CoordinatorFixture()
+        await f.startMonitoring()
+        f.coordinator.monitoringFailed(AudioMonitoringFailure(.sourceUnavailable, "No AI source is speaking."))
+        f.coordinator.setUserSpeechMayStartAlone(false)
+
+        t.expect(f.coordinator.setActivity(true, source: .preview), "a preview is accepted with no source and on speakers")
+        t.expectEqual(f.lastCommand?.kind, .pause, "the preview runs the configured interruption")
+        f.completeLast(nextState: .paused)
+        t.expect(f.coordinator.shouldMuteTargetAudio, "other apps are lowered during the preview")
+
+        t.expect(f.coordinator.setActivity(false, source: .preview))
+        f.scheduler.advance(by: 0.81)
+        t.expectEqual(f.lastCommand?.kind, .resume, "the preview restores after the quiet interval")
+        f.completeLast(nextState: .playing)
+        t.expect(f.coordinator.ownership == nil)
+    }
+
+    await t.runAsync("30. test interruption does nothing while automation is off") {
+        let f = CoordinatorFixture()
+        await f.startMonitoring()
+        f.coordinator.setAutomationEnabled(false)
+        t.expect(!f.coordinator.setActivity(true, source: .preview), "automation off means Oreja never touches playback")
+        t.expect(f.coordinator.ownership == nil)
     }
 
     await t.runAsync("22. microphone-only duck lowers and restores volume with no valid AI source") {

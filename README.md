@@ -2,10 +2,11 @@
 
 **Your AI talks. Your audio makes room.**
 
-Oreja is a tiny macOS menu bar companion. Choose apps whose audio signals an interruption, then
-choose how a playback target responds. Release 0.4.0 adds an experimental Browser target alongside
-Apple Music. The browser control path uses Apple Events and page scripting; the maker reported
-successful real playback testing, though the exact browser and site were not recorded.
+Oreja is a tiny macOS menu bar companion. Choose the apps whose audio means "someone is speaking"
+(ChatGPT Desktop, a browser with ChatGPT Web, your own voice), then choose what makes room: Apple
+Music pauses or lowers, and any other app (a browser playing YouTube, Spotify, VLC) is lowered or
+silenced. Release 0.5.0 makes browser and music-player lowering work through Core Audio process
+taps, with no browser setting or page scripting.
 
 - It runs alongside ChatGPT. It does not replace it, proxy it, or change your account.
 - It needs no OpenAI API key, no account, and no network connection.
@@ -15,16 +16,17 @@ successful real playback testing, though the exact browser and site were not rec
 
 ## Download
 
-[Oreja 0.4.0](https://github.com/EnzoVezzaro/oreja/releases/latest) is a disk image for macOS 14.2
+[Oreja 0.5.0](https://github.com/EnzoVezzaro/oreja/releases/latest) is a disk image for macOS 14.2
 or newer, also served from [the landing page](https://oreja-tau.vercel.app/). It is ad-hoc signed
 and not notarized, so the first launch on another Mac needs one Gatekeeper approval (System
 Settings › Privacy & Security › Open Anyway). What changed: [CHANGELOG.md](CHANGELOG.md), with
-[0.4.0 release details](docs/releases/0.4.0.md).
+[0.5.0 release details](docs/releases/0.5.0.md).
 
 Status: **macOS MVP built and working on the development machine** (macOS 26.6.2, Apple M2). The
 Core Audio capture path and real Apple Music pause/resume have been exercised end to end against a
-controlled audio fixture. A live **ChatGPT Voice session has not** been run; see
-[Verification](#verification) for exactly what was and was not executed.
+controlled audio fixture. In 0.5.0 the maker ran live ChatGPT Desktop voice sessions and reported
+Apple Music lowering for ChatGPT and for their own voice; see [Verification](#verification) for
+exactly what was measured and what was user-reported.
 
 ## How it works
 
@@ -37,12 +39,12 @@ Apple Music playback state ◄── Apple Events ◄── pause / duck command
 Oreja taps the **output** of the selected applications' Core Audio processes (macOS 14.2+), unmuted,
 so each primary app keeps playing normally while Oreja listens to a copy. You can select several
 apps as primary sources (ChatGPT, Claude, a coding agent, a call app, a browser, or any running app).
-The Browser target supports standard HTML media in Safari, Chrome, Edge, Brave, Arc, and ego lite
-through browser scripting. Choose all supported browsers or the active browser; use Pause (resume at
-the same position) or Lower volume. An Oreja user confirmed real playback works in their setup, but
-did not record the exact browser, site, or settings, so browser-specific and protected-player
-behavior may vary. Firefox has no adapter, Internet Explorer is unavailable on macOS, and Spotify's
-native app is not a playback target. A speech-shape
+Apps under Playback › Lower these apps (a browser playing YouTube, Spotify, VLC, any other player)
+are handled with a second, muted process tap: their own output is silenced at the source and the
+tapped audio is replayed to the current output device at your duck level, then ramped back. In
+pause mode they are silenced, because they expose no pause control Oreja can reach. Safari is not
+supported (its audio runs in a WebKit process shared with other apps), and an app is never both a
+source and something that gets lowered. A speech-shape
 filter then decides whether a burst is worth interrupting music for: it wants the
 syllable-shaped loudness changes of speech, so short blips, steady alert tones and single decay
 chimes are ignored instead of pausing your music. Music is controlled with Apple Events against the Music app, which Oreja never launches on
@@ -61,11 +63,9 @@ Read [docs/architecture.md](docs/architecture.md) for the full design.
 - At least one audio app to listen to. The ChatGPT desktop app is the default. Others are chosen in
   Settings or onboarding, and each listed app's support level is in
   [docs/compatibility.md](docs/compatibility.md). A browser selected as an interruption source is
-  process-wide, so audio from any tab may count. This does not make browser playback a supported
-  target.
+  process-wide, so audio from any tab may count: play music in a different browser from ChatGPT Web.
 - The Music app for playback control. An Apple Music subscription is not required by Oreja, but
-  Music must be the app that is playing for the Apple Music target. Browser media is a separate,
-  experimental playback target; Spotify's native app is not supported.
+  Music is paused or lowered natively. Browsers and other players are lowered through process taps.
 - To build: Command Line Tools (`xcode-select --install`) or Xcode. No third-party dependencies.
 
 ## Build and run
@@ -156,7 +156,11 @@ attention.
 
 Executed on this machine (macOS 26.6.2, Apple M2, Swift 6.3.3):
 
-- ✅ **88/88 automated tests pass** (411 assertions), including settings migration, browser scripting dialect selection and escaping, primary/secondary selection separation, microphone-driven target control, and safe process matching.
+- ✅ **113/113 automated tests pass** (557 assertions), including the coordinator, microphone gating on speakers, the test-interruption path, the real-time gain renderer (channel mapping, time-based ramp), browser and music-player targets, and settings migration.
+- ✅ **0.5.0 live checks** (details in [docs/test-evidence.md](docs/test-evidence.md)): the maker
+  reported Apple Music lowering while ChatGPT Desktop spoke and while they spoke; YouTube in a
+  browser (ego lite) was lowered to 11% by a real voice onset and restored, observed in the app log
+  and measured with the probe (replayed audio about −40 dBFS, then silence after restore).
 - ✅ **App bundle builds, signs, and launches**: the menu bar app stays resident, maps only its own
   `Contents/Frameworks` dylibs, and idles at 0.0–0.1% CPU with a ~37–54 MB physical footprint.
   A packaging bug that made the app abort in dyld at launch was found and fixed; see
@@ -178,9 +182,9 @@ Executed on this machine (macOS 26.6.2, Apple M2, Swift 6.3.3):
   speech is modulated from its first syllable. Evidence: [docs/test-evidence.md](docs/test-evidence.md#speech-shape filter-against-real-audio-2026-11-01).
 - ✅ **Process discovery works** against real Core Audio process objects, including the installed
   ChatGPT application (`/Applications/ChatGPT.app`, bundle `com.openai.codex`) and its helpers.
-- ❌ **Not executed: a real ChatGPT Voice session.** Starting one requires a signed-in human
-  session, and the desktop app exposes no scriptable window or Voice command. Oreja's ChatGPT audio
-  path is therefore unverified against live ChatGPT output.
+- ⚠️ **ChatGPT Voice is user-reported, not instrumented.** Sessions need a signed-in person; the
+  maker ran them and reported the result. ChatGPT Web + Apple Music and Spotify/VLC lowering were
+  not measured (Spotify and VLC are not installed on the test Mac).
 - ❌ **Not measured: CPU/battery impact, Bluetooth/AirPods/device switching, and ChatGPT-specific
   end-to-end latency.** The harness numbers above use a local fixture and the default output device.
 - ❌ **Not notarized.** No Developer ID credentials were available. Ad-hoc signing only.
@@ -219,8 +223,9 @@ There is no analytics SDK and no server. Full text: [docs/privacy.md](docs/priva
   tones and single-decay chimes, but a long, loudly modulated non-speech sound (a ringtone melody,
   a beat-driven alarm) still counts. It is not speech recognition and makes no semantic claims.
 - Browser-based ChatGPT can be selected as an interruption source, but monitoring is process-wide
-  and captures activity from every tab in that browser. This is separate from browser playback
-  control, which is experimental in release 0.4.0.
+  and captures activity from every tab in that browser. ChatGPT Web and music in the same browser
+  cannot be separated; use two browsers.
+- Other apps can be lowered or silenced, not paused: a video keeps playing silently in pause mode.
 - The app is ad-hoc signed and unnotarized, so another Mac will require a Gatekeeper bypass.
 - The name has not been cleared for trademark use; do not publish under it without a search.
 
@@ -228,8 +233,7 @@ There is no analytics SDK and no server. Full text: [docs/privacy.md](docs/priva
 
 See [docs/roadmap.md](docs/roadmap.md). Next milestone: a supervised live test against a real
 ChatGPT Voice session and Apple Music, including measured pause/resume latency and a device matrix.
-Then breadth: browser playback control with reliable per-session ownership and manual-pause handling,
-followed by more music players (including Spotify) and more coding harnesses
+Then breadth: native pause for more players where a supported control exists, and more coding harnesses
 (Claude Code, Codex and the other terminal agents), each behind the same ports and capability
 declarations.
 

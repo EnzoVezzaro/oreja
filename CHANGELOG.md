@@ -8,10 +8,60 @@ made, not the day it was published.
 
 ### Planned
 
-- **More music players.** Apple Music and the experimental Browser target are available. Spotify
-  and other desktop players remain planned.
+- **Native pause for more players** where a supported control exists (today other players are
+  lowered or silenced, not paused).
 - **More app sources.** Add and verify more audio-source profiles as apps and their audio process
   identifiers change.
+
+## [0.5.0] - 2026-11-22
+
+### Added
+
+- **Lower browsers and other players.** Playback › Lower these apps takes any app that plays audio:
+  a browser with YouTube (Chrome, Edge, Brave, Arc, Firefox, ego lite), Spotify, VLC. While someone
+  speaks it is lowered to the duck level, or silenced in pause mode, and ramped back afterwards. It
+  works through a muted Core Audio process tap with the audio replayed at the chosen level: no
+  browser setting, no page scripting, no system volume.
+- **Your voice interrupts reliably.** Microphone thresholds were recalibrated against measured
+  speech (Normal −35 dBFS). The monitor listens on the headset mic while a voice session or call
+  already has it open, and on the Mac's own mic otherwise, so Oreja never switches a Bluetooth
+  headset into call mode by itself. On the Mac's own speakers your voice only extends an
+  interruption already in progress, so music from the speakers cannot pause itself.
+- **Status names the speaker:** "ChatGPT is speaking", "You are speaking", "You and ChatGPT are
+  speaking", in the menu bar and in Settings.
+- **Test interruption** button: runs your setup for 4 seconds without waiting for an assistant.
+- **Permissions at a glance:** audio recording, microphone and Music automation, each with its
+  status and a button to the right System Settings pane.
+- **Diagnostics shortcuts:** open the diagnostics window or show the log file; verbose mode records
+  the microphone level once a second.
+- A warning, with a one-click move, when an app selected as a source is playing media.
+
+### Changed
+
+- **Settings redesigned.** Audio is what Oreja listens to (apps, your voice, detection); Playback is
+  what makes room (Apple Music, timing, Lower these apps). Compact app lists with search and "Show
+  all apps", switches aligned in one column, explanations above the controls, live Apple Music
+  status and connection-check results.
+- **The version shown in the app is stamped from git** at build time (tag, build number, commit),
+  so it always matches the build you are running.
+
+### Removed
+
+- The 0.4.0 per-tab JavaScript browser control and the rule refusing browser sources next to a
+  browser target. Browsers are now lowered through process taps instead.
+
+### Verified and limitations
+
+- Automated suite: 113 tests passed, 557 assertions. App built, signed ad hoc and launched on
+  macOS 26.6.2 (Apple M2).
+- Live: the maker reported Apple Music lowering while ChatGPT Desktop spoke and while they spoke.
+  YouTube in ego lite was lowered to 11% by a real voice onset and restored, observed in the app
+  log and measured with the probe. Details: `docs/test-evidence.md`.
+- Not measured: ChatGPT Web + Apple Music, Spotify and VLC (not installed on the test Mac).
+- Other apps are lowered or silenced, never paused; a video keeps playing silently in pause mode.
+  Safari cannot be lowered (shared WebKit audio process). ChatGPT Web and music in the same browser
+  cannot be separated: use two browsers.
+- Ad-hoc signed, not notarized.
 
 ## [0.4.0] - 2026-11-15
 
@@ -200,5 +250,6 @@ First public build: an ad-hoc signed DMG on the landing page and on the GitHub r
 - CPU, battery, Bluetooth and latency figures are unmeasured on real sessions.
 - macOS only. iOS is researched in [docs/ios-strategy.md](docs/ios-strategy.md); no iOS code exists.
 
-[Unreleased]: https://github.com/EnzoVezzaro/oreja/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/EnzoVezzaro/oreja/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/EnzoVezzaro/oreja/releases/tag/v0.5.0
 [0.1.0]: https://github.com/EnzoVezzaro/oreja/releases/tag/v0.1.0

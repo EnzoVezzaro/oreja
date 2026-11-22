@@ -56,7 +56,7 @@ struct MenuBarView: View {
             StatusDot(color: model.state.tint, isActive: model.state.isActive)
                 .padding(.top, 6)
             VStack(alignment: .leading, spacing: 3) {
-                Text(model.state.title)
+                Text(model.statusTitle)
                     .font(.system(size: 14, weight: .semibold))
                     .tracking(-0.15)
                     .foregroundStyle(OrejaTheme.Palette.ink)

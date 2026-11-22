@@ -24,6 +24,30 @@ public enum AudioProcessCatalog {
         }
     }
 
+    /// True when a process other than `excludedPID` is capturing audio input right now, for example
+    /// a ChatGPT voice session holding the headset microphone. Read errors count as "not recording".
+    public static func anotherProcessIsRecording(excluding excludedPID: pid_t = getpid()) -> Bool {
+        guard let objectIDs = try? processObjectIDs() else { return false }
+        return objectIDs.contains { objectID in
+            guard let pid = try? readPID(objectID), pid != excludedPID else { return false }
+            return readFlag(objectID, kAudioProcessPropertyIsRunningInput)
+        }
+    }
+
+    private static func readFlag(_ objectID: AudioObjectID, _ selector: AudioObjectPropertySelector) -> Bool {
+        var address = AudioObjectPropertyAddress(
+            mSelector: selector,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        var value: UInt32 = 0
+        var size = UInt32(MemoryLayout<UInt32>.size)
+        let status = withUnsafeMutablePointer(to: &value) { pointer in
+            AudioObjectGetPropertyData(objectID, &address, 0, nil, &size, pointer)
+        }
+        return status == noErr && value != 0
+    }
+
     /// Processes whose bundle identifier starts with any of the given prefixes. Helper processes
     /// of the same application (which may be the ones actually rendering audio) are included.
     public static func processes(matchingPrefixes prefixes: [String]) throws -> [AudioProcess] {

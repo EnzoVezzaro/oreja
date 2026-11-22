@@ -15,6 +15,7 @@ final class AppModel: ObservableObject {
     // MARK: Published state
 
     @Published private(set) var state: CoordinatorState = .disabled
+    @Published private(set) var speakers = ActivityAggregator()
     @Published private(set) var music: MediaPlaybackSnapshot?
     @Published private(set) var sourceDescription = ""
     @Published private(set) var lastError: String?
@@ -25,6 +26,9 @@ final class AppModel: ObservableObject {
     @Published private(set) var launchAtLoginError: String?
     @Published private(set) var userSpeechError: String?
     @Published private(set) var isListeningForUser = false
+    /// The microphone Oreja is listening on, by its macOS name.
+    @Published private(set) var listeningMicrophoneName: String?
+    @Published private(set) var isPreviewingInterruption = false
 
     @Published var settings: AppSettings {
         didSet {
@@ -41,7 +45,6 @@ final class AppModel: ObservableObject {
     let media: any MediaPlaybackController & MediaAdministration
     private let monitorFactory: any AIAudioMonitorFactory
     private var targetAudioMuteController: ProcessAudioTargetMuteController?
-    private let browserAudioController = BrowserAudioController()
     private let settingsStore: any SettingsStoring
     private let pauseJournal: any PauseJournal
     private let hookExecutor: any HookExecuting = MacHookExecutor()
@@ -54,6 +57,7 @@ final class AppModel: ObservableObject {
     private var eventTask: Task<Void, Never>?
     private var speechMonitor: MicrophoneActivityMonitor?
     private var speechEventTask: Task<Void, Never>?
+    private var microphoneRouteTask: Task<Void, Never>?
     private var observationTask: Task<Void, Never>?
     private var retryTask: Task<Void, Never>?
     private var hasRunStalePauseRecovery = false
@@ -62,7 +66,6 @@ final class AppModel: ObservableObject {
     private var lastOwnership: PauseOwnership?
     private var lastVolumeOwnership: VolumeOwnership?
     private var lastTargetMuteIntent: Bool?
-    private var lastBrowserControlError: String?
 
     init(
         settingsStore: (any SettingsStoring)? = nil,
@@ -174,51 +177,14 @@ final class AppModel: ObservableObject {
         setAutomationEnabled(!settings.automationEnabled)
     }
 
-    /// Adds the app to the listened-to set, or removes it when it is already selected. A browser
-    /// source is refused while the browser playback target is on; neither selection is changed.
+    /// Adds the app to the listened-to set, or removes it when it is already selected.
     func toggleSource(_ selection: AISourceSelection) {
         if settings.aiSources.contains(where: { $0.bundleIdentifier == selection.bundleIdentifier }) {
             settings.aiSources.removeAll { $0.bundleIdentifier == selection.bundleIdentifier }
             return
         }
-        guard PlaybackTargets.canAddSource(
-            selection,
-            to: settings.aiSources,
-            browserPlaybackEnabled: settings.browserPlaybackEnabled
-        ) else {
-            let reason = PlaybackTargets.combinationConflictReason(
-                aiSources: settings.aiSources + [selection],
-                browserPlaybackEnabled: true
-            ) ?? "That source cannot be combined with Browser media."
-            record(.warning, .settings, reason)
-            return
-        }
         settings.targetAudioApps.removeAll { $0.bundleIdentifier == selection.bundleIdentifier }
         settings.aiSources.append(selection)
-    }
-
-    /// Enabling the browser playback target is refused when a browser source is already selected.
-    func setBrowserPlaybackEnabled(_ enabled: Bool) {
-        guard enabled else {
-            settings.browserPlaybackEnabled = false
-            return
-        }
-        guard PlaybackTargets.canEnableBrowserPlayback(with: settings.aiSources) else {
-            let reason = PlaybackTargets.combinationConflictReason(
-                aiSources: settings.aiSources,
-                browserPlaybackEnabled: true
-            ) ?? "Browser media cannot be combined with a browser listening source."
-            record(.warning, .settings, reason)
-            return
-        }
-        settings.browserPlaybackEnabled = true
-    }
-
-    /// Browser source rows are disabled for *adding* while the browser target is on. An already
-    /// selected browser source stays toggleable so the person can remove it.
-    func isSourceBlockedForAddition(_ selection: AISourceSelection) -> Bool {
-        guard settings.browserPlaybackEnabled else { return false }
-        return selection.kind == .browser || AISourceCatalog.isBrowser(bundleIdentifier: selection.bundleIdentifier)
     }
 
     func toggleTargetAudioApp(_ selection: AISourceSelection) {
@@ -250,6 +216,42 @@ final class AppModel: ObservableObject {
 
     func openAutomationSettings() {
         openPrivacyPane(anchor: "Privacy_Automation")
+    }
+
+    func openMicrophoneSettings() {
+        openPrivacyPane(anchor: "Privacy_Microphone")
+    }
+
+    /// Shows Oreja's diagnostics log file in Finder. It holds state changes only, never audio.
+    func revealLogFile() {
+        guard let url = DiagnosticsLog.defaultLogURL else { return }
+        if FileManager.default.fileExists(atPath: url.path) {
+            NSWorkspace.shared.activateFileViewerSelecting([url])
+        } else {
+            record(.info, .lifecycle, "No log file has been written yet.")
+        }
+    }
+
+    /// Runs the configured interruption for a few seconds, through the coordinator, so a setup
+    /// (Apple Music, a browser under "Lower these apps") can be checked without an assistant
+    /// speaking. Playback is restored by the normal quiet-interval path.
+    func previewInterruption(seconds: Double = 4) {
+        guard !isPreviewingInterruption else { return }
+        guard settings.automationEnabled else {
+            record(.warning, .lifecycle, "Turn automation on to test the interruption.")
+            return
+        }
+        isPreviewingInterruption = true
+        record(.info, .lifecycle, "Testing the interruption for \(Int(seconds)) seconds.")
+        coordinator.setActivity(true, source: .preview)
+        publishCoordinatorState()
+        Task { [weak self] in
+            try? await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
+            guard let self else { return }
+            self.coordinator.setActivity(false, source: .preview)
+            self.isPreviewingInterruption = false
+            self.publishCoordinatorState()
+        }
     }
 
     // MARK: Settings side effects
@@ -433,6 +435,9 @@ final class AppModel: ObservableObject {
                 .monitoring,
                 String(format: "Ignored a sound from the AI source: %@ (%.0f dBFS).", reason.explanation, levelDB)
             )
+        case .microphoneLevels:
+            // Only the microphone monitor reports levels; the AI path never receives them.
+            break
         }
         publishCoordinatorState()
     }
@@ -447,10 +452,17 @@ final class AppModel: ObservableObject {
         guard speechMonitor == nil else { return }
 
         // Read the output at start; a device change takes effect the next time monitoring starts.
-        coordinator.setUserSpeechMayStartAlone(!DefaultOutputDevice.isBuiltInSpeakers())
+        let outputIsBuiltIn = DefaultOutputDevice.isBuiltInSpeakers()
+        coordinator.setUserSpeechMayStartAlone(!outputIsBuiltIn)
         let monitor = MicrophoneActivityMonitor(sensitivity: settings.microphoneSensitivity)
         speechMonitor = monitor
-        record(.info, .monitoring, "Listening for your voice as well.")
+        record(
+            .info,
+            .monitoring,
+            outputIsBuiltIn
+                ? "Listening for your voice as well. The default output is built-in speakers, so your voice cannot start a pause on its own."
+                : "Listening for your voice as well. The default output is not built-in speakers, so your voice can start a pause."
+        )
 
         speechEventTask = Task { [weak self] in
             for await event in monitor.events {
@@ -465,6 +477,10 @@ final class AppModel: ObservableObject {
                 guard let self else { return }
                 self.isListeningForUser = true
                 self.userSpeechError = nil
+                let name = monitor.inputDeviceID.flatMap(InputDeviceSelection.name(of:))
+                self.listeningMicrophoneName = name
+                self.record(.info, .monitoring, "Listening for your voice on \(name ?? "the default microphone").")
+                self.startMicrophoneRouteCheck()
             } catch {
                 guard let self else { return }
                 let message = (error as? AudioMonitoringFailure)?.message ?? error.localizedDescription
@@ -476,8 +492,31 @@ final class AppModel: ObservableObject {
         }
     }
 
+    /// Re-checks every few seconds which microphone to listen on (see `InputDeviceSelection`): the
+    /// headset mic while a voice session holds it, otherwise the built-in mic. Moves the monitor
+    /// when the choice changes, so speaking into the headset during a ChatGPT call is heard.
+    private func startMicrophoneRouteCheck() {
+        guard #available(macOS 14.2, *) else { return }
+        microphoneRouteTask?.cancel()
+        microphoneRouteTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 3_000_000_000)
+                guard let self, let monitor = self.speechMonitor, !Task.isCancelled else { return }
+                let wanted = InputDeviceSelection.effectiveInputForMonitoring()
+                guard monitor.inputDeviceID != wanted else { continue }
+                let name = InputDeviceSelection.name(of: wanted) ?? "another microphone"
+                self.stopUserSpeechMonitoring(reason: "moving to \(name)")
+                self.startUserSpeechMonitoring()
+                return
+            }
+        }
+    }
+
     private func stopUserSpeechMonitoring(reason: String) {
         guard let monitor = speechMonitor else { return }
+        microphoneRouteTask?.cancel()
+        microphoneRouteTask = nil
+        listeningMicrophoneName = nil
         speechMonitor = nil
         speechEventTask?.cancel()
         speechEventTask = nil
@@ -518,8 +557,26 @@ final class AppModel: ObservableObject {
             // The microphone path is not gated: it exists to hear the person in the room, and a
             // hesitation in their own sentence should not be second-guessed.
             break
+        case .microphoneLevels(let peakDB, let meanDB, let frameCount, let activationDB):
+            // Once per second, so only recorded when verbose diagnostics are on. It shows whether
+            // the microphone delivered audio at all and how close speech came to the threshold.
+            guard diagnostics.isVerbose else { return }
+            record(.debug, .monitoring, Self.microphoneLevelMessage(
+                peakDB: peakDB, meanDB: meanDB, frameCount: frameCount, activationDB: activationDB
+            ))
+            return
         }
         publishCoordinatorState()
+    }
+
+    static func microphoneLevelMessage(peakDB: Double?, meanDB: Double?, frameCount: Int, activationDB: Double) -> String {
+        guard let peakDB, let meanDB, frameCount > 0 else {
+            return "Microphone delivered no audio in the last second. Voice threshold \(String(format: "%.0f", activationDB)) dBFS."
+        }
+        return String(
+            format: "Microphone level, last second: peak %.1f dBFS, mean %.1f dBFS over %d frames. Voice threshold %.0f dBFS.",
+            peakDB, meanDB, frameCount, activationDB
+        )
     }
 
     private func handleStartFailure(_ error: Error) {
@@ -672,8 +729,15 @@ final class AppModel: ObservableObject {
 
     // MARK: Coordinator mirror
 
+    /// The status line shown in the menu bar and in Settings: who is speaking when someone is,
+    /// otherwise what Oreja is doing.
+    var statusTitle: String {
+        speakers.speakerTitle(sourceNames: settings.aiSources.map(\.displayName)) ?? state.title
+    }
+
     private func publishCoordinatorState() {
         state = coordinator.state
+        speakers = coordinator.speakers
         lastError = coordinator.lastError
         syncTargetAudioMute()
 
@@ -706,66 +770,38 @@ final class AppModel: ObservableObject {
         let targets = settings.targetAudioApps.filter { !primaryIDs.contains($0.bundleIdentifier) }
         let shouldInterrupt = coordinator.shouldMuteTargetAudio
 
-        // Whole-browser control is a hard platform blocker. The status controller only records why;
-        // it never runs per-tab JavaScript and never opens an Automation prompt.
-        // Refuse the ChatGPT Web + Browser media pairing even if a legacy settings file contains
-        // both. The selections are left intact and the reason is reported below.
-        let browserTargetAllowed = settings.browserPlaybackEnabled && !settings.hasBrowserSourceTargetConflict
-        browserAudioController.update(
-            applications: browserTargetAllowed ? browserPlaybackTargets() : [],
-            active: shouldInterrupt,
-            mode: settings.interruptionMode,
-            duckPercent: settings.duckVolumePercent
-        )
-        if settings.hasBrowserSourceTargetConflict {
-            let reason = PlaybackTargets.combinationConflictReason(
-                aiSources: settings.aiSources,
-                browserPlaybackEnabled: settings.browserPlaybackEnabled
-            ) ?? "Browser media cannot be combined with a browser interruption source."
-            if reason != lastBrowserControlError {
-                record(.warning, .settings, reason)
-                lastBrowserControlError = reason
-            }
-        }
-        if let reason = browserAudioController.lastErrorMessage, reason != lastBrowserControlError {
-            record(.warning, .monitoring, "Browser playback target unavailable: \(reason)")
-            lastBrowserControlError = reason
-        } else if browserAudioController.lastErrorMessage == nil {
-            lastBrowserControlError = nil
-        }
-
-        // Only explicitly selected secondary apps are muted. AI sources, including any browser
-        // carrying the conversation, are never muted, so ChatGPT output stays audible. No system
+        // Only explicitly selected other apps are interrupted. AI sources, including a browser
+        // carrying the conversation, are never targets, so the assistant stays audible. No system
         // volume or global mute stands in for the configured duck/pause action.
-        let processMuteTargets = targets.filter { !AISourceCatalog.isBrowser(bundleIdentifier: $0.bundleIdentifier) }
-        let shouldMute = shouldInterrupt && !processMuteTargets.isEmpty
+        let shouldMute = shouldInterrupt && !targets.isEmpty
+        let gain = settings.targetAudioGain
         do {
             try targetAudioMuteController.update(
-                applications: processMuteTargets,
-                shouldMute: shouldMute
+                applications: targets,
+                shouldMute: shouldMute,
+                gain: gain
             )
-            if !processMuteTargets.isEmpty, lastTargetMuteIntent != shouldMute {
-                record(.info, .monitoring, shouldMute
-                    ? "Muting selected secondary app audio during speech."
-                    : "Released selected secondary app mute.")
+            if !targets.isEmpty, lastTargetMuteIntent != shouldMute {
+                let names = targets.map(\.displayName).joined(separator: ", ")
+                // Report what the controller is really doing, not what was asked for.
+                switch (shouldMute, targetAudioMuteController.activeInterruption) {
+                case (true, .lowered):
+                    record(.info, .monitoring, "Lowering \(names) to \(settings.duckVolumePercent)% during speech.")
+                case (true, .silenced):
+                    record(gain > 0 ? .warning : .info, .monitoring, gain > 0
+                        ? "Silencing \(names) during speech: the output device could not be read, so lowering was not possible."
+                        : "Silencing \(names) during speech.")
+                case (true, .none):
+                    record(.info, .monitoring, "\(names) is not playing audio right now; nothing to lower.")
+                case (false, _):
+                    record(.info, .monitoring, "Restored \(names).")
+                }
             }
             lastTargetMuteIntent = shouldMute
         } catch {
             lastTargetMuteIntent = nil
             record(.warning, .monitoring, "Could not control selected app audio: \(error.localizedDescription)")
         }
-    }
-
-    private func browserPlaybackTargets() -> [AISourceSelection] {
-        let known = AISourceCatalog.knownApps.filter {
-            $0.category == .browser && BrowserAudioController.knownBrowserBundleIDs.contains($0.bundleIdentifier)
-        }
-        let candidates = known.map {
-            AISourceSelection.browser(bundleIdentifier: $0.bundleIdentifier, displayName: $0.displayName)
-        }
-        guard settings.browserTargetScope == .activeBrowserOnly else { return candidates }
-        guard let frontmostID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier else { return [] }
-        return candidates.filter { $0.bundleIdentifier == frontmostID }
     }
 
     // MARK: System events

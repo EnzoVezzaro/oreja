@@ -13,6 +13,29 @@ func runMediaAndSettingsSuite(_ t: Harness) async {
         t.expect(PlaybackTargets.capability(for: .browser).reason?.contains("per-tab JavaScript") == true)
     }
 
+    t.run("the status names who is speaking: the assistant, you, or both") {
+        var speakers = ActivityAggregator()
+        t.expect(speakers.speakerTitle(sourceNames: ["ChatGPT"]) == nil, "nobody speaking falls back to the state title")
+        _ = speakers.set(true, for: .user)
+        t.expectEqual(speakers.speakerTitle(sourceNames: ["ChatGPT"]), "You are speaking")
+        _ = speakers.set(true, for: .ai)
+        t.expectEqual(speakers.speakerTitle(sourceNames: ["ChatGPT"]), "You and ChatGPT are speaking")
+        _ = speakers.set(false, for: .user)
+        t.expectEqual(speakers.speakerTitle(sourceNames: ["ChatGPT"]), "ChatGPT is speaking")
+        t.expectEqual(speakers.speakerTitle(sourceNames: ["ChatGPT", "Orca"]), "A selected app is speaking", "merged sources are not guessed")
+        _ = speakers.set(false, for: .ai)
+        _ = speakers.set(true, for: .preview)
+        t.expect(speakers.speakerTitle(sourceNames: ["ChatGPT"]) == nil, "a test run names no speaker")
+    }
+
+    await t.runAsync("the coordinator reports a microphone-only onset as your voice, not the assistant") {
+        let f = CoordinatorFixture()
+        await f.startMonitoring()
+        f.coordinator.setActivity(true, source: .user, levelDB: -30)
+        t.expect(f.coordinator.speakers.userIsActive)
+        t.expect(!f.coordinator.speakers.aiIsActive, "your voice is never shown as the assistant speaking")
+    }
+
     t.run("AppleScript state parser reads playing state and track") {
         let sep = AppleMusicScript.fieldSeparator
         let output = "playing\(sep)ABC-123\(sep)Aja\(sep)Steely Dan\(sep)72"
@@ -149,8 +172,6 @@ func runMediaAndSettingsSuite(_ t: Harness) async {
         settings.resumeDelay = 1.4
         settings.aiSources = [.safari, .chatGPTDesktop]
         settings.targetAudioApps = [.app(bundleIdentifier: "com.apple.Preview", displayName: "Preview")]
-        settings.browserPlaybackEnabled = true
-        settings.browserTargetScope = .activeBrowserOnly
         settings.launchAtLogin = true
         settings.onboardingCompleted = true
         settings.verboseDiagnostics = true
@@ -159,8 +180,6 @@ func runMediaAndSettingsSuite(_ t: Harness) async {
         let decoded = try! JSONDecoder().decode(AppSettings.self, from: data)
         t.expectEqual(decoded, settings)
         t.expectEqual(decoded.targetAudioApps, [.app(bundleIdentifier: "com.apple.Preview", displayName: "Preview")])
-        t.expect(decoded.browserPlaybackEnabled)
-        t.expectEqual(decoded.browserTargetScope, .activeBrowserOnly)
         t.expectClose(decoded.policy.quietInterval, 1.4)
         t.expectClose(decoded.policy.conversationHold, 0, "conversation hold is disabled by default for immediate volume restore")
         t.expectClose(decoded.policy.resumeWait, 1.4)
@@ -179,22 +198,6 @@ func runMediaAndSettingsSuite(_ t: Harness) async {
         let decoded = try! JSONDecoder().decode(AppSettings.self, from: Data(data.utf8))
         t.expectEqual(decoded.aiSources.map(\.bundleIdentifier), ["com.google.Chrome"])
         t.expect(decoded.targetAudioApps.isEmpty)
-    }
-
-    t.run("browser playback target is separate and legacy browser targets migrate") {
-        let legacy = #"{"aiSources":[{"kind":"chatGPTDesktop","bundleIdentifier":"com.openai.codex","displayName":"ChatGPT"}],"targetAudioApps":[{"kind":"browser","bundleIdentifier":"com.google.Chrome","displayName":"Google Chrome"}]}"#
-        let decoded = try! JSONDecoder().decode(AppSettings.self, from: Data(legacy.utf8))
-        t.expect(decoded.browserPlaybackEnabled, "old browser target selection becomes the Browser playback target")
-        t.expect(decoded.targetAudioApps.isEmpty, "browser is removed from the other-app target list")
-        t.expectEqual(decoded.browserTargetScope, .activeBrowserOnly, "legacy browser app selections do not expand to all browsers")
-
-        var settings = AppSettings(browserPlaybackEnabled: true, browserTargetScope: .activeBrowserOnly)
-        settings.aiSources = [.safari, .chatGPTDesktop]
-        let encoded = try! JSONEncoder().encode(settings)
-        let roundTrip = try! JSONDecoder().decode(AppSettings.self, from: encoded)
-        t.expect(roundTrip.browserPlaybackEnabled, "browser playback remains independent from a browser interruption source")
-        t.expectEqual(roundTrip.browserTargetScope, .activeBrowserOnly)
-        t.expectEqual(roundTrip.aiSources, settings.aiSources)
     }
 
     t.run("conversation hold is clamped and can be switched off") {
@@ -384,92 +387,6 @@ func runMediaAndSettingsSuite(_ t: Harness) async {
         for target in PlaybackTargetID.allCases where target != .appleMusic {
             t.expect(PlaybackTargets.capability(for: target).reason?.isEmpty == false)
         }
-    }
-
-    t.run("browser sources warn about co-process music but never lose Apple Music control") {
-        t.expect(PlaybackTargets.coProcessWarning(aiSources: [.chatGPTDesktop], browserPlaybackEnabled: false) == nil)
-        t.expect(PlaybackTargets.coProcessWarning(aiSources: [.chatGPTDesktop], browserPlaybackEnabled: true) == nil)
-
-        let webOnly = PlaybackTargets.coProcessWarning(aiSources: [AISourceSelection.chrome], browserPlaybackEnabled: false)
-        t.expect(webOnly != nil, "a browser source still gets the separation warning")
-        t.expect(webOnly?.contains("Apple Music") == true, "browser sources remain valid for Apple Music")
-        t.expect(webOnly?.contains("ChatGPT Desktop") == true)
-
-        let withTarget = PlaybackTargets.coProcessWarning(aiSources: [AISourceSelection.egoLite], browserPlaybackEnabled: true)
-        t.expect(withTarget?.contains("cannot be used together") == true)
-        t.expect(withTarget?.contains("Neither selection was changed") == true)
-
-        let mixed = PlaybackTargets.coProcessWarning(
-            aiSources: [.chatGPTDesktop, AISourceSelection.safari],
-            browserPlaybackEnabled: true
-        )
-        t.expect(mixed != nil, "one browser source among several is enough to block")
-    }
-
-    t.run("ChatGPT Web and Browser media are a refused combination, not a silent deselection") {
-        t.expect(PlaybackTargets.isCombinationAllowed(aiSources: [.chatGPTDesktop], browserPlaybackEnabled: true))
-        t.expect(PlaybackTargets.isCombinationAllowed(aiSources: [AISourceSelection.chrome], browserPlaybackEnabled: false))
-        t.expect(PlaybackTargets.isCombinationAllowed(aiSources: [.chatGPTDesktop, AISourceSelection.safari], browserPlaybackEnabled: false))
-
-        let browserSource = [AISourceSelection.chrome]
-        t.expect(!PlaybackTargets.isCombinationAllowed(aiSources: browserSource, browserPlaybackEnabled: true))
-        t.expect(!PlaybackTargets.isCombinationAllowed(aiSources: [.chatGPTDesktop, AISourceSelection.safari], browserPlaybackEnabled: true))
-        t.expect(PlaybackTargets.combinationConflictReason(aiSources: browserSource, browserPlaybackEnabled: true)?.contains("Neither selection was changed") == true)
-
-        var settings = AppSettings()
-        settings.aiSources = browserSource
-        t.expect(!settings.hasBrowserSourceTargetConflict, "legacy file without the target is fine")
-        settings.browserPlaybackEnabled = true
-        t.expect(settings.hasBrowserSourceTargetConflict, "the pairing is detected, not silently undone")
-        t.expectEqual(settings.aiSources, browserSource, "the browser source is still selected for Apple Music")
-    }
-
-    t.run("attempted browser source selection and target enable are both rejected") {
-        // Adding a browser source while the browser target is on is refused.
-        t.expect(!PlaybackTargets.canAddSource(
-            AISourceSelection.chrome,
-            to: [.chatGPTDesktop],
-            browserPlaybackEnabled: true
-        ))
-        t.expect(!PlaybackTargets.canAddSource(
-            .chatGPTDesktop,
-            to: [AISourceSelection.chrome],
-            browserPlaybackEnabled: true
-        ), "the conflict remains while a browser source stays selected")
-        let vscode = AISourceSelection.app(bundleIdentifier: "com.microsoft.VSCode", displayName: "VS Code")
-        t.expect(PlaybackTargets.canAddSource(
-            vscode,
-            to: [.chatGPTDesktop],
-            browserPlaybackEnabled: true
-        ), "a desktop-only set is always allowed")
-        t.expect(PlaybackTargets.canAddSource(
-            AISourceSelection.chrome,
-            to: [.chatGPTDesktop],
-            browserPlaybackEnabled: false
-        ), "browser sources stay selectable when the target is off (Apple Music case)")
-        t.expect(PlaybackTargets.canAddSource(
-            AISourceSelection.chrome,
-            to: [AISourceSelection.chrome],
-            browserPlaybackEnabled: true
-        ), "removing an already-selected source is never blocked")
-
-        // The reverse path: enabling the target against an already-selected browser source.
-        t.expect(!PlaybackTargets.canEnableBrowserPlayback(with: [AISourceSelection.egoLite]))
-        t.expect(!PlaybackTargets.canEnableBrowserPlayback(with: [.chatGPTDesktop, AISourceSelection.safari]))
-        t.expect(PlaybackTargets.canEnableBrowserPlayback(with: [.chatGPTDesktop]))
-
-        // A rejection leaves both sides untouched; the core rule is pure and does not mutate.
-        var settings = AppSettings()
-        settings.aiSources = [.chatGPTDesktop]
-        let original = settings.aiSources
-        let rejected = !PlaybackTargets.canAddSource(
-            AISourceSelection.chrome,
-            to: settings.aiSources,
-            browserPlaybackEnabled: true
-        )
-        t.expect(rejected)
-        t.expectEqual(settings.aiSources, original)
-        t.expect(!settings.browserPlaybackEnabled)
     }
 
     t.run("tapped process diagnostics name the exact helper and its output state") {

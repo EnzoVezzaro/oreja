@@ -89,6 +89,8 @@ public final class PlaybackCoordinator {
     /// a monitoring failure can clear AI activity deterministically and a microphone-only onset is
     /// never rejected just because no AI source tap is available.
     private var activity = ActivityAggregator()
+    /// Which sources are speaking right now (the assistant, your voice, a test), for the UI.
+    public var speakers: ActivityAggregator { activity }
 
     public init(
         policy: PlaybackPolicy = .default,
@@ -148,8 +150,25 @@ public final class PlaybackCoordinator {
         let userMayAct = source == .user
             && (userSpeechMayStartAlone || interruptionInProgress)
         // Releasing the voice is always accepted, so the microphone half can never stick on.
-        let acceptable = source == .user ? (!active || userMayAct) : sourceIsValid
-        guard acceptable else { return false }
+        // A preview was requested by the person in Settings, so it needs no AI source.
+        let acceptable: Bool
+        switch source {
+        case .user: acceptable = !active || userMayAct
+        case .ai: acceptable = sourceIsValid
+        case .preview: acceptable = true
+        }
+        guard acceptable else {
+            // Without this line a rejected voice onset is invisible: the user sees AI ducking and no
+            // sign that their own speech was heard and deliberately ignored.
+            if source == .user, active {
+                log(
+                    .info,
+                    .monitoring,
+                    "Your voice was heard but did not pause music: the default output is built-in speakers, so the microphone cannot start a pause without an AI interruption."
+                )
+            }
+            return false
+        }
 
         let changed = activity.set(active, for: source)
         if source == .user { userSpeechIsActive = active }

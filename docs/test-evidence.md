@@ -1025,3 +1025,143 @@ whole-browser control route was found; nothing in this section should be read as
   (user report)**. It does not establish browser-target control.
 - Browser target capability continues to report `unavailable` from `PlaybackTargets`; the
   deterministic test covering that reason still passes. No browser playback E2E was executed.
+
+## v0.4.0 microphone speech report (2026-11-22)
+
+Report: Apple Music ducks to 11% when ChatGPT Desktop speaks, but not when the user speaks. Settings:
+`pauseWhileISpeak=true`, `automationEnabled=true`, `interruptionMode=duck`, `duckVolumePercent=11`,
+`microphoneSensitivity=normal`. Default input: Sony Bluetooth, mono, 16 kHz. The default output was
+not recorded in the report.
+
+### Code findings (read, not measured)
+
+- Sample path: the tap delivers Float32, `LevelSampler` computes RMS over 50 ms frames, and
+  `AudioMath.decibels` converts with `10·log10(mean square)`, which is dBFS for RMS. The conversion is
+  correct.
+- Gate: `PlaybackCoordinator.setActivity(_:source: .user)` rejects a voice onset when the default
+  output is built-in speakers and no AI interruption is in progress (`userSpeechMayStartAlone`). The
+  rejection was silent before this change, so the logs cannot distinguish it from a missed onset.
+  Test 27 asserts this rule on purpose; it guards against speaker-to-microphone feedback.
+- Threshold history: commit `ac96c97` set the normal microphone activation to −25 dBFS after live
+  Sony-mic idle spikes in the high −30s re-paused Music (`docs/test-evidence.md`, "Human microphone
+  path"). Commit `b09e63f` changed normal to −35 dBFS, citing built-in-mic numbers (room median −46,
+  speech median −26) that do not appear in any evidence file. The −35 value has no Sony-mic
+  measurement behind it.
+- The −35 threshold is more permissive than −25, so it cannot explain a miss by itself.
+
+### Not established by the report
+
+- No microphone level in dBFS was present in the logs, so it is not known whether speech reached the
+  −35 dBFS threshold. No output-device transport was logged either. The report alone does not
+  separate "speech below threshold" from "output is built-in speakers, so the gate rejected the
+  onset".
+
+### Change made
+
+- `PlaybackCoordinator.setActivity`: a rejected voice onset is logged at info level ("Your voice was
+  heard but did not pause music…"). Covered by test 27 and test 27b.
+- `AppModel.startUserSpeechMonitoring`: the start message now states whether the default output is
+  built-in speakers, which decides whether the voice can start a pause.
+- `MicrophoneLevelWindow` plus `AudioActivityEvent.microphoneLevels`: once per second the microphone
+  monitor reports peak dBFS, mean dBFS and the frame count, plus the activation threshold. It keeps
+  numbers only; no samples are stored. `AppModel` records these only when verbose diagnostics are on.
+  A window with zero frames means the microphone delivered no audio. Covered by the detection test
+  "microphone level window reports peak, mean and frame count once per second".
+- The threshold is unchanged. The evidence does not show which value is correct for this input.
+
+### Verification executed
+
+- `./scripts/test.sh`: 104 passed, 0 failed, 508 assertions (baseline 102; two added).
+- `./scripts/build.sh`: built `build/Oreja.app`, ad-hoc signed; `valid on disk`.
+- `./scripts/build.sh --probe` was refused by the permission layer and was not run. The
+  `tools/AudioProbe` and `tools/IntegrationHarness` switch cases were edited but not compiled.
+- Not executed: launching the built app, any real speech or microphone run, verbose-log capture,
+  and any check of the default output device. No microphone level was measured.
+
+### Live verification still needed
+
+1. Enable verbose diagnostics, speak into the Sony input, and read the `Microphone level, last second`
+   lines. Peak above −35 dBFS means the threshold is not the cause. Peak below −35 with clear speech
+   means the Sony input is too quiet, and the threshold choice is the question.
+2. Read the start message: "default output is built-in speakers" means the voice gate is rejecting
+   onsets by design. Switch the output to headphones and repeat.
+3. Only after 1 and 2 are known, decide whether the −35 normal value should move. Do not adjust it
+   from this evidence alone.
+
+## 2026-11-22 — Browser music as a lowered "other app" (case 2: ChatGPT Desktop + YouTube in a browser)
+
+Change: browsers other than Safari can be selected as other apps to interrupt. Lower mode mutes the
+browser's process output with a Core Audio process tap and plays the tapped audio to the default
+output device at the duck level (`TargetAudioRenderer`); pause mode silences the browser, because a
+browser exposes no pause control Oreja can reach without per-tab scripting. The previous browser
+target (per-tab JavaScript, refusal rules, "Browser (unavailable)" section) was removed first.
+
+Executed:
+- `./scripts/test.sh`: 108 passed, 0 failed, 502 assertions (renderer channel mapping, ramp,
+  non-interleaved output, empty input, browser targets kept/Safari dropped, gain per mode).
+- Real audio, harness (`scratchpad/tap-harness`) driving `ProcessAudioTargetMuteController` against
+  YouTube playing in ego lite (`com.citrolabs.ego.helper`, pid 6261, output=yes). Original onset level
+  measured by `oreja-probe --bundle com.citrolabs.ego`: −15.4 dBFS. Replayed audio from the harness
+  process at gain 0.15: no activity at a −25 dBFS threshold, activity at −45 dBFS (onset −41.0 dBFS).
+  This brackets the replay well below the original; it is not an exact gain measurement.
+- Full app path with `OrejaFixture` as a scripted source (notification filter off for the run only):
+  log shows "Lowering ego lite to 11% during speech." at tone start and "Restored ego lite." after the
+  quiet interval; Oreja was an audio process with output=yes during the tone. YouTube had stopped by
+  then (ego helpers output=no), so this run proves the control path, not audible lowering.
+
+Not executed / not proven:
+- A person hearing YouTube lowered while ChatGPT Desktop speaks. Needs the user.
+- That the original browser output is inaudible while lowered (mute behavior) — only inferred from
+  the API contract and the absence of an error.
+- Safari as a target (excluded: shared WebKit audio process).
+- Case 3 (ChatGPT Web + Apple Music) and case 4 (ChatGPT Web + YouTube in the same browser).
+  Detection of ego lite audio through its helper tap did work in this session (YouTube onset at
+  −15.4 dBFS), which is the same path ChatGPT Web would use, but no ChatGPT Web reply was measured.
+
+## 2026-11-22 — Settings redesign, music players as targets, live browser lowering through the app
+
+Changes: "Listen to" (Audio) and "Lower these apps" (Playback) are separate lists; the lowered list
+now shows browsers (it hid them before, so a browser could never be chosen) and music players
+(Spotify, VLC; Apple Music stays native). Toggles align right, captions sit above cards, the sidebar
+icon column is fixed width, slider tick rows removed. Added: Test interruption (coordinator
+`.preview` source), permission status rows including Microphone, Open diagnostics / Show log file,
+live Apple Music status and connection-check results, a warning with a one-click move when a
+selected source is playing media. Version is stamped from git by `scripts/build.sh`
+(`0.4.0`, build 42, `b09e63f-modified`, 1 commit after v0.4.0) instead of the hard-coded plist.
+Real-time fixes from review: raw-pointer renderer, no reference counting in the IOProc,
+time-based ramp (0.2 s), a pending release is not restarted, "Lowering" is only logged when audio
+is actually replayed.
+
+Executed:
+- `./scripts/test.sh`: 111 passed, 0 failed, 548 assertions.
+- Build launched: PID 71150, footprint ~51 MB, three Oreja dylibs loaded.
+- Settings pages captured with Orca computer use; layout reviewed on screen.
+- Live, real app, user's YouTube in ego lite (`com.citrolabs.ego.helper` output=yes), ego lite moved
+  to "Lower these apps" through the new UI, output Sony headphones: microphone speech triggered
+  "Lowering ego lite to 11% during speech." (23:40:57Z), Oreja rendered audio (probe on Oreja pid:
+  activity at −40.1 dBFS), then "Restored ego lite." (23:41:00Z) and Oreja output ended (−100 dBFS).
+  Repeated on later phrases.
+
+Not executed / not proven:
+- The person confirming by ear that YouTube dropped and came back.
+- ChatGPT Desktop speech lowering ego lite (same path as the microphone run; not observed).
+- The Test interruption button clicked live (unit-tested through the coordinator only).
+- Spotify/VLC lowering (not installed here).
+
+## 2026-11-22 — Status names the speaker; microphone follows the voice session
+
+- Status line (menu bar and Settings sidebar) now comes from the coordinator's per-source activity:
+  "ChatGPT is speaking", "You are speaking", "You and ChatGPT are speaking", "Testing the
+  interruption"; with several selected apps it says "a selected app" (their audio is measured
+  together, so the app is not guessed). Unit-tested; `./scripts/test.sh`: 113 passed, 0 failed.
+- Root cause of "it said ChatGPT while I spoke": Oreja listened on the MacBook mic while the person
+  spoke into the Sony headset. Measured with ffmpeg at the same moment: Sony headset mic speech
+  peaks −21 to −25 dBFS (above the −35 threshold); MacBook mic max −40 dBFS (below it). The earlier
+  conclusion that the headset mic "delivers silence" came from a measurement taken while nobody spoke.
+- New rule (`InputDeviceSelection`): headset mic while another app is already recording (voice
+  session or call: the headset is in call mode anyway), otherwise the built-in mic so Oreja never
+  switches the headset into call mode itself; re-checked every 3 s. Live: with the ChatGPT voice
+  session open, the log shows "Listening for your voice on Sony Headphones."
+- In the window where the label read "ChatGPT is speaking" after the fix (23:49:31–36Z) the headset
+  mic peaked at −70 to −45 dBFS, i.e. the person was not speaking then. "You are speaking" from a
+  real person into the headset has not been observed yet.

@@ -142,6 +142,26 @@ rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" "$APP/Contents/Frameworks"
 cp "$BUILD/bin/Oreja" "$APP/Contents/MacOS/Oreja"
 cp packaging/Info.plist "$APP/Contents/Info.plist"
+# Stamp the version from git so the app never shows a stale number:
+#   version = latest tag (v0.4.0 -> 0.4.0), or OREJA_VERSION when set for a release build
+#   build   = commit count, so every commit gets a higher number
+#   commit  = short hash, with "-modified" when the tree has uncommitted changes
+PLIST="$APP/Contents/Info.plist"
+GIT_TAG="$(git -C "$ROOT" describe --tags --abbrev=0 2>/dev/null || echo v0.0.0)"
+APP_VERSION="${OREJA_VERSION:-${GIT_TAG#v}}"
+APP_BUILD="$(git -C "$ROOT" rev-list --count HEAD 2>/dev/null || echo 0)"
+APP_COMMIT="$(git -C "$ROOT" rev-parse --short HEAD 2>/dev/null || echo unknown)"
+if ! git -C "$ROOT" diff --quiet HEAD 2>/dev/null; then APP_COMMIT="$APP_COMMIT-modified"; fi
+APP_AHEAD="$(git -C "$ROOT" rev-list --count "$GIT_TAG"..HEAD 2>/dev/null || echo 0)"
+/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $APP_VERSION" "$PLIST"
+/usr/libexec/PlistBuddy -c "Set :CFBundleVersion $APP_BUILD" "$PLIST"
+for key in OrejaGitCommit OrejaCommitsSinceTag OrejaBuildDate; do
+    /usr/libexec/PlistBuddy -c "Delete :$key" "$PLIST" 2>/dev/null || true
+done
+/usr/libexec/PlistBuddy -c "Add :OrejaGitCommit string $APP_COMMIT" "$PLIST"
+/usr/libexec/PlistBuddy -c "Add :OrejaCommitsSinceTag string $APP_AHEAD" "$PLIST"
+/usr/libexec/PlistBuddy -c "Add :OrejaBuildDate string $(date -u +%Y-%m-%dT%H:%MZ)" "$PLIST"
+echo "    version $APP_VERSION (build $APP_BUILD, $APP_COMMIT, $APP_AHEAD commits since $GIT_TAG)"
 cp "$BUILD/AppIcon.icns" "$APP/Contents/Resources/AppIcon.icns"
 # Optional shared pixel character; a missing illustration never prevents a native build.
 if [ -f "$ROOT/site/assets/oreja-vincent.png" ]; then

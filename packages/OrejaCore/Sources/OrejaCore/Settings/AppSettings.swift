@@ -1,17 +1,5 @@
 import Foundation
 
-public enum BrowserTargetScope: String, Codable, Sendable, Equatable, CaseIterable {
-    case allSupportedBrowsers
-    case activeBrowserOnly
-
-    public var title: String {
-        switch self {
-        case .allSupportedBrowsers: "All supported browsers"
-        case .activeBrowserOnly: "Active browser only"
-        }
-    }
-}
-
 public struct AppSettings: Codable, Sendable, Equatable {
     /// Applications whose audio counts as the AI speaking. Empty means nothing is listened to.
     public var aiSources: [AISourceSelection] {
@@ -26,18 +14,13 @@ public struct AppSettings: Codable, Sendable, Equatable {
     /// Apps whose output should be muted while a primary source is active.
     public var targetAudioApps: [AISourceSelection] {
         didSet {
-            let normalized = AISourceCatalog.normalized(targetAudioApps).filter {
-                !AISourceCatalog.isBrowser(bundleIdentifier: $0.bundleIdentifier)
-            }
+            let normalized = AISourceCatalog.normalizedTargets(targetAudioApps)
             let primaryIDs = Set(aiSources.map(\.bundleIdentifier))
             let disjoint = normalized.filter { !primaryIDs.contains($0.bundleIdentifier) }
             if disjoint != targetAudioApps { targetAudioApps = disjoint }
         }
     }
     public var musicProvider: MediaProviderID
-    /// Browser media is a playback target, independent from the apps Oreja listens to for speech.
-    public var browserPlaybackEnabled: Bool
-    public var browserTargetScope: BrowserTargetScope
     public var automationEnabled: Bool
     public var resumeDelay: TimeInterval {
         didSet {
@@ -62,6 +45,12 @@ public struct AppSettings: Codable, Sendable, Equatable {
     public var duckVolumePercent: Int {
         didSet { duckVolumePercent = min(max(duckVolumePercent, 1), 100) }
     }
+    /// Gain applied to selected other apps (browsers, other players) while someone speaks.
+    /// Lower mode uses the duck level; pause mode silences them, because these apps expose no pause
+    /// control Oreja can reach.
+    public var targetAudioGain: Float {
+        interruptionMode == .duck ? Float(duckVolumePercent) / 100 : 0
+    }
     public var restoreVolumePercent: Int {
         didSet { restoreVolumePercent = min(max(restoreVolumePercent, 1), 100) }
     }
@@ -79,16 +68,6 @@ public struct AppSettings: Codable, Sendable, Equatable {
         }
     }
 
-    /// True when a browser interruption source is paired with the browser playback target. The
-    /// combination is refused by `PlaybackTargets.isCombinationAllowed`; a legacy saved file that
-    /// still contains both is reported instead of being silently rewritten.
-    public var hasBrowserSourceTargetConflict: Bool {
-        !PlaybackTargets.isCombinationAllowed(
-            aiSources: aiSources,
-            browserPlaybackEnabled: browserPlaybackEnabled
-        )
-    }
-
     public static let resumeDelayRange: ClosedRange<TimeInterval> = 0...3.0
     public static let conversationHoldRange: ClosedRange<TimeInterval> = 0...60
 
@@ -96,8 +75,6 @@ public struct AppSettings: Codable, Sendable, Equatable {
         aiSources: [AISourceSelection] = [.chatGPTDesktop],
         targetAudioApps: [AISourceSelection] = [],
         musicProvider: MediaProviderID = .appleMusic,
-        browserPlaybackEnabled: Bool = false,
-        browserTargetScope: BrowserTargetScope = .allSupportedBrowsers,
         automationEnabled: Bool = true,
         resumeDelay: TimeInterval = 0.8,
         launchAtLogin: Bool = false,
@@ -116,15 +93,10 @@ public struct AppSettings: Codable, Sendable, Equatable {
     ) {
         let normalizedSources = AISourceCatalog.normalized(aiSources)
         self.aiSources = normalizedSources
-        self.targetAudioApps = AISourceCatalog.normalized(targetAudioApps).filter { target in
-            !AISourceCatalog.isBrowser(bundleIdentifier: target.bundleIdentifier)
-                &&
+        self.targetAudioApps = AISourceCatalog.normalizedTargets(targetAudioApps).filter { target in
             !normalizedSources.contains { $0.bundleIdentifier == target.bundleIdentifier }
         }
         self.musicProvider = musicProvider
-        self.browserPlaybackEnabled = browserPlaybackEnabled
-            || targetAudioApps.contains { AISourceCatalog.isBrowser(bundleIdentifier: $0.bundleIdentifier) }
-        self.browserTargetScope = browserTargetScope
         self.automationEnabled = automationEnabled
         self.resumeDelay = Self.clampResumeDelay(resumeDelay)
         self.launchAtLogin = launchAtLogin
@@ -166,7 +138,7 @@ public struct AppSettings: Codable, Sendable, Equatable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case aiSources, targetAudioApps, musicProvider, browserPlaybackEnabled, browserTargetScope, automationEnabled, resumeDelay, launchAtLogin, onboardingCompleted, verboseDiagnostics, pauseWhileISpeak, ignoreNotificationSounds, aiSensitivity, microphoneSensitivity, interruptionMode, duckVolumePercent, restoreVolumePercent, hooks, holdThroughConversation, conversationHold
+        case aiSources, targetAudioApps, musicProvider, automationEnabled, resumeDelay, launchAtLogin, onboardingCompleted, verboseDiagnostics, pauseWhileISpeak, ignoreNotificationSounds, aiSensitivity, microphoneSensitivity, interruptionMode, duckVolumePercent, restoreVolumePercent, hooks, holdThroughConversation, conversationHold
     }
 
     private enum LegacyKeys: String, CodingKey {
@@ -185,18 +157,11 @@ public struct AppSettings: Codable, Sendable, Equatable {
             sources = AISourceCatalog.normalized([legacy])
         }
         self.aiSources = sources
-        let decodedTargets = AISourceCatalog.normalized(try container.decodeIfPresent([AISourceSelection].self, forKey: .targetAudioApps) ?? [])
-        let targets = decodedTargets.filter { !AISourceCatalog.isBrowser(bundleIdentifier: $0.bundleIdentifier) }
+        let targets = AISourceCatalog.normalizedTargets(try container.decodeIfPresent([AISourceSelection].self, forKey: .targetAudioApps) ?? [])
         self.targetAudioApps = targets.filter { target in
             !sources.contains { $0.bundleIdentifier == target.bundleIdentifier }
         }
         self.musicProvider = try container.decodeIfPresent(MediaProviderID.self, forKey: .musicProvider) ?? .appleMusic
-        self.browserPlaybackEnabled = try container.decodeIfPresent(Bool.self, forKey: .browserPlaybackEnabled)
-            ?? decodedTargets.contains { AISourceCatalog.isBrowser(bundleIdentifier: $0.bundleIdentifier) }
-        self.browserTargetScope = try container.decodeIfPresent(BrowserTargetScope.self, forKey: .browserTargetScope)
-            ?? (decodedTargets.contains { AISourceCatalog.isBrowser(bundleIdentifier: $0.bundleIdentifier) }
-                ? .activeBrowserOnly
-                : .allSupportedBrowsers)
         self.automationEnabled = try container.decodeIfPresent(Bool.self, forKey: .automationEnabled) ?? true
         self.resumeDelay = Self.clampResumeDelay(try container.decodeIfPresent(TimeInterval.self, forKey: .resumeDelay) ?? 0.8)
         self.launchAtLogin = try container.decodeIfPresent(Bool.self, forKey: .launchAtLogin) ?? false

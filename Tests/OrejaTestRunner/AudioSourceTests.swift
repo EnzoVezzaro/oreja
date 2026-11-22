@@ -96,7 +96,28 @@ func runAudioSourceSuite(_ t: Harness) {
         let ids = AISourceCatalog.knownApps.map(\.bundleIdentifier)
         t.expectEqual(ids.count, Set(ids).count, "duplicate bundle identifiers in the catalog")
         t.expect(AISourceCatalog.knownApps.allSatisfy { !$0.displayName.isEmpty && !$0.prefixes.isEmpty })
-        t.expect(AISourceCatalog.knownApps.allSatisfy { app in AISourceCatalog.isSelectable(bundleIdentifier: app.bundleIdentifier) })
+        // Music players are known so they can be lowered, but they are never a speech source.
+        for app in AISourceCatalog.knownApps {
+            if app.category == .music {
+                t.expect(!AISourceCatalog.isSelectable(bundleIdentifier: app.bundleIdentifier), "\(app.displayName) is never a source")
+                t.expect(AISourceCatalog.isTargetSelectable(bundleIdentifier: app.bundleIdentifier), "\(app.displayName) can be lowered")
+            } else {
+                t.expect(AISourceCatalog.isSelectable(bundleIdentifier: app.bundleIdentifier), "\(app.displayName) can be a source")
+            }
+        }
+    }
+
+    t.run("music players can be lowered; Apple Music and Oreja cannot") {
+        var settings = AppSettings()
+        settings.aiSources = [.chatGPTDesktop, .app(bundleIdentifier: "com.spotify.client", displayName: "Spotify")]
+        t.expectEqual(settings.aiSources.map(\.bundleIdentifier), ["com.openai.codex"], "a music player is never a source")
+        settings.targetAudioApps = [
+            .app(bundleIdentifier: "com.spotify.client", displayName: "Spotify"),
+            .app(bundleIdentifier: "org.videolan.vlc", displayName: "VLC"),
+            .app(bundleIdentifier: "com.apple.Music", displayName: "Music"),
+            .app(bundleIdentifier: "app.oreja.van-gogh", displayName: "Oreja"),
+        ]
+        t.expectEqual(settings.targetAudioApps.map(\.bundleIdentifier), ["com.spotify.client", "org.videolan.vlc"])
     }
 
     t.run("settings written with the single-source key still load") {
