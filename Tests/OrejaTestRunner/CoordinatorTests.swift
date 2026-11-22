@@ -564,6 +564,145 @@ func runCoordinatorSuite(_ t: Harness) async {
         f.scheduler.advance(by: 0.81)
         t.expectEqual(f.lastCommand?.kind, .resume, "music returns once both sides are quiet")
     }
+
+    await t.runAsync("21. microphone-only speech pauses and restores with no valid AI source") {
+        let f = CoordinatorFixture()
+        await f.startMonitoring()
+        f.coordinator.monitoringFailed(AudioMonitoringFailure(.sourceUnavailable, "No AI source is speaking."))
+        t.expectFalseMonitoredSource(f.coordinator.sourceIsValid)
+
+        t.expect(f.coordinator.setActivity(true, source: .user, levelDB: -30), "mic onset is accepted without a tap")
+        t.expectEqual(f.lastCommand?.kind, .pause, "the user's voice pauses music on its own")
+        f.completeLast(nextState: .paused)
+        t.expect(f.coordinator.ownership != nil)
+
+        t.expect(f.coordinator.setActivity(false, source: .user))
+        f.scheduler.advance(by: 0.81)
+        t.expectEqual(f.lastCommand?.kind, .resume, "the owned pause restores without a valid source")
+        f.completeLast(nextState: .playing)
+        t.expect(f.coordinator.ownership == nil)
+    }
+
+    await t.runAsync("27. built-in speakers: your voice alone never pauses music") {
+        let f = CoordinatorFixture()
+        await f.startMonitoring()
+        f.coordinator.monitoringFailed(AudioMonitoringFailure(.sourceUnavailable, "No AI source is speaking."))
+        f.coordinator.setUserSpeechMayStartAlone(false)
+
+        t.expect(!f.coordinator.setActivity(true, source: .user, levelDB: -30),
+                 "a mic onset with no AI interruption is rejected on speakers")
+        t.expect(f.lastCommand == nil, "no pause command is issued from speaker feedback")
+        t.expect(f.coordinator.ownership == nil)
+    }
+
+    await t.runAsync("28. built-in speakers: your voice keeps an AI-started interruption alive") {
+        let f = CoordinatorFixture()
+        await f.startMonitoring()
+        f.coordinator.setUserSpeechMayStartAlone(false)
+
+        f.coordinator.audioActivityStarted(levelDB: -20)
+        t.expectEqual(f.lastCommand?.kind, .pause, "the assistant starts the pause")
+        f.completeLast(nextState: .paused)
+
+        // The combined state was already active, so the call reports no change, but the voice is
+        // accepted and no second pause is issued.
+        f.coordinator.setActivity(true, source: .user, levelDB: -30)
+        t.expect(f.coordinator.userSpeechIsActive, "your voice is accepted while that interruption is in progress")
+        f.coordinator.setActivity(false, source: .user)
+        t.expect(!f.coordinator.userSpeechIsActive, "releasing the voice clears only the microphone half")
+    }
+
+    await t.runAsync("22. microphone-only duck lowers and restores volume with no valid AI source") {
+        var policy = PlaybackPolicy.default
+        policy.interruptionMode = .duck
+        policy.duckVolume = 0.05
+        policy.restoreVolume = 0.67
+        let f = CoordinatorFixture(policy: policy)
+        f.media.snapshot.volume = 0.67
+        await f.startMonitoring()
+        f.coordinator.sourceInvalidated(reason: "no AI source")
+
+        t.expect(f.coordinator.setActivity(true, source: .user, levelDB: -30))
+        t.expectEqual(f.lastCommand?.kind, .setVolume, "the configured duck action still applies")
+        t.expectClose(f.lastCommand?.targetVolume ?? -1, 0.05)
+        f.completeLast()
+        t.expectClose(f.coordinator.volumeOwnership?.originalVolume ?? -1, 0.67)
+
+        t.expect(f.coordinator.setActivity(false, source: .user))
+        f.scheduler.advance(by: 0.81)
+        t.expect(f.lastCommand?.restoresVolume == true)
+        t.expectClose(f.lastCommand?.targetVolume ?? -1, 0.67)
+        f.completeLast()
+        t.expect(f.coordinator.volumeOwnership == nil)
+    }
+
+    await t.runAsync("23. monitoring failure clears AI activity so a retry's next onset pauses") {
+        let f = CoordinatorFixture()
+        await f.startMonitoring()
+        t.expect(f.coordinator.setActivity(true, source: .ai, levelDB: -20))
+        f.completeLast(nextState: .paused)
+
+        f.coordinator.monitoringFailed(AudioMonitoringFailure(.streamFailed, "Tap stopped delivering audio."))
+        f.completeLast(nextState: .playing)
+        t.expectEqual(f.coordinator.state, .error)
+
+        f.coordinator.retryAfterError()
+        f.coordinator.monitoringBecameAvailable(description: "ChatGPT (1 audio process)")
+        t.expect(f.coordinator.setActivity(true, source: .ai, levelDB: -20), "stale AI activity was cleared")
+        t.expectEqual(f.lastCommand?.kind, .pause, "the next real onset pauses again")
+    }
+
+    await t.runAsync("24. AI failure while the microphone is active keeps the owned pause") {
+        let f = CoordinatorFixture()
+        await f.startMonitoring()
+        t.expect(f.coordinator.setActivity(true, source: .ai, levelDB: -20))
+        f.completeLast(nextState: .paused)
+        t.expect(!f.coordinator.setActivity(true, source: .user, levelDB: -30), "overlap does not issue a second pause")
+        t.expectEqual(f.commands(of: .pause).count, 1)
+
+        f.coordinator.monitoringFailed(AudioMonitoringFailure(.streamFailed, "Tap stopped delivering audio."))
+        t.expect(f.coordinator.ownership != nil, "the pause is kept while the user still speaks")
+        t.expect(f.coordinator.aiIsActive, "the combined active state is kept")
+        t.expectEqual(f.commands(of: .resume).count, 0, "no premature restore")
+
+        t.expect(f.coordinator.setActivity(false, source: .user))
+        f.scheduler.advance(by: 0.81)
+        t.expectEqual(f.lastCommand?.kind, .resume, "restore happens only when speech ends")
+    }
+
+    await t.runAsync("25. microphone failure while AI is active keeps music paused") {
+        let f = CoordinatorFixture()
+        await f.startMonitoring()
+        t.expect(f.coordinator.setActivity(true, source: .ai, levelDB: -20))
+        f.completeLast(nextState: .paused)
+        f.coordinator.setActivity(true, source: .user, levelDB: -30)
+
+        f.coordinator.setUserSpeechActive(false)
+        t.expect(f.coordinator.aiIsActive, "AI still drives the combined state")
+        t.expectEqual(f.commands(of: .resume).count, 0, "a mic failure alone never resumes music")
+
+        t.expect(f.coordinator.setActivity(false, source: .ai))
+        f.scheduler.advance(by: 0.81)
+        t.expectEqual(f.lastCommand?.kind, .resume)
+    }
+
+    await t.runAsync("26. automation toggle and teardown never strand an owned pause") {
+        let f = CoordinatorFixture()
+        f.coordinator.setAutomationEnabled(true)
+        f.coordinator.setAutomationEnabled(false)
+        f.coordinator.setAutomationEnabled(true)
+        f.coordinator.monitoringBecameAvailable(description: "ChatGPT (1 audio process)")
+        f.coordinator.observe(media: f.media.snapshot)
+
+        t.expect(f.coordinator.setActivity(true, source: .user, levelDB: -30), "mic still works after the toggle")
+        f.completeLast(nextState: .paused)
+        f.coordinator.resetActivity()
+        f.scheduler.advance(by: 0.81)
+        t.expectEqual(f.lastCommand?.kind, .resume, "teardown finishes the interruption")
+
+        f.completeLast(nextState: .playing)
+        t.expect(f.coordinator.ownership == nil)
+    }
 }
 
 private extension Harness {

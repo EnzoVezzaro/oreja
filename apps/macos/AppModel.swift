@@ -54,7 +54,6 @@ final class AppModel: ObservableObject {
     private var eventTask: Task<Void, Never>?
     private var speechMonitor: MicrophoneActivityMonitor?
     private var speechEventTask: Task<Void, Never>?
-    private var activity = ActivityAggregator()
     private var observationTask: Task<Void, Never>?
     private var retryTask: Task<Void, Never>?
     private var hasRunStalePauseRecovery = false
@@ -63,11 +62,7 @@ final class AppModel: ObservableObject {
     private var lastOwnership: PauseOwnership?
     private var lastVolumeOwnership: VolumeOwnership?
     private var lastTargetMuteIntent: Bool?
-    private var lastUnsupportedBrowserTargetIDs = Set<String>()
     private var lastBrowserControlError: String?
-    private var browserInterruptionTargets: [AISourceSelection]?
-    private var browserInterruptionMode: MusicInterruptionMode?
-    private var browserInterruptionDuckPercent: Int?
 
     init(
         settingsStore: (any SettingsStoring)? = nil,
@@ -179,14 +174,51 @@ final class AppModel: ObservableObject {
         setAutomationEnabled(!settings.automationEnabled)
     }
 
-    /// Adds the app to the listened-to set, or removes it when it is already selected.
+    /// Adds the app to the listened-to set, or removes it when it is already selected. A browser
+    /// source is refused while the browser playback target is on; neither selection is changed.
     func toggleSource(_ selection: AISourceSelection) {
         if settings.aiSources.contains(where: { $0.bundleIdentifier == selection.bundleIdentifier }) {
             settings.aiSources.removeAll { $0.bundleIdentifier == selection.bundleIdentifier }
-        } else {
-            settings.targetAudioApps.removeAll { $0.bundleIdentifier == selection.bundleIdentifier }
-            settings.aiSources.append(selection)
+            return
         }
+        guard PlaybackTargets.canAddSource(
+            selection,
+            to: settings.aiSources,
+            browserPlaybackEnabled: settings.browserPlaybackEnabled
+        ) else {
+            let reason = PlaybackTargets.combinationConflictReason(
+                aiSources: settings.aiSources + [selection],
+                browserPlaybackEnabled: true
+            ) ?? "That source cannot be combined with Browser media."
+            record(.warning, .settings, reason)
+            return
+        }
+        settings.targetAudioApps.removeAll { $0.bundleIdentifier == selection.bundleIdentifier }
+        settings.aiSources.append(selection)
+    }
+
+    /// Enabling the browser playback target is refused when a browser source is already selected.
+    func setBrowserPlaybackEnabled(_ enabled: Bool) {
+        guard enabled else {
+            settings.browserPlaybackEnabled = false
+            return
+        }
+        guard PlaybackTargets.canEnableBrowserPlayback(with: settings.aiSources) else {
+            let reason = PlaybackTargets.combinationConflictReason(
+                aiSources: settings.aiSources,
+                browserPlaybackEnabled: true
+            ) ?? "Browser media cannot be combined with a browser listening source."
+            record(.warning, .settings, reason)
+            return
+        }
+        settings.browserPlaybackEnabled = true
+    }
+
+    /// Browser source rows are disabled for *adding* while the browser target is on. An already
+    /// selected browser source stays toggleable so the person can remove it.
+    func isSourceBlockedForAddition(_ selection: AISourceSelection) -> Bool {
+        guard settings.browserPlaybackEnabled else { return false }
+        return selection.kind == .browser || AISourceCatalog.isBrowser(bundleIdentifier: selection.bundleIdentifier)
     }
 
     func toggleTargetAudioApp(_ selection: AISourceSelection) {
@@ -246,6 +278,9 @@ final class AppModel: ObservableObject {
                 coordinator.setAutomationEnabled(true)
                 startObservation()
                 startMonitoringIfNeeded()
+                // Explicit so an opted-in microphone restarts even if a monitor was already live
+                // when automation was toggled back on.
+                startUserSpeechMonitoring()
             } else {
                 coordinator.setAutomationEnabled(false)
                 stopMonitoring(reason: "automation disabled")
@@ -332,10 +367,9 @@ final class AppModel: ObservableObject {
 
     func stopMonitoring(reason: String) {
         stopUserSpeechMonitoring(reason: reason)
-        activity.reset()
-        // The aggregator forgets activity here, so the coordinator must hear that it ended too.
-        // Otherwise a stale `aiIsActive` makes every later voice onset return without pausing.
-        coordinator.audioActivityEnded()
+        // The coordinator owns the activity aggregator. Forgetting it here keeps a later voice
+        // onset from being mistaken for a continuation of stale activity.
+        coordinator.resetActivity()
         retryTask?.cancel()
         retryTask = nil
         isMonitoring = false
@@ -355,6 +389,9 @@ final class AppModel: ObservableObject {
             isMonitoring = true
             hasAudioPermission = true
             sourceDescription = description
+            // Logs the exact helper processes behind the tap, so an isolated Desktop-only Voice
+            // run can be attributed to a process instead of guessed at from a combined source.
+            record(.info, .monitoring, "Tapped audio processes: \(description)")
             coordinator.monitoringBecameAvailable(description: description)
             fire(.monitoringStarted, detail: "Listening to \(description)")
         case .targetsChanged(let description):
@@ -380,13 +417,11 @@ final class AppModel: ObservableObject {
                 scheduleMonitoringRetry()
             }
         case .activityStarted(let levelDB):
-            if activity.set(true, for: .ai) {
-                coordinator.audioActivityStarted(levelDB: levelDB)
+            if coordinator.setActivity(true, source: .ai, levelDB: levelDB) {
                 fire(.speechStarted, detail: "The AI source started speaking")
             }
         case .activityEnded:
-            if activity.set(false, for: .ai) {
-                coordinator.audioActivityEnded()
+            if coordinator.setActivity(false, source: .ai) {
                 fire(.speechEnded, detail: "The AI source went quiet")
             }
         case .activitySuppressed(let reason, let levelDB):
@@ -411,6 +446,8 @@ final class AppModel: ObservableObject {
         guard #available(macOS 14.2, *) else { return }
         guard speechMonitor == nil else { return }
 
+        // Read the output at start; a device change takes effect the next time monitoring starts.
+        coordinator.setUserSpeechMayStartAlone(!DefaultOutputDevice.isBuiltInSpeakers())
         let monitor = MicrophoneActivityMonitor(sensitivity: settings.microphoneSensitivity)
         speechMonitor = monitor
         record(.info, .monitoring, "Listening for your voice as well.")
@@ -445,9 +482,7 @@ final class AppModel: ObservableObject {
         speechEventTask?.cancel()
         speechEventTask = nil
         isListeningForUser = false
-        if activity.set(false, for: .user) {
-            coordinator.audioActivityEnded()
-        }
+        // Clear only the microphone half; an AI conversation can still be in progress.
         coordinator.setUserSpeechActive(false)
         Task { await monitor.stop() }
         record(.info, .monitoring, "Stopped listening for your voice: \(reason).")
@@ -466,24 +501,18 @@ final class AppModel: ObservableObject {
         case .monitorFailed(let failure):
             isListeningForUser = false
             userSpeechError = failure.message
-            if activity.set(false, for: .user) {
-                coordinator.audioActivityEnded()
-            }
+            // Clear only the microphone half; the coordinator keeps an AI interruption owned.
             coordinator.setUserSpeechActive(false)
         case .activityStarted(let levelDB):
-            // User speech must be able to start a pause when the person speaks first. Headphones
-            // are recommended because speakers can feed Music back into this microphone. The
-            // coordinator still owns the pause and the activity aggregator prevents duplicate
-            // pause requests when AI and user activity overlap.
-            coordinator.setUserSpeechActive(true)
-            if activity.set(true, for: .user) {
+            // User speech must be able to start a pause when the person speaks first, even when no
+            // AI source tap is valid. Route it through the coordinator's source-aware activity API
+            // so the pause decision and overlap handling stay in one tested place.
+            // Re-read the output on every onset: switching to speakers mid-session must take effect.
+            coordinator.setUserSpeechMayStartAlone(!DefaultOutputDevice.isBuiltInSpeakers())
+            if coordinator.setActivity(true, source: .user, levelDB: levelDB) {
                 record(.info, .monitoring, "Your voice is active; pausing music.")
-                coordinator.audioActivityStarted(levelDB: levelDB)
             }
         case .activityEnded:
-            if activity.set(false, for: .user) {
-                coordinator.audioActivityEnded()
-            }
             coordinator.setUserSpeechActive(false)
         case .activitySuppressed:
             // The microphone path is not gated: it exists to hear the person in the room, and a
@@ -676,39 +705,38 @@ final class AppModel: ObservableObject {
         let primaryIDs = Set(settings.aiSources.map(\.bundleIdentifier))
         let targets = settings.targetAudioApps.filter { !primaryIDs.contains($0.bundleIdentifier) }
         let shouldInterrupt = coordinator.shouldMuteTargetAudio
-        if shouldInterrupt {
-            if browserInterruptionTargets == nil {
-                browserInterruptionTargets = browserPlaybackTargets()
-                browserInterruptionMode = settings.interruptionMode
-                browserInterruptionDuckPercent = settings.duckVolumePercent
-            }
-        } else {
-            browserInterruptionTargets = nil
-            browserInterruptionMode = nil
-            browserInterruptionDuckPercent = nil
-        }
+
+        // Whole-browser control is a hard platform blocker. The status controller only records why;
+        // it never runs per-tab JavaScript and never opens an Automation prompt.
+        // Refuse the ChatGPT Web + Browser media pairing even if a legacy settings file contains
+        // both. The selections are left intact and the reason is reported below.
+        let browserTargetAllowed = settings.browserPlaybackEnabled && !settings.hasBrowserSourceTargetConflict
         browserAudioController.update(
-            applications: settings.browserPlaybackEnabled ? (browserInterruptionTargets ?? []) : [],
+            applications: browserTargetAllowed ? browserPlaybackTargets() : [],
             active: shouldInterrupt,
-            mode: browserInterruptionMode ?? settings.interruptionMode,
-            duckPercent: browserInterruptionDuckPercent ?? settings.duckVolumePercent
+            mode: settings.interruptionMode,
+            duckPercent: settings.duckVolumePercent
         )
-        let unsupported = Set(browserAudioController.unsupportedBundleIdentifiers)
-        if unsupported != lastUnsupportedBrowserTargetIDs {
-            if !unsupported.isEmpty {
-                record(.warning, .monitoring, "No browser media adapter is available for: \(unsupported.sorted().joined(separator: ", ")).")
+        if settings.hasBrowserSourceTargetConflict {
+            let reason = PlaybackTargets.combinationConflictReason(
+                aiSources: settings.aiSources,
+                browserPlaybackEnabled: settings.browserPlaybackEnabled
+            ) ?? "Browser media cannot be combined with a browser interruption source."
+            if reason != lastBrowserControlError {
+                record(.warning, .settings, reason)
+                lastBrowserControlError = reason
             }
-            lastUnsupportedBrowserTargetIDs = unsupported
         }
-        if let error = browserAudioController.lastErrorMessage, error != lastBrowserControlError {
-            record(.warning, .monitoring, error)
-            lastBrowserControlError = error
+        if let reason = browserAudioController.lastErrorMessage, reason != lastBrowserControlError {
+            record(.warning, .monitoring, "Browser playback target unavailable: \(reason)")
+            lastBrowserControlError = reason
         } else if browserAudioController.lastErrorMessage == nil {
             lastBrowserControlError = nil
         }
 
-        // Browser playback is controlled through the selected media sessions. Other selected app
-        // targets retain the existing process-level mute behavior.
+        // Only explicitly selected secondary apps are muted. AI sources, including any browser
+        // carrying the conversation, are never muted, so ChatGPT output stays audible. No system
+        // volume or global mute stands in for the configured duck/pause action.
         let processMuteTargets = targets.filter { !AISourceCatalog.isBrowser(bundleIdentifier: $0.bundleIdentifier) }
         let shouldMute = shouldInterrupt && !processMuteTargets.isEmpty
         do {
@@ -729,10 +757,10 @@ final class AppModel: ObservableObject {
     }
 
     private func browserPlaybackTargets() -> [AISourceSelection] {
-        let supported = AISourceCatalog.knownApps.filter {
-            $0.category == .browser && BrowserAudioController.supportedBrowserBundleIDs.contains($0.bundleIdentifier)
+        let known = AISourceCatalog.knownApps.filter {
+            $0.category == .browser && BrowserAudioController.knownBrowserBundleIDs.contains($0.bundleIdentifier)
         }
-        let candidates = supported.map {
+        let candidates = known.map {
             AISourceSelection.browser(bundleIdentifier: $0.bundleIdentifier, displayName: $0.displayName)
         }
         guard settings.browserTargetScope == .activeBrowserOnly else { return candidates }

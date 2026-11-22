@@ -887,3 +887,141 @@ Privacy were opened in the rebuilt app and visually inspected.
   this branch. Firefox has no adapter; Spotify playback control is not implemented. Internet
   Explorer is unavailable on macOS.
 - No deployment, publication, or release was performed.
+
+## v0.4.0 repair: lifecycle, honest capabilities and attribution (2026-11-21)
+
+Worktree: `/Users/mac/orca/workspaces/oreja/oreja-v040-repair` (tag `v0.4.0`, commit `8313abd`).
+This section records the repair built on the two completed dependency audits (Codex lifecycle/media
+audit and the read-only Core Audio / API audit).
+
+### Evidence levels used here
+
+- **L0 — user report.** The person says they observed it; not reproduced by this agent.
+- **L1 — deterministic test.** Executed by `./scripts/test.sh`; no hardware dependency.
+- **L2 — build / static.** Compiles and/or inspected source; no live behavior claimed.
+- **L3 — live local.** Executed and observed on this Mac in this worktree; command recorded.
+- **L4 — not executed.** No pass is claimed.
+
+### Commands actually run
+
+| Command | Result | Level |
+| --- | --- | --- |
+| `./scripts/test.sh` | **100 passed, 0 failed, 486 assertions** (was 89/0/422 at v0.4.0) | L1 |
+| `./scripts/build.sh --probe` | OrejaCore, OrejaAudio, OrejaMedia, menu-bar app and `oreja-probe` compiled; ad-hoc codesign valid on disk and satisfies its designated requirement | L2 |
+| `open -n build/Oreja.app` | final build started PID 78478; `vmmap -summary` → physical footprint **54.5 MB**; `lsof -p` → `libOrejaCore.dylib`, `libOrejaAudio.dylib`, `libOrejaMedia.dylib` all loaded from this worktree's `build/Oreja.app/Contents/Frameworks`. Earlier rebuild launched PID 68119 at 53.1 MB. All test-launched instances were terminated; the person's `/Applications/Oreja.app` instance was untouched. | L3 |
+| `./build/bin/oreja-probe --list` | 32 audio processes; `com.openai.codex.helper` pid 15739 `output=yes`, `com.openai.codex` (ChatGPT.app pid 723) `output=no`, `com.citrolabs.ego.helper` pid 6261 `output=yes` | L3 |
+| `ps -axo pid,ppid,comm \| grep -i chatgpt` | ChatGPT desktop runs a large helper tree (`Codex (Aperitif)`, renderers, `codex-cli`), confirming the audio renderer is a helper rather than the main app process | L3 |
+
+The extra instances launched for this check were terminated; the person's `/Applications/Oreja.app`
+instance (pid 32872) was left untouched. No Apple Music command, TCC change, or settings write was
+performed by this agent.
+
+### Fixes and their deterministic coverage (L1)
+
+- Activity aggregation now lives in `PlaybackCoordinator`. `monitoringFailed` and
+  `sourceInvalidated` clear only the AI half, so a retry's next real onset issues a new pause;
+  tests 23 and 24 cover recovery and the AI-fails-while-mic-active case.
+- Microphone activity is routed through `setActivity(..., source: .user, levelDB:)`, which does not
+  require a valid AI source. Tests 21 and 22 cover mic-only pause and mic-only duck with
+  `sourceIsValid == false`. Test 25 covers mic failure while AI remains active. Test 26 covers an
+  automation off/on cycle plus teardown without stranding an owned pause.
+- `shouldMuteTargetAudio` keeps the previously tested release semantics while allowing mic-only
+  interruptions; the existing mute test still passes.
+- `AppModel` re-enables the opted-in microphone monitor when automation is switched back on. The
+  core half (mic activity after an automation toggle) is covered by test 26; the AppKit monitor
+  restart itself is L2 only because `apps/macos` has no test target in this harness.
+- `PlaybackTargetCapability` tests assert Apple Music is supported, and that Spotify and Browser
+  return explicit reasons. `coProcessWarning` tests assert a browser source still controls Apple
+  Music while warning that ChatGPT Web and browser music in the same process cannot be separated.
+- `AudioProcessDiagnostics.describe` tests assert the exact helper bundle, pid and output state are
+  present. The monitor now logs the tapped process set, so a future Desktop-only Voice run can
+  attribute an onset to a process instead of guessing from a combined source.
+
+### Five-path acceptance matrix
+
+| # | Path | Evidence | Result |
+| --- | --- | --- | --- |
+| P1 | Selected ChatGPT audio detected; ChatGPT stays audible | L3 process inventory shows the desktop renderer is `com.openai.codex.helper` (pid 15739) while the main app has no output; L0 user reports both Desktop and Web speech lower Music | Detection path plausible and user-observed; not reproduced under an isolated Desktop-only Voice run by this agent |
+| P2 | Apple Music duck to configured % | L0 user reports Desktop and Web speech individually lower Music; L1 duck tests pass; commands | Live duck is **user-reported only (L0)**; no live duck was executed by this agent |
+| P3 | Apple Music pause/resume | Historical L3 measurements in this document (~190–280 ms per command); no new live run | Previously verified on a local track; not re-run in this repair |
+| P4 | Spotify duck or pause | Audit L2: Spotify.app absent, no official dictionary available locally; Web API needs Premium, an OAuth grant and a remote service, all excluded by project rules | **Hard blocker — not implemented, not claimed** |
+| P5 | Whole-browser duck or pause | Audit L2: no supported public per-process gain or pause/transport API; Chrome/Safari dictionaries only expose per-tab JavaScript (excluded); tap mute would silence the conversation and is not a duck | **Hard blocker — browser playback target is marked unavailable**; no mute or per-tab JS path is used |
+
+### Uncovered gaps and warnings added
+
+- Desktop AI + music playing in a browser cannot be lowered or paused: no supported target API
+  exists (P5). Settings now states this explicitly.
+- ChatGPT Web + music in the same browser share one audio process and cannot be separated. The
+  user chose **"Impedir la combinación"**, so this is now a refusal, not only a warning:
+  `PlaybackTargets.canAddSource` rejects adding a browser source while the Browser media target is
+  on, and `canEnableBrowserPlayback` rejects enabling that target against an already-selected
+  browser source. `toggleSource` and `setBrowserPlaybackEnabled` enforce it in the real settings
+  path, and `AudioSourcePicker` disables the conflicting new selection with an explicit reason.
+  Neither side is silently deselected; an already-selected browser source stays toggleable so it
+  can be removed, and it remains fully valid for controlling Apple Music when the target is off.
+  Repository tests cover both rejection directions (L1). The Browser media target itself is still
+  unavailable, so no live selection of it was possible here.
+- The user's baseline live interval showed combined monitor reaction and manual Music starts being
+  honored. That does **not** prove which source triggered, so Desktop-only acceptance is still open.
+  A future isolated run should select only `com.openai.codex`, start a Voice reply, and read the new
+  `Tapped audio processes:` diagnostic line to correlate the onset with a pid.
+- Not executed (L4): isolated Desktop-only Voice session, clean-account Apple Music control, any
+  Spotify or browser playback control, real microphone ducking, notarization, and measured latency.
+
+## Remaining public-route investigation: whole-browser playback target (2026-11-21)
+
+Status: **OPEN — requirement not met, browser E2E not passed.** The user's requirement stands: while
+ChatGPT Desktop speaks, music playing in a browser must duck to the configured percentage or
+pause/resume per settings. Disabling the Browser media target and refusing the ChatGPT Web +
+Browser media combination are safety decisions, **not** completion of that requirement. No supported
+whole-browser control route was found; nothing in this section should be read as a pass.
+
+### Local SDK evidence (all L2: static header/dictionary inspection, no live control)
+
+| Command | Observed result |
+| --- | --- |
+| `grep -rn 'kAudioProcessProperty' .../CoreAudio.framework/.../Headers` | The Process audio object exposes only `kAudioProcessPropertyPID`, `BundleID`, `Devices`, `IsRunning`, `IsRunningInput`, `IsRunningOutput`. There is **no process gain, volume, mute or transport property**. |
+| `sed -n '1944,1986p' .../AudioHardware.h` | Header doc confirms those six properties only: PID, bundle ID, devices, and three running flags. |
+| `grep -rn 'kAudioDevicePropertyMute' .../CoreAudio.framework/.../Headers` | Mute exists only as `kAudioDevicePropertyMute` on **AudioDevice** (the whole device), not per process. Using it would mute every app and is a forbidden system/substitute control. |
+| `grep -n -A 24 'CATapMuteBehavior' .../CATapDescription.h` | `CATapUnmuted` captures and still sends audio to hardware; `CATapMuted` captures but sends **no** audio from the process to hardware; `CATapMutedWhenTapped` suppresses hardware output while another client reads the tap. These are capture-path controls, not gain. |
+| `grep -n -A 6 'AudioHardwareCreateProcessTap' .../AudioHardwareTapping.h` | Process taps are public from macOS 14.2. They create a tap object; they do not set another process's output level or transport state. |
+| `grep -n 'addTarget\|removeTarget' .../MediaPlayer.framework/.../MPRemoteCommand.h` | `MPRemoteCommandCenter` is receive-only: an app calls `addTarget:action:` / `addTargetWithHandler:` to **handle** remote commands sent to it. There is no API to send a command to an arbitrary app. |
+| `find .../SDKs/MacOSX.sdk/System/Library/Frameworks -iname 'MediaRemote*'` | No result. The framework that would issue system media commands is not in the public SDK; using it would be a private API. |
+| `grep -o -i 'name="[^"]*"' /Applications/Google\ Chrome.app/Contents/Resources/scripting.sdef \| grep -i -E 'play\|pause\|volume\|javascript\|execute'` | Only `execute` / `javascript`. No media transport or volume command. |
+| same on `/Applications/Safari.app/Contents/Resources/Safari.sdef` | Only `do JavaScript`. No media transport or volume command. |
+| same on `/System/Applications/Music.app/Contents/Resources/com.apple.Music.sdef` | `pause`, `play`, `playpause`, `resume`, `sound volume`. This is why Apple Music is the only supported target. |
+
+### Routes considered and rejected
+
+1. **Per-process gain/volume property** — does not exist on the Process audio class (see above).
+2. **App-level media transport aimed at a browser** — `MPRemoteCommandCenter` receives commands for
+   the calling app only; there is no public sender API and no way to address another app's Now
+   Playing session. `MediaRemote` is private. Global media-key event synthesis is not browser
+   specific and would also hit Apple Music and other players, so it is excluded.
+3. **Browser Apple Events / scripting dictionary** — Chrome and Safari expose only per-tab
+   JavaScript, which the user forbids; it also cannot guarantee session ownership across tabs.
+4. **Tap with `CATapMuted` plus re-rendering the captured audio at the configured gain through an
+   aggregate device / output AudioUnit** — the only conceivable public-primitive route. It is **not
+   implemented and not claimed**, for these concrete reasons:
+   - It requires suppressing the browser's real output (`CATapMuted` / `MutedWhenTapped`) and playing
+     a copy from Oreja. If Oreja crashes, is force-quit, or loses the device, the browser's audio can
+     be left silent — a worse outcome than not ducking. There is no OS-owned restore guarantee.
+   - It cannot distinguish browser media from a browser conversation without per-tab scripting. For
+     ChatGPT Web plus music in the same browser it is therefore unusable, and for other browsers it
+     would duck unrelated audio (meetings, alerts) in the same process.
+   - It inserts an app-mediated real-time path with added latency, device-change, sleep/wake and
+     sample-drop handling that has not been designed, implemented or measured here. No latency or
+     correctness evidence exists.
+   - Suppressing the original output is a mute-based substitute, which the user explicitly ruled out.
+
+### Consequence for acceptance
+
+- **Open requirement (L4 here):** ChatGPT Desktop speech + browser music → configured duck or
+  pause/resume. No supported route was found; do not mark this passed. A future implementation would
+  need a new public per-process/per-session gain or transport API, or a browser-provided extension
+  API that does not rely on per-tab JavaScript and can prove ownership and restore; neither exists
+  in the audited SDK or browser dictionaries.
+- The user-reported live ducking of Apple Music by ChatGPT Desktop and ChatGPT Web remains **L0
+  (user report)**. It does not establish browser-target control.
+- Browser target capability continues to report `unavailable` from `PlaybackTargets`; the
+  deterministic test covering that reason still passes. No browser playback E2E was executed.

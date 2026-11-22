@@ -8,6 +8,9 @@ struct AudioSourcePicker: View {
     var targets: [AISourceSelection]
     var onTogglePrimary: (AISourceSelection) -> Void
     var onToggleTarget: (AISourceSelection) -> Void
+    /// Returns true when a source may not be newly selected. Used to refuse the
+    /// ChatGPT Web + Browser media pairing without silently changing either selection.
+    var isSourceBlocked: ((AISourceSelection) -> Bool)?
 
     @State private var choices: [AudioAppChoice] = []
     @State private var searchText = ""
@@ -93,6 +96,8 @@ struct AudioSourcePicker: View {
     private func row(_ choice: AudioAppChoice, selected: [AISourceSelection], isTarget: Bool) -> some View {
         let on = selected.contains { $0.bundleIdentifier == choice.id }
         let supported = !isTarget || targetControlSupported(choice.id)
+        // Only a new selection is blocked; an already-selected browser source can still be removed.
+        let blocked = !isTarget && !on && (isSourceBlocked?(choice.selection) ?? false)
         return Button {
             if isTarget { onToggleTarget(choice.selection) } else { onTogglePrimary(choice.selection) }
         } label: {
@@ -123,9 +128,11 @@ struct AudioSourcePicker: View {
                                 .foregroundStyle(OrejaTheme.Palette.warning)
                         }
                     }
-                    Text(supported ? status(for: choice) : (on ? "Selected, but this app has no supported audio control; click to remove" : "Audio control is not available for this app"))
+                    Text(blocked
+                         ? "Blocked: cannot be combined with Browser media"
+                         : supported ? status(for: choice) : (on ? "Selected, but this app has no supported audio control; click to remove" : "Audio control is not available for this app"))
                         .font(OrejaTheme.Typography.micro)
-                        .foregroundStyle(OrejaTheme.Palette.inkSoft)
+                        .foregroundStyle(blocked ? OrejaTheme.Palette.warning : OrejaTheme.Palette.inkSoft)
                 }
                 Spacer(minLength: 0)
             }
@@ -138,9 +145,11 @@ struct AudioSourcePicker: View {
             )
         }
         .buttonStyle(.plain)
-        .disabled(!supported && !on)
+        .disabled(blocked || (!supported && !on))
         .accessibilityLabel(choice.selection.displayName)
-        .accessibilityValue(supported ? status(for: choice) : (on ? "Selected but unsupported; activate to remove" : "Audio control is not available"))
+        .accessibilityValue(blocked
+            ? "Blocked: cannot be combined with Browser media"
+            : supported ? status(for: choice) : (on ? "Selected but unsupported; activate to remove" : "Audio control is not available"))
         .accessibilityAddTraits(on ? [.isSelected] : [])
     }
 
@@ -153,7 +162,9 @@ struct AudioSourcePicker: View {
 
     private func targetControlSupported(_ bundleIdentifier: String) -> Bool {
         if AISourceCatalog.isBrowser(bundleIdentifier: bundleIdentifier) {
-            return BrowserAudioController.supportedBrowserBundleIDs.contains(bundleIdentifier)
+            // Browsers remain valid interruption sources, but whole-browser playback control has
+            // no supported platform API, so they cannot be selected as controlled targets.
+            return PlaybackTargets.capability(for: .browser).isSupported
         }
         return AISourceCatalog.supportsTargetMute(bundleIdentifier: bundleIdentifier)
     }

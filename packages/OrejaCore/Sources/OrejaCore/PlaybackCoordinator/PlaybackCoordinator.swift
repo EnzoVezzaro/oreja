@@ -50,13 +50,16 @@ public final class PlaybackCoordinator {
     public private(set) var automationEnabled = false
     public private(set) var aiIsActive = false
     public private(set) var userSpeechIsActive = false
+    /// False when the default output is built-in speakers: the microphone then only extends an
+    /// interruption that is already in progress. The platform adapter sets it from the output device.
+    public private(set) var userSpeechMayStartAlone = true
     /// Whether selected secondary applications should currently be muted by the platform adapter.
     public var shouldMuteTargetAudio: Bool {
         automationEnabled
             && state != .suspended
             && state != .error
             && state != .permissionRequired
-            && (userSpeechIsActive || (sourceIsValid && (aiIsActive || silenceToken != nil)))
+            && (userSpeechIsActive || aiIsActive || (sourceIsValid && silenceToken != nil))
     }
     public private(set) var ownership: PauseOwnership?
     public private(set) var volumeOwnership: VolumeOwnership?
@@ -82,6 +85,10 @@ public final class PlaybackCoordinator {
     private var quietElapsedTime: TimeInterval?
     private var consecutiveFailures = 0
     private var userOverrodeDuringActivity = false
+    /// Single source of truth for "somebody is talking". It lives here (not in the UI adapter) so
+    /// a monitoring failure can clear AI activity deterministically and a microphone-only onset is
+    /// never rejected just because no AI source tap is available.
+    private var activity = ActivityAggregator()
 
     public init(
         policy: PlaybackPolicy = .default,
@@ -117,6 +124,7 @@ public final class PlaybackCoordinator {
 
         automationEnabled = false
         cancelSilence()
+        activity.reset()
         aiIsActive = false
         userSpeechIsActive = false
         userOverrodeDuringActivity = false
@@ -128,13 +136,55 @@ public final class PlaybackCoordinator {
         log(.info, .lifecycle, "Automation disabled.")
     }
 
+    /// Updates the combined activity signal. `source` distinguishes microphone activity from
+    /// selected-app output: the microphone path must still trigger the configured response when no
+    /// AI source tap is valid. Returns whether the *combined* active state changed.
+    @discardableResult
+    public func setActivity(_ active: Bool, source: ActivityAggregator.Source, levelDB: Double? = nil) -> Bool {
+        guard automationEnabled else { return false }
+        // On built-in speakers the microphone hears Music too, so your voice may only keep an
+        // interruption alive that is already in progress. It must never start one by itself.
+        let interruptionInProgress = aiIsActive || ownership != nil || volumeOwnership != nil
+        let userMayAct = source == .user
+            && (userSpeechMayStartAlone || interruptionInProgress)
+        // Releasing the voice is always accepted, so the microphone half can never stick on.
+        let acceptable = source == .user ? (!active || userMayAct) : sourceIsValid
+        guard acceptable else { return false }
+
+        let changed = activity.set(active, for: source)
+        if source == .user { userSpeechIsActive = active }
+        guard changed else { return false }
+
+        if activity.isActive {
+            beginActivity(levelDB: levelDB)
+        } else {
+            endActivity()
+        }
+        return true
+    }
+
+    public func setUserSpeechMayStartAlone(_ mayStart: Bool) {
+        userSpeechMayStartAlone = mayStart
+    }
+
     /// Tracks optional microphone activity separately so secondary app muting can follow the
     /// user's speech even when the selected AI source is temporarily unavailable.
     public func setUserSpeechActive(_ active: Bool) {
-        guard !active || automationEnabled else { return }
-        guard active != userSpeechIsActive else { return }
-        userSpeechIsActive = active
-        notify()
+        _ = setActivity(active, source: .user)
+    }
+
+    /// Forgets every activity source. If an interruption was in progress this finishes it through
+    /// the normal quiet-interval path, so an owned pause is never stranded by a teardown.
+    public func resetActivity() {
+        let wasActive = activity.isActive
+        activity.reset()
+        userSpeechIsActive = false
+        if wasActive, !activity.isActive {
+            endActivity()
+        } else {
+            aiIsActive = activity.isActive
+            notify()
+        }
     }
 
     public func updatePolicy(_ policy: PlaybackPolicy) {
@@ -200,8 +250,15 @@ public final class PlaybackCoordinator {
     public func monitoringFailed(_ failure: AudioMonitoringFailure) {
         sourceIsValid = false
         cancelSilence()
-        aiIsActive = false
-        activityOnsetTime = nil
+        // Clear only the AI half of the activity signal. Without this a retry's first real onset is
+        // treated as stale activity and never issues a new pause command. If the microphone is
+        // still active, the combined signal stays active and the owned interruption must be kept.
+        _ = activity.set(false, for: .ai)
+        let microphoneStillActive = activity.isActive
+        if !microphoneStillActive {
+            aiIsActive = false
+            activityOnsetTime = nil
+        }
         lastError = failure.message
 
         switch failure.kind {
@@ -213,6 +270,19 @@ public final class PlaybackCoordinator {
             log(.info, .monitoring, "Waiting for audio: \(failure.message)")
         default:
             log(.error, .monitoring, "Monitoring failed: \(failure.message)")
+        }
+
+        if microphoneStillActive {
+            // The person is still talking. Restore would fight a live interruption, so keep the
+            // owned pause and let the normal end-of-speech quiet interval restore playback. The
+            // failure is still recorded in lastError and diagnostics and in the retry log.
+            log(.warning, .recovery, "AI monitoring failed while your microphone is active; keeping the owned interruption until speech ends.")
+            if ownership != nil || volumeOwnership != nil {
+                transition(.musicPausedByOreja)
+            } else {
+                transition(aiIsActive ? .aiActive : desiredIdleState())
+            }
+            return
         }
 
         if policy.restoreOwnedPauseOnFailure, ownership != nil {
@@ -237,25 +307,43 @@ public final class PlaybackCoordinator {
     public func sourceInvalidated(reason: String) {
         sourceIsValid = false
         cancelSilence()
-        aiIsActive = false
-        activityOnsetTime = nil
+        _ = activity.set(false, for: .ai)
+        let microphoneStillActive = activity.isActive
+        if !microphoneStillActive {
+            aiIsActive = false
+            activityOnsetTime = nil
+        }
         isRestoringOnFailure = false
         log(.warning, .monitoring, "Monitored source became invalid: \(reason)")
+        if microphoneStillActive {
+            // The user is still speaking; keep the owned interruption until speech ends.
+            if ownership != nil || volumeOwnership != nil {
+                transition(.musicPausedByOreja)
+            } else {
+                transition(aiIsActive ? .aiActive : desiredIdleState())
+            }
+            return
+        }
         restoreOwnedPause(reason: "monitored source vanished")
         restoreOwnedVolume(reason: "monitored source vanished")
         transition(automationEnabled ? .searchingForSource : .disabled)
     }
 
+    /// Convenience for selected-app output. Kept for callers that do not distinguish sources.
     public func audioActivityStarted(levelDB: Double) {
-        guard automationEnabled, sourceIsValid else { return }
-        statistics.lastActivityLevelDB = levelDB
+        _ = setActivity(true, source: .ai, levelDB: levelDB)
+    }
+
+    /// Convenience for the end of selected-app output.
+    public func audioActivityEnded() {
+        _ = setActivity(false, source: .ai)
+    }
+
+    private func beginActivity(levelDB: Double?) {
+        if let levelDB { statistics.lastActivityLevelDB = levelDB }
         activityOnsetTime = now()
-
-        if aiIsActive {
-            // Continued activity inside one response.
-            return
-        }
-
+        // `aiIsActive` is the combined "somebody is talking" flag. The aggregator above decides
+        // when it should flip; repeated onsets inside one response are ignored upstream.
         aiIsActive = true
         userOverrodeDuringActivity = false
         cancelSilence()
@@ -282,16 +370,18 @@ public final class PlaybackCoordinator {
         transition(.aiActive)
     }
 
-    public func audioActivityEnded() {
-        guard aiIsActive else { return }
+    private func endActivity() {
         aiIsActive = false
         activityOnsetTime = nil
 
-        guard automationEnabled, sourceIsValid else {
+        guard automationEnabled else {
             transition(desiredIdleState())
             return
         }
 
+        // A microphone-only interruption has no valid AI source. Once Oreja owns a pause (or has a
+        // command in flight) it must still schedule the quiet interval and restore playback, so
+        // source validity is deliberately not required here.
         guard ownership != nil || volumeOwnership != nil || pendingCommand?.kind == .pause || pendingCommand?.kind == .setVolume else {
             transition(desiredIdleState())
             return
@@ -498,6 +588,7 @@ public final class PlaybackCoordinator {
 
     public func systemWillSleep() {
         cancelSilence()
+        activity.reset()
         aiIsActive = false
         userSpeechIsActive = false
         activityOnsetTime = nil
@@ -555,6 +646,7 @@ public final class PlaybackCoordinator {
         queuedIntent = nil
         silenceToken = nil
         ownership = nil
+        activity.reset()
         aiIsActive = false
         userSpeechIsActive = false
         userOverrodeDuringActivity = false
@@ -634,7 +726,9 @@ public final class PlaybackCoordinator {
         silenceToken = nil
         silenceTask = nil
 
-        guard automationEnabled, !aiIsActive, sourceIsValid else { return }
+        // Source validity is not required once an interruption is owned: a microphone-only pause
+        // must be restorable even when no AI tap is available.
+        guard automationEnabled, !aiIsActive else { return }
 
         if pendingCommand?.kind == .pause {
             // The pause was slow; resume once it lands (ownership does not exist yet).

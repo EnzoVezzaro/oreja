@@ -93,6 +93,11 @@ func runDetectionSuite(_ t: Harness) {
             t.expect(AudioActivityDetector.Configuration.forMicrophone(level).activationThresholdDB
                 > AudioActivityDetector.Configuration.forAI(level).activationThresholdDB)
         }
+
+        // Normal must sit between the measured room floor (about -42 dBFS 90th percentile) and
+        // ordinary speech at the built-in mic (about -26 dBFS median).
+        let normalMic = AudioActivityDetector.Configuration.forMicrophone(.normal).activationThresholdDB
+        t.expect(normalMic > -42 && normalMic < -26, "normal mic threshold sits between room noise and speech")
     }
 
     // MARK: Speech-shape filter

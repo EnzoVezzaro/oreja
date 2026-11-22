@@ -6,45 +6,11 @@ import OrejaMedia
 func runMediaAndSettingsSuite(_ t: Harness) async {
     print("\nApple Music scripting, settings and recovery")
 
-    t.run("browser media adapters select Safari and Chromium scripting dialects") {
-        t.expectEqual(BrowserMediaScripting.dialectsByBundleIdentifier["com.apple.Safari"], .safari)
-        for bundleID in [
-            "com.citrolabs.ego.lite", "com.google.Chrome", "com.microsoft.edgemac",
-            "com.brave.Browser", "company.thebrowser.Browser",
-        ] {
-            t.expectEqual(BrowserMediaScripting.dialectsByBundleIdentifier[bundleID], .chromium)
-        }
-        t.expect(BrowserMediaScripting.dialectsByBundleIdentifier["org.mozilla.firefox"] == nil)
-        t.expect(BrowserMediaScripting.controlScript(bundleIdentifier: "com.microsoft.internetexplorer", javascript: "1") == nil)
-
-        let chromium = BrowserMediaScripting.controlScript(
-            bundleIdentifier: "com.google.Chrome",
-            javascript: #"document.title = "quoted"\path"#
-        ) ?? ""
-        t.expect(chromium.contains("execute t javascript"))
-        t.expect(chromium.contains("application id \"com.google.Chrome\" is running"))
-        t.expect(chromium.contains(#"document.title = \"quoted\"\\path"#))
-
-        let safari = BrowserMediaScripting.controlScript(
-            bundleIdentifier: "com.apple.Safari",
-            javascript: "return 'ok'"
-        ) ?? ""
-        t.expect(safari.contains("do JavaScript"))
-        t.expect(safari.contains("in t"))
-        t.expect(safari.contains("failures as text"), "tab command failures are counted for diagnostics")
-
-        let ducking = BrowserMediaScripting.mediaControlJavaScript(mode: .duck, duckPercent: 5)
-        t.expect(ducking.contains("s.level = 0.05"))
-        t.expect(ducking.contains("old.appliedVolume = Math.min(old.volume, s.level)"))
-        t.expect(ducking.contains("Math.abs(m.volume - old.appliedVolume)"), "restoration preserves a user's volume adjustment")
-
-        let pausing = BrowserMediaScripting.mediaControlJavaScript(mode: .pause, duckPercent: 5)
-        t.expect(pausing.contains("old.pausedByOreja = true"))
-        t.expect(pausing.contains("old.playbackOverride"), "restoration respects manual play and pause actions")
-        t.expect(pausing.contains("old.volumeOverride"), "restoration respects manual volume changes independently")
-        t.expect(pausing.contains("if (m.paused || m.ended) return"), "only media already playing at interruption start is captured")
-        t.expect(pausing.contains("e.isTrusted"), "trusted browser controls relinquish Oreja ownership")
-        t.expect(!pausing.contains("currentTime"), "pause and restore never seeks")
+    t.run("browser tab scripting is removed and cannot be used as a fallback") {
+        // The per-tab Apple Events/JavaScript path was deleted with the v0.4.0 repair. No runtime
+        // adapter may fall back to it, and no capability may claim browser playback control.
+        t.expect(!PlaybackTargets.capability(for: .browser).isSupported)
+        t.expect(PlaybackTargets.capability(for: .browser).reason?.contains("per-tab JavaScript") == true)
     }
 
     t.run("AppleScript state parser reads playing state and track") {
@@ -394,5 +360,134 @@ func runMediaAndSettingsSuite(_ t: Harness) async {
         t.expectEqual(mock.commands, ["pause", "resume"])
         t.expectEqual(mock.pauseCount, 1)
         t.expectEqual(mock.resumeCount, 1)
+    }
+
+    t.run("unsupported playback targets report an honest reason instead of faked control") {
+        t.expectEqual(PlaybackTargetID.allCases.count, 3)
+        t.expectEqual(PlaybackTargetID.appleMusic.displayName, "Apple Music")
+
+        let music = PlaybackTargets.capability(for: .appleMusic)
+        t.expect(music.isSupported, "Apple Music is the one supported target")
+        t.expect(music.reason == nil)
+
+        let spotify = PlaybackTargets.capability(for: .spotify)
+        t.expect(!spotify.isSupported)
+        t.expect(spotify.reason?.contains("not installed") == true)
+        t.expect(spotify.reason?.contains("remote service") == true)
+
+        let browser = PlaybackTargets.capability(for: .browser)
+        t.expect(!browser.isSupported)
+        t.expect(browser.reason?.contains("no public per-process gain") == true)
+        t.expect(browser.reason?.contains("per-tab JavaScript") == true)
+        t.expect(browser.reason?.contains("stays audible") == true)
+
+        for target in PlaybackTargetID.allCases where target != .appleMusic {
+            t.expect(PlaybackTargets.capability(for: target).reason?.isEmpty == false)
+        }
+    }
+
+    t.run("browser sources warn about co-process music but never lose Apple Music control") {
+        t.expect(PlaybackTargets.coProcessWarning(aiSources: [.chatGPTDesktop], browserPlaybackEnabled: false) == nil)
+        t.expect(PlaybackTargets.coProcessWarning(aiSources: [.chatGPTDesktop], browserPlaybackEnabled: true) == nil)
+
+        let webOnly = PlaybackTargets.coProcessWarning(aiSources: [AISourceSelection.chrome], browserPlaybackEnabled: false)
+        t.expect(webOnly != nil, "a browser source still gets the separation warning")
+        t.expect(webOnly?.contains("Apple Music") == true, "browser sources remain valid for Apple Music")
+        t.expect(webOnly?.contains("ChatGPT Desktop") == true)
+
+        let withTarget = PlaybackTargets.coProcessWarning(aiSources: [AISourceSelection.egoLite], browserPlaybackEnabled: true)
+        t.expect(withTarget?.contains("cannot be used together") == true)
+        t.expect(withTarget?.contains("Neither selection was changed") == true)
+
+        let mixed = PlaybackTargets.coProcessWarning(
+            aiSources: [.chatGPTDesktop, AISourceSelection.safari],
+            browserPlaybackEnabled: true
+        )
+        t.expect(mixed != nil, "one browser source among several is enough to block")
+    }
+
+    t.run("ChatGPT Web and Browser media are a refused combination, not a silent deselection") {
+        t.expect(PlaybackTargets.isCombinationAllowed(aiSources: [.chatGPTDesktop], browserPlaybackEnabled: true))
+        t.expect(PlaybackTargets.isCombinationAllowed(aiSources: [AISourceSelection.chrome], browserPlaybackEnabled: false))
+        t.expect(PlaybackTargets.isCombinationAllowed(aiSources: [.chatGPTDesktop, AISourceSelection.safari], browserPlaybackEnabled: false))
+
+        let browserSource = [AISourceSelection.chrome]
+        t.expect(!PlaybackTargets.isCombinationAllowed(aiSources: browserSource, browserPlaybackEnabled: true))
+        t.expect(!PlaybackTargets.isCombinationAllowed(aiSources: [.chatGPTDesktop, AISourceSelection.safari], browserPlaybackEnabled: true))
+        t.expect(PlaybackTargets.combinationConflictReason(aiSources: browserSource, browserPlaybackEnabled: true)?.contains("Neither selection was changed") == true)
+
+        var settings = AppSettings()
+        settings.aiSources = browserSource
+        t.expect(!settings.hasBrowserSourceTargetConflict, "legacy file without the target is fine")
+        settings.browserPlaybackEnabled = true
+        t.expect(settings.hasBrowserSourceTargetConflict, "the pairing is detected, not silently undone")
+        t.expectEqual(settings.aiSources, browserSource, "the browser source is still selected for Apple Music")
+    }
+
+    t.run("attempted browser source selection and target enable are both rejected") {
+        // Adding a browser source while the browser target is on is refused.
+        t.expect(!PlaybackTargets.canAddSource(
+            AISourceSelection.chrome,
+            to: [.chatGPTDesktop],
+            browserPlaybackEnabled: true
+        ))
+        t.expect(!PlaybackTargets.canAddSource(
+            .chatGPTDesktop,
+            to: [AISourceSelection.chrome],
+            browserPlaybackEnabled: true
+        ), "the conflict remains while a browser source stays selected")
+        let vscode = AISourceSelection.app(bundleIdentifier: "com.microsoft.VSCode", displayName: "VS Code")
+        t.expect(PlaybackTargets.canAddSource(
+            vscode,
+            to: [.chatGPTDesktop],
+            browserPlaybackEnabled: true
+        ), "a desktop-only set is always allowed")
+        t.expect(PlaybackTargets.canAddSource(
+            AISourceSelection.chrome,
+            to: [.chatGPTDesktop],
+            browserPlaybackEnabled: false
+        ), "browser sources stay selectable when the target is off (Apple Music case)")
+        t.expect(PlaybackTargets.canAddSource(
+            AISourceSelection.chrome,
+            to: [AISourceSelection.chrome],
+            browserPlaybackEnabled: true
+        ), "removing an already-selected source is never blocked")
+
+        // The reverse path: enabling the target against an already-selected browser source.
+        t.expect(!PlaybackTargets.canEnableBrowserPlayback(with: [AISourceSelection.egoLite]))
+        t.expect(!PlaybackTargets.canEnableBrowserPlayback(with: [.chatGPTDesktop, AISourceSelection.safari]))
+        t.expect(PlaybackTargets.canEnableBrowserPlayback(with: [.chatGPTDesktop]))
+
+        // A rejection leaves both sides untouched; the core rule is pure and does not mutate.
+        var settings = AppSettings()
+        settings.aiSources = [.chatGPTDesktop]
+        let original = settings.aiSources
+        let rejected = !PlaybackTargets.canAddSource(
+            AISourceSelection.chrome,
+            to: settings.aiSources,
+            browserPlaybackEnabled: true
+        )
+        t.expect(rejected)
+        t.expectEqual(settings.aiSources, original)
+        t.expect(!settings.browserPlaybackEnabled)
+    }
+
+    t.run("tapped process diagnostics name the exact helper and its output state") {
+        t.expectEqual(AudioProcessDiagnostics.describe([]), "no audio process matched")
+
+        let helper = AudioProcessIdentity(bundleID: "com.openai.codex.helper", pid: 15739, isRunningOutput: true)
+        let silent = AudioProcessIdentity(bundleID: "com.citrolabs.ego.helper", pid: 6263, isRunningOutput: false)
+        let described = AudioProcessDiagnostics.describe([helper, silent])
+
+        t.expect(described.contains("com.openai.codex.helper"))
+        t.expect(described.contains("pid 15739"))
+        t.expect(described.contains("output"))
+        t.expect(described.contains("com.citrolabs.ego.helper"))
+        t.expect(described.contains("pid 6263"))
+        t.expect(described.contains("silent"))
+
+        let unknown = AudioProcessDiagnostics.describe([AudioProcessIdentity(bundleID: nil, pid: 412, isRunningOutput: true)])
+        t.expect(unknown.contains("unknown bundle"))
+        t.expect(unknown.contains("pid 412"))
     }
 }

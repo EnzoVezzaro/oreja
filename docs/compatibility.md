@@ -37,7 +37,7 @@ read "expected" as verified; see `test-evidence.md`.
 | Apple Music (Music.app), local library | Control implemented, live unverified | Apple Events. Requires Automation consent; never launched by Oreja. |
 | Apple Music streaming/radio | Expected, unverified | Same play/pause commands; buffer/queue behavior untested. |
 | Spotify | Not implemented | Spotify's native app is not available as a playback target. |
-| Browser media (HTML audio/video) | **Experimental in 0.4.0** | Uses Apple Events and page scripting for Safari, Chrome, Edge, Brave, Arc, and ego lite. The user reported successful real playback testing, but did not identify the browser, site, or settings. All supported browsers and active browser scopes are available. Protected/custom players may not respond. Firefox has no adapter; Internet Explorer is unavailable on macOS. |
+| Browser media (HTML audio/video) | **Unavailable** | No supported whole-browser gain or pause/transport API exists in the macOS public frameworks. The v0.4.0 per-tab Apple Events/JavaScript path and its Automation prompt were removed. Browser apps remain valid *interruption sources* for Apple Music. Desktop AI + browser music cannot be lowered; ChatGPT Web + music in the same browser cannot be separated, so that pairing is refused. See `test-evidence.md`. |
 | Internet Explorer | Unsupported | Internet Explorer has no current macOS release and cannot be a target on this macOS-only app. |
 | YouTube Music, VLC | Not implemented | No playback adapter. |
 
@@ -79,9 +79,14 @@ real ChatGPT/Music conversation).
 - Detection is speech-*shaped* output activity, not speech recognition: a long modulated non-speech sound still counts.
 - Browser monitoring as an interruption source is process-wide; audio from any tab may count. This
   is separate from the Browser playback target.
-- Browser control is experimental and relies on browser scripting permissions and standard HTML
-  media elements. The exact browser/site used in the reported manual playback test was not recorded;
-  protected/custom players and other edge cases may behave differently.
+- Browser playback control is unavailable: there is no supported public whole-browser gain or
+  pause/transport API. No per-tab JavaScript, permission popup, app mute or system volume is used
+  as a substitute. Browsers remain valid interruption sources for Apple Music.
+- **Open requirement:** while ChatGPT Desktop speaks, music playing in a browser should duck to the
+  configured level or pause/resume. Marking the Browser target unavailable and refusing the
+  ChatGPT Web + Browser media pairing do not satisfy this; it stays unverified and unsupported until
+  a public whole-browser gain or transport API exists. Browser playback E2E has not passed. The
+  local SDK route analysis is in `test-evidence.md`.
 - Ad-hoc signing means TCC grants may reset when the app is rebuilt.
 - No notarization: another Mac needs Gatekeeper approval.
 - The app is a menu bar utility; there is no Dock icon or main window by design.

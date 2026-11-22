@@ -100,6 +100,121 @@ public struct MediaCapabilities: Sendable, Equatable {
     }
 }
 
+/// A media service a user might expect Oreja to control. This is deliberately broader than
+/// `MediaProviderID`: an unavailable target must still be nameable in Settings without pretending
+/// an adapter exists.
+public enum PlaybackTargetID: String, Sendable, Equatable, CaseIterable {
+    case appleMusic
+    case spotify
+    case browser
+
+    public var displayName: String {
+        switch self {
+        case .appleMusic: "Apple Music"
+        case .spotify: "Spotify"
+        case .browser: "Browser"
+        }
+    }
+}
+
+/// What Oreja can actually do for a target. Unsupported targets are surfaced verbatim instead of
+/// running a best-effort script that would look like working control.
+public enum PlaybackTargetCapability: Sendable, Equatable {
+    case supported
+    case unavailable(reason: String)
+
+    public var isSupported: Bool {
+        if case .supported = self { return true }
+        return false
+    }
+
+    public var reason: String? {
+        if case .unavailable(let reason) = self { return reason }
+        return nil
+    }
+}
+
+public enum PlaybackTargets {
+    /// Capability findings from the v0.4.0 dependency audits. These describe supported platform
+    /// APIs and local installation state, not an intention to fake control.
+    public static func capability(for target: PlaybackTargetID) -> PlaybackTargetCapability {
+        switch target {
+        case .appleMusic:
+            return .supported
+        case .spotify:
+            return .unavailable(reason: "Not implemented. Spotify is not installed here and no official desktop scripting dictionary was available to verify; its Web API needs a Premium account and a remote service, which Oreja does not use.")
+        case .browser:
+            return .unavailable(reason: "No supported whole-browser control: macOS exposes no public per-process gain or pause/transport API for a browser. Oreja does not use per-tab JavaScript, app mute, or system volume as a substitute, and selected conversation audio stays audible.")
+        }
+    }
+
+    /// Whether the user's selected interruption sources may be paired with the browser playback
+    /// target. A browser source (for example ChatGPT Web) and browser media in the same browser
+    /// share one audio process, so Oreja cannot separate them. The combination is refused rather
+    /// than left selected; the browser source remains valid for Apple Music.
+    public static func isCombinationAllowed(
+        aiSources: [AISourceSelection],
+        browserPlaybackEnabled: Bool
+    ) -> Bool {
+        guard browserPlaybackEnabled else { return true }
+        return !aiSources.contains { source in
+            source.kind == .browser || AISourceCatalog.isBrowser(bundleIdentifier: source.bundleIdentifier)
+        }
+    }
+
+    /// Whether a requested new interruption source may be added while the browser playback target
+    /// is enabled. A browser source is refused; Apple Music works with every source.
+    public static func canAddSource(
+        _ source: AISourceSelection,
+        to sources: [AISourceSelection],
+        browserPlaybackEnabled: Bool
+    ) -> Bool {
+        guard !sources.contains(where: { $0.bundleIdentifier == source.bundleIdentifier }) else {
+            return true // removing a source is always allowed
+        }
+        return isCombinationAllowed(
+            aiSources: sources + [source],
+            browserPlaybackEnabled: browserPlaybackEnabled
+        )
+    }
+
+    /// Whether the browser playback target may be switched on with the current sources.
+    public static func canEnableBrowserPlayback(with sources: [AISourceSelection]) -> Bool {
+        isCombinationAllowed(aiSources: sources, browserPlaybackEnabled: true)
+    }
+
+    /// Explains a refused combination. The conflicting control is disabled with this reason shown;
+    /// Oreja never silently changes the user's selection.
+    public static func combinationConflictReason(
+        aiSources: [AISourceSelection],
+        browserPlaybackEnabled: Bool
+    ) -> String? {
+        guard !isCombinationAllowed(aiSources: aiSources, browserPlaybackEnabled: browserPlaybackEnabled) else {
+            return nil
+        }
+        return "ChatGPT Web and Browser media cannot be used together: both live in the same browser audio process and Oreja cannot tell them apart. Keep the browser as a source for Apple Music, or use ChatGPT Desktop with a supported music target. Neither selection was changed."
+    }
+
+    /// Advisory copy for a browser source without the conflicting target, and the refusal reason
+    /// when the pairing is attempted.
+    public static func coProcessWarning(
+        aiSources: [AISourceSelection],
+        browserPlaybackEnabled: Bool
+    ) -> String? {
+        if let conflict = combinationConflictReason(
+            aiSources: aiSources,
+            browserPlaybackEnabled: browserPlaybackEnabled
+        ) {
+            return conflict
+        }
+        let usesBrowserSource = aiSources.contains { source in
+            source.kind == .browser || AISourceCatalog.isBrowser(bundleIdentifier: source.bundleIdentifier)
+        }
+        guard usesBrowserSource else { return nil }
+        return "A browser is selected as an interruption source. Browsers are still valid sources for controlling Apple Music, but ChatGPT Web and music in the same browser share one audio process and cannot be separated. Use ChatGPT Desktop when you also play music in that browser."
+    }
+}
+
 public enum MediaControlError: Error, Sendable, Equatable, LocalizedError {
     case providerUnavailable(String)
     case notRunning(String)

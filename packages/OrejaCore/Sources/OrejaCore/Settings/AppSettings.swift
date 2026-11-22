@@ -79,6 +79,16 @@ public struct AppSettings: Codable, Sendable, Equatable {
         }
     }
 
+    /// True when a browser interruption source is paired with the browser playback target. The
+    /// combination is refused by `PlaybackTargets.isCombinationAllowed`; a legacy saved file that
+    /// still contains both is reported instead of being silently rewritten.
+    public var hasBrowserSourceTargetConflict: Bool {
+        !PlaybackTargets.isCombinationAllowed(
+            aiSources: aiSources,
+            browserPlaybackEnabled: browserPlaybackEnabled
+        )
+    }
+
     public static let resumeDelayRange: ClosedRange<TimeInterval> = 0...3.0
     public static let conversationHoldRange: ClosedRange<TimeInterval> = 0...60
 

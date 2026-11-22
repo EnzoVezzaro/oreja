@@ -6,7 +6,6 @@ import OrejaCore
 struct SettingsView: View {
     @ObservedObject var model: AppModel
     @State private var selectedPage: SettingsPage = .audio
-    @State private var browserChoices: [AudioAppChoice] = []
 
     var body: some View {
         HStack(spacing: 0) {
@@ -70,7 +69,6 @@ struct SettingsView: View {
         .background(OrejaTheme.Palette.paper)
         .tint(OrejaTheme.Palette.accent)
         .frame(minWidth: 720, minHeight: 560)
-        .onAppear(perform: refreshBrowserChoices)
     }
 
     private var header: some View {
@@ -241,7 +239,7 @@ struct SettingsView: View {
                         step: 1
                     )
                     .tint(OrejaTheme.Palette.accent)
-                    Text("Music and supported browser media lower to this level. Music returns to the level below; browser media returns to its previous volume.")
+                    Text("Music lowers to this level while a selected app or your voice is speaking. Browser playback control is unavailable, so this does not change browser media.")
                         .font(OrejaTheme.Typography.micro)
                         .foregroundStyle(OrejaTheme.Palette.inkSoft)
                         .fixedSize(horizontal: false, vertical: true)
@@ -265,7 +263,7 @@ struct SettingsView: View {
                         step: 1
                     )
                     .tint(OrejaTheme.Palette.accent)
-                    Text("After the conversation is quiet, Music returns to this level. Browser media returns to its own previous volume.")
+                    Text("After the conversation is quiet, Music returns to this level.")
                         .font(OrejaTheme.Typography.micro)
                         .foregroundStyle(OrejaTheme.Palette.inkSoft)
                         .fixedSize(horizontal: false, vertical: true)
@@ -357,7 +355,7 @@ struct SettingsView: View {
                 .tint(OrejaTheme.Palette.accent)
                 .font(.system(size: 13))
 
-                Text("Use the microphone to keep the selected interruption active while you answer. Your speech never starts an interruption by itself. Microphone access is separate.")
+                Text("When enabled, your voice can start the selected interruption and keep it active while you speak. Microphone access is separate and must be granted in macOS.")
                     .font(OrejaTheme.Typography.micro)
                     .foregroundStyle(OrejaTheme.Palette.inkSoft)
                     .fixedSize(horizontal: false, vertical: true)
@@ -378,7 +376,8 @@ struct SettingsView: View {
                 primary: model.settings.aiSources,
                 targets: model.settings.targetAudioApps,
                 onTogglePrimary: model.toggleSource,
-                onToggleTarget: model.toggleTargetAudioApp
+                onToggleTarget: model.toggleTargetAudioApp,
+                isSourceBlocked: model.isSourceBlockedForAddition
             )
         }
     }
@@ -437,7 +436,7 @@ struct SettingsView: View {
                         )
                     )
 
-                    Text("Used by “Pause while I speak”. Raise it if the microphone hears room noise, lower it if your own answers are missed.")
+                    Text("Sets the voice detection threshold. Raise it if the microphone hears room noise; lower it if your speech is missed.")
                         .font(OrejaTheme.Typography.micro)
                         .foregroundStyle(OrejaTheme.Palette.inkSoft)
                         .fixedSize(horizontal: false, vertical: true)
@@ -478,7 +477,11 @@ struct SettingsView: View {
             VStack(alignment: .leading, spacing: 14) {
                 playbackTargetRow("Apple Music", subtitle: "Available", supported: true)
                 Hairline()
-                playbackTargetRow("Spotify", subtitle: "Playback control is not available yet", supported: false)
+                playbackTargetRow("Spotify", subtitle: "Unavailable — no verified native control", supported: false)
+                Text(PlaybackTargets.capability(for: .spotify).reason ?? "")
+                    .font(OrejaTheme.Typography.micro)
+                    .foregroundStyle(OrejaTheme.Palette.inkSoft)
+                    .fixedSize(horizontal: false, vertical: true)
 
                 Hairline()
 
@@ -502,99 +505,37 @@ struct SettingsView: View {
 
     private var browserTarget: some View {
         ThemeSection(
-            title: "Browser (any audio)",
-            caption: "Controls standard HTML audio and video in supported browser tabs. Protected or custom players may not respond. Oreja needs Automation permission for each browser."
+            title: "Browser (unavailable)",
+            caption: PlaybackTargets.capability(for: .browser).reason ?? "Unavailable."
         ) {
             VStack(alignment: .leading, spacing: 12) {
                 InlineNotice(
-                    text: "Experimental. YouTube, multiple tabs, manual pauses, and overlapping interruptions are not yet verified on this Mac.",
+                    text: "Browsers stay interruption sources only. Oreja does not control browser playback.",
                     symbol: "exclamationmark.triangle.fill"
                 )
-
-                Toggle("Control browser media during interruptions", isOn: Binding(
-                    get: { model.settings.browserPlaybackEnabled },
-                    set: { model.settings.browserPlaybackEnabled = $0 }
-                ))
-                .toggleStyle(.switch)
-                .tint(OrejaTheme.Palette.accent)
-                .font(.system(size: 13))
-
-                if model.settings.browserPlaybackEnabled {
-                    Picker("Browser scope", selection: Binding(
-                        get: { model.settings.browserTargetScope },
-                        set: { model.settings.browserTargetScope = $0 }
-                    )) {
-                        ForEach(BrowserTargetScope.allCases, id: \.self) { scope in
-                            Text(scope.title).tag(scope)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-
-                    Text("All supported browsers checks each supported browser that is running. Active browser only uses the foreground browser when speech begins. Pause resumes at the same position; only media already playing is controlled.")
-                        .font(OrejaTheme.Typography.micro)
-                        .foregroundStyle(OrejaTheme.Palette.inkSoft)
-                        .fixedSize(horizontal: false, vertical: true)
-
-                    Text("Firefox has no playback adapter in this build. Internet Explorer is not available on macOS.")
-                        .font(OrejaTheme.Typography.micro)
-                        .foregroundStyle(OrejaTheme.Palette.inkSoft)
-                        .fixedSize(horizontal: false, vertical: true)
-
-                    Text("Supported scripting adapters: Safari, Chrome, Edge, Brave, Arc and ego lite. Tabs with protected or custom playback can remain unsupported.")
-                        .font(OrejaTheme.Typography.micro)
-                        .foregroundStyle(OrejaTheme.Palette.inkSoft)
-                        .fixedSize(horizontal: false, vertical: true)
-
-                    browserStatusRows
-
-                    Button("Allow browser automation…") { model.openAutomationSettings() }
-                        .controlSize(.small)
-                }
-            }
-        }
-    }
-
-    private var browserStatusRows: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            ForEach(browserChoices.filter { $0.isInstalled || $0.isRunning }) { choice in
-                HStack(spacing: 8) {
-                    Image(systemName: BrowserAudioController.supportedBrowserBundleIDs.contains(choice.id)
-                        ? "checkmark.circle.fill"
-                        : "exclamationmark.circle")
-                        .foregroundStyle(BrowserAudioController.supportedBrowserBundleIDs.contains(choice.id)
-                            ? OrejaTheme.Palette.accent
-                            : OrejaTheme.Palette.warning)
-                    Text(choice.selection.displayName)
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(OrejaTheme.Palette.ink)
-                    Spacer(minLength: 6)
-                    Text(BrowserAudioController.supportedBrowserBundleIDs.contains(choice.id)
-                        ? browserStatus(for: choice)
-                        : "No playback adapter")
-                        .font(OrejaTheme.Typography.micro)
-                        .foregroundStyle(OrejaTheme.Palette.inkSoft)
-                }
-                .accessibilityElement(children: .combine)
-            }
-            if !browserChoices.contains(where: { $0.isInstalled || $0.isRunning }) {
-                Text("No supported browser is installed or running.")
+                Text("No supported whole-browser gain, pause or transport API exists in the macOS public frameworks. Per-tab JavaScript, app mute and system volume are not used as substitutes, so Oreja shows no Automation prompt for browser control. Selected conversation audio is never muted or ducked by this target.")
                     .font(OrejaTheme.Typography.micro)
                     .foregroundStyle(OrejaTheme.Palette.inkSoft)
+                    .fixedSize(horizontal: false, vertical: true)
+                if let warning = PlaybackTargets.coProcessWarning(
+                    aiSources: model.settings.aiSources,
+                    browserPlaybackEnabled: model.settings.browserPlaybackEnabled
+                ) {
+                    InlineNotice(text: warning, symbol: "exclamationmark.triangle.fill")
+                }
+                if model.settings.hasBrowserSourceTargetConflict {
+                    Text("Blocked combination. The conflicting Browser media choice stays disabled and your selections are not changed. Keep the browser as a source for Apple Music, or switch to ChatGPT Desktop with a supported music target.")
+                        .font(OrejaTheme.Typography.micro)
+                        .foregroundStyle(OrejaTheme.Palette.inkSoft)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Text("Desktop AI with music in a browser: Oreja cannot lower or pause that browser's music through a supported target API, so this combination is not controlled. Choose ChatGPT Desktop with Apple Music as the playback target.")
+                    .font(OrejaTheme.Typography.micro)
+                    .foregroundStyle(OrejaTheme.Palette.inkSoft)
+                    .fixedSize(horizontal: false, vertical: true)
+                playbackTargetRow("Browser media", subtitle: "Unavailable on macOS", supported: false)
             }
-            Button("Refresh browser list") { refreshBrowserChoices() }
-                .controlSize(.small)
         }
-        .padding(.top, 2)
-    }
-
-    private func refreshBrowserChoices() {
-        browserChoices = RunningApplicationCatalog.choices().filter { $0.category == .browser }
-    }
-
-    private func browserStatus(for choice: AudioAppChoice) -> String {
-        if choice.isProducingOutput { return "Audio detected" }
-        if choice.isRunning { return "Running" }
-        return "Installed"
     }
 
     private func playbackTargetRow(_ title: String, subtitle: String, supported: Bool) -> some View {
